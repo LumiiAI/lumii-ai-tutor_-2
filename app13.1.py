@@ -13,6 +13,309 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+import re
+from datetime import datetime
+from typing import List, Dict, Tuple, Optional
+
+def analyze_conversation_timing(message: str, conversation_history: List[Dict]) -> List[Dict]:
+    """
+    Detect when topics need time to develop in real world
+    Returns list of recent commitments that shouldn't be followed up on yet
+    """
+    
+    # Future action indicators
+    future_indicators = [
+        'i will check', 'i will try', 'i will ask', 'i will go', 'i will see',
+        'i will find out', 'i will look', 'i will talk to', 'i will call',
+        'tomorrow', 'next week', 'later', 'soon', 'when i get a chance',
+        'maybe', 'i might', 'i could try', 'i should probably',
+        'after school', 'this weekend', 'when i have time'
+    ]
+    
+    # Process indicators - things that take time
+    process_indicators = [
+        'waiting for', 'applied for', 'thinking about', 'considering',
+        'parents need to', 'have to ask', 'need permission',
+        'sign up', 'registration', 'tryouts', 'audition'
+    ]
+    
+    recent_commitments = []
+    
+    # Check last 15 exchanges for commitments
+    for i, msg in enumerate(conversation_history[-15:]):
+        if msg['role'] == 'user':
+            content_lower = msg['content'].lower()
+            exchanges_ago = len(conversation_history) - (len(conversation_history) - 15 + i)
+            
+            # Check for future actions
+            for indicator in future_indicators:
+                if indicator in content_lower:
+                    topic = extract_topic_from_commitment(msg['content'], indicator)
+                    recent_commitments.append({
+                        'topic': topic,
+                        'exchanges_ago': exchanges_ago,
+                        'commitment_type': 'future_action',
+                        'original_message': msg['content'],
+                        'indicator': indicator,
+                        'urgency': determine_urgency(content_lower)
+                    })
+                    break
+            
+            # Check for processes that take time
+            for indicator in process_indicators:
+                if indicator in content_lower:
+                    topic = extract_topic_from_commitment(msg['content'], indicator)
+                    recent_commitments.append({
+                        'topic': topic,
+                        'exchanges_ago': exchanges_ago,
+                        'commitment_type': 'process',
+                        'original_message': msg['content'],
+                        'indicator': indicator,
+                        'urgency': 'low'
+                    })
+                    break
+    
+    return recent_commitments
+
+def extract_topic_from_commitment(message: str, indicator: str) -> str:
+    """Extract the main topic from a commitment statement"""
+    
+    # Common topic patterns
+    topic_patterns = [
+        r'(chess club|drama club|soccer team|basketball|football|baseball)',
+        r'(math class|science class|english class|history class)',
+        r'(homework|assignment|project|test|quiz)',
+        r'(friend|teacher|parent|mom|dad|coach)',
+        r'(school|library|gym|cafeteria)',
+        r'(tryouts|audition|meeting|practice|game)'
+    ]
+    
+    message_lower = message.lower()
+    
+    # Try to find specific topics
+    for pattern in topic_patterns:
+        match = re.search(pattern, message_lower)
+        if match:
+            return match.group(1)
+    
+    # Fallback: extract words around the indicator
+    indicator_pos = message_lower.find(indicator)
+    if indicator_pos != -1:
+        # Get words before and after indicator
+        words = message_lower.split()
+        try:
+            indicator_word_pos = words.index(indicator.split()[0])
+            context_words = words[max(0, indicator_word_pos-2):indicator_word_pos+4]
+            # Filter out common words
+            meaningful_words = [w for w in context_words if w not in 
+                             ['i', 'will', 'the', 'a', 'an', 'to', 'and', 'or', 'but']]
+            return ' '.join(meaningful_words[:2])  # First 2 meaningful words
+        except:
+            pass
+    
+    return "something"
+
+def determine_urgency(content: str) -> str:
+    """Determine how urgent/immediate a commitment is"""
+    
+    if any(word in content for word in ['today', 'now', 'right now', 'immediately']):
+        return 'immediate'
+    elif any(word in content for word in ['tomorrow', 'this week', 'soon']):
+        return 'high'
+    elif any(word in content for word in ['next week', 'weekend', 'when i can']):
+        return 'medium'
+    else:
+        return 'low'
+
+def should_follow_up_on_topic(topic: str, commitment_info: Dict, conversation_history: List[Dict]) -> Tuple[bool, str]:
+    """
+    Decide if it's appropriate to follow up on a topic yet
+    Returns (should_follow_up, reason)
+    """
+    
+    exchanges_ago = commitment_info['exchanges_ago']
+    commitment_type = commitment_info['commitment_type']
+    urgency = commitment_info['urgency']
+    
+    # Very recent commitments - don't follow up
+    if exchanges_ago < 3:
+        return False, "just_mentioned"
+    
+    # Future actions need time based on urgency
+    if commitment_type == 'future_action':
+        if urgency == 'immediate' and exchanges_ago < 5:
+            return False, "too_soon_immediate"
+        elif urgency == 'high' and exchanges_ago < 8:
+            return False, "too_soon_high"
+        elif urgency == 'medium' and exchanges_ago < 12:
+            return False, "too_soon_medium"
+        elif urgency == 'low' and exchanges_ago < 15:
+            return False, "too_soon_low"
+    
+    # Processes take longer
+    if commitment_type == 'process' and exchanges_ago < 10:
+        return False, "process_needs_time"
+    
+    # Check if already followed up recently
+    recent_follow_ups = check_recent_follow_ups(topic, conversation_history)
+    if recent_follow_ups and recent_follow_ups < 8:
+        return False, "already_followed_up"
+    
+    return True, "appropriate_timing"
+
+def check_recent_follow_ups(topic: str, conversation_history: List[Dict]) -> Optional[int]:
+    """Check if we've already followed up on this topic recently"""
+    
+    # Look for Lumii mentions of the topic in recent history
+    for i, msg in enumerate(conversation_history[-10:]):
+        if msg['role'] == 'assistant' and topic.lower() in msg['content'].lower():
+            # Check if it's a follow-up (contains question words)
+            if any(word in msg['content'].lower() for word in 
+                  ['how did', 'how was', 'did you', 'have you', 'what happened']):
+                return len(conversation_history) - (len(conversation_history) - 10 + i)
+    
+    return None
+
+def generate_timing_aware_follow_up(tool_used: str, priority: str, conversation_history: List[Dict]) -> str:
+    """
+    Generate follow-up questions that respect conversational timing
+    """
+    
+    if not conversation_history or len(conversation_history) < 5:
+        return ""
+    
+    # Analyze recent commitments
+    last_user_message = None
+    for msg in reversed(conversation_history):
+        if msg['role'] == 'user':
+            last_user_message = msg['content']
+            break
+    
+    if not last_user_message:
+        return ""
+    
+    recent_commitments = analyze_conversation_timing(last_user_message, conversation_history)
+    
+    # Check if any commitments are too recent to follow up on
+    for commitment in recent_commitments:
+        should_follow_up, reason = should_follow_up_on_topic(
+            commitment['topic'], commitment, conversation_history
+        )
+        
+        if not should_follow_up:
+            # Generate a supportive but non-pressuring response
+            return generate_supportive_response(commitment, reason)
+    
+    # Regular follow-up logic for appropriate topics
+    return generate_regular_follow_up(tool_used, priority, conversation_history)
+
+def generate_supportive_response(commitment: Dict, reason: str) -> str:
+    """Generate supportive responses for topics that are too soon to follow up on"""
+    
+    topic = commitment['topic']
+    urgency = commitment['urgency']
+    
+    supportive_responses = {
+        'just_mentioned': [
+            f"I hope you get a chance to check out {topic} when you're ready!",
+            f"Take your time with {topic} - no rush at all!",
+            f"Good luck with {topic} whenever you get to it!"
+        ],
+        'too_soon_immediate': [
+            f"I'll be curious to hear how {topic} goes when you get a chance to try it!",
+            f"Hope {topic} works out well for you!"
+        ],
+        'too_soon_high': [
+            f"I'm excited to hear about {topic} when you have an update!",
+            f"Looking forward to hearing how {topic} goes!"
+        ],
+        'process_needs_time': [
+            f"These things with {topic} can take time - hope it works out!",
+            f"Fingers crossed about {topic}! These processes can be slow sometimes."
+        ]
+    }
+    
+    responses = supportive_responses.get(reason, supportive_responses['just_mentioned'])
+    import random
+    return random.choice(responses)
+
+def generate_regular_follow_up(tool_used: str, priority: str, conversation_history: List[Dict]) -> str:
+    """Generate regular follow-up when timing is appropriate"""
+    
+    # Your existing follow-up logic here
+    follow_ups = {
+        'felicity': [
+            "How are you feeling about everything we talked about?",
+            "I hope you're feeling a bit better about things!",
+            "Just checking - how's your mood doing now?"
+        ],
+        'mira': [
+            "How did that math problem work out?",
+            "Are you feeling more confident about the math?",
+            "Did those math strategies help?"
+        ],
+        'cali': [
+            "How's your organization going?",
+            "Did that planning help with your assignments?",
+            "Are you feeling less overwhelmed now?"
+        ]
+    }
+    
+    import random
+    return random.choice(follow_ups.get(tool_used, follow_ups['felicity']))
+
+# INTEGRATION EXAMPLE: How to use in your main response function
+def enhanced_generate_response_with_timing(message, priority, tool, student_age=10, is_distressed=False):
+    """
+    Your main response generation function enhanced with timing awareness
+    """
+    
+    # Generate your normal AI response
+    ai_response, tool_used, detected_priority = generate_response_with_ai_and_memory(
+        message, priority, tool, student_age, is_distressed
+    )
+    
+    # Add timing-aware follow-up
+    follow_up = generate_timing_aware_follow_up(tool_used, detected_priority, st.session_state.messages)
+    
+    # Combine response with appropriate follow-up
+    if follow_up:
+        final_response = f"{ai_response}\n\n{follow_up}"
+    else:
+        final_response = ai_response
+    
+    return final_response, tool_used, detected_priority
+
+# QUICK TEST FUNCTION
+def test_timing_awareness():
+    """Test the timing awareness with the chess club example"""
+    
+    # Simulate the conversation history
+    test_history = [
+        {"role": "user", "content": "I'm interested in chess"},
+        {"role": "assistant", "content": "That's awesome! Chess is such a great game for developing strategic thinking."},
+        {"role": "user", "content": "i will check. i think there is a chess club at school"},
+        {"role": "assistant", "content": "That sounds like a great idea! Chess clubs are usually really welcoming."},
+        {"role": "user", "content": "what's 6 times 7?"},
+        {"role": "assistant", "content": "6 × 7 = 42! Great question."}
+    ]
+    
+    # Test the timing analysis
+    commitments = analyze_conversation_timing("i will check. i think there is a chess club at school", test_history)
+    
+    print("Detected commitments:", commitments)
+    
+    for commitment in commitments:
+        should_follow_up, reason = should_follow_up_on_topic(commitment['topic'], commitment, test_history)
+        print(f"Should follow up on {commitment['topic']}? {should_follow_up} (reason: {reason})")
+    
+    # Test the follow-up generation
+    follow_up = generate_timing_aware_follow_up('mira', 'math', test_history)
+    print(f"Generated follow-up: {follow_up}")
+
+# Uncomment to test:
+# test_timing_awareness()
+
 # =============================================================================
 # PRIVACY DISCLAIMER POPUP - LAUNCH REQUIREMENT
 # =============================================================================
