@@ -1422,17 +1422,17 @@ if prompt := st.chat_input(prompt_placeholder):
     # Smart priority detection with safety first
     priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
     
-   # DEBUG: Show what priority was detected
-   st.error(f"🔍 PRIORITY DETECTED: {priority} - {tool}")
+    # DEBUG: Show what priority was detected
+    st.error(f"🔍 PRIORITY DETECTED: {priority} - {tool}")
 
-   # DEBUG: Show post-crisis monitoring status
-   st.error(f"🔍 POST-CRISIS MONITORING: {st.session_state.get('post_crisis_monitoring', False)}")
+    # DEBUG: Show post-crisis monitoring status
+    st.error(f"🔍 POST-CRISIS MONITORING: {st.session_state.get('post_crisis_monitoring', False)}")
 
-   # DEBUG: Show if positive response detected
-   message_lower = prompt.lower()
-   positive_responses = ['you are right', 'you\'re right', 'thank you', 'thanks', 'okay', 'ok']
-   is_positive = any(phrase in message_lower for phrase in positive_responses)
-   st.error(f"🔍 POSITIVE RESPONSE DETECTED: {is_positive}")
+    # DEBUG: Show if positive response detected
+    message_lower = prompt.lower()
+    positive_responses = ['you are right', 'you\'re right', 'thank you', 'thanks', 'okay', 'ok']
+    is_positive = any(phrase in message_lower for phrase in positive_responses)
+    st.error(f"🔍 POSITIVE RESPONSE DETECTED: {is_positive}")
     
     student_age = detect_age_from_message_and_history(prompt)
     is_distressed = detect_emotional_distress(prompt)
