@@ -874,8 +874,13 @@ def detect_emotional_distress(message):
     return has_distress_keyword or has_distress_phrase
 
 def detect_priority_smart_with_safety(message):
-    """Smart priority detection with SAFETY FIRST and enhanced post-crisis monitoring"""
+    """Smart priority detection with TERMINATION CHECK FIRST"""
     message_lower = message.lower()
+    
+    # CHECK CONVERSATION TERMINATION FIRST (before other safety checks)
+    should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
+    if should_stop:
+        return 'immediate_termination', 'CONVERSATION_END', stop_reason
     
     # ENHANCED POST-CRISIS MONITORING
     if st.session_state.get('post_crisis_monitoring', False):
@@ -899,7 +904,7 @@ def detect_priority_smart_with_safety(message):
             # Allow supportive continuation for positive responses
             return 'post_crisis_support', 'supportive_continuation', None
     
-    # PRIORITY 0: SAFETY CHECK FIRST
+    # PRIORITY 0: SAFETY CHECK (after termination check)
     is_safe, safety_type, trigger = check_request_safety(message)
     if not is_safe:
         if safety_type.startswith('CRISIS_'):
@@ -1050,7 +1055,23 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with comprehensive memory safety and SAFETY CHECKS"""
     
-    # CRITICAL: Force conversation termination for direct crisis language
+    # Handle immediate termination FIRST (this will now catch "I want to hurt myself")
+    if priority == 'immediate_termination':
+        st.session_state.harmful_request_count += 1
+        st.session_state.safety_interventions += 1
+        st.session_state.post_crisis_monitoring = True  # Enable enhanced monitoring
+        response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
+        
+This conversation needs to stop for your safety. Please talk to:
+• A parent or trusted adult RIGHT NOW
+• Crisis Text Line: Text HOME to 741741
+• Suicide & Crisis Lifeline: 988
+
+You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
+        
+        return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
+    
+    # CRITICAL: Force conversation termination for direct crisis language (backup check)
     should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
     if should_stop:
         st.session_state.harmful_request_count += 1
@@ -1122,14 +1143,14 @@ Is there anything positive we can focus on right now while you're getting the su
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
     
     # Reset harmful request count if safe message and reset post-crisis monitoring after sustained safety
-    if priority not in ['crisis', 'crisis_return', 'safety', 'concerning']:
+    if priority not in ['crisis', 'crisis_return', 'safety', 'concerning', 'immediate_termination']:
         st.session_state.harmful_request_count = 0
         
         # Reset post-crisis monitoring after 5 safe exchanges
         if st.session_state.get('post_crisis_monitoring', False):
             safe_exchanges = sum(1 for msg in st.session_state.messages[-10:] 
                                if msg.get('role') == 'assistant' and 
-                               msg.get('priority') not in ['crisis', 'crisis_return', 'safety', 'concerning'])
+                               msg.get('priority') not in ['crisis', 'crisis_return', 'safety', 'concerning', 'immediate_termination'])
             if safe_exchanges >= 5:
                 st.session_state.post_crisis_monitoring = False
                 st.success("✅ Post-crisis monitoring deactivated - conversation appears stable")
@@ -1377,7 +1398,7 @@ for i, message in enumerate(st.session_state.messages):
             priority = message["priority"]
             tool_used = message["tool_used"]
             
-            if priority == "safety" or priority == "crisis" or priority == "crisis_return":
+            if priority == "safety" or priority == "crisis" or priority == "crisis_return" or priority == "immediate_termination":
                 st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
             elif priority == "post_crisis_support":
@@ -1424,15 +1445,6 @@ if prompt := st.chat_input(prompt_placeholder):
     
     # DEBUG: Show what priority was detected
     st.error(f"🔍 PRIORITY DETECTED: {priority} - {tool}")
-
-    # DEBUG: Show post-crisis monitoring status
-    st.error(f"🔍 POST-CRISIS MONITORING: {st.session_state.get('post_crisis_monitoring', False)}")
-
-    # DEBUG: Show if positive response detected
-    message_lower = prompt.lower()
-    positive_responses = ['you are right', 'you\'re right', 'thank you', 'thanks', 'okay', 'ok']
-    is_positive = any(phrase in message_lower for phrase in positive_responses)
-    st.error(f"🔍 POSITIVE RESPONSE DETECTED: {is_positive}")
     
     student_age = detect_age_from_message_and_history(prompt)
     is_distressed = detect_emotional_distress(prompt)
@@ -1451,7 +1463,7 @@ if prompt := st.chat_input(prompt_placeholder):
                 response += follow_up
             
             # Display with appropriate styling and enhanced memory indicator
-            if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return":
+            if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return" or response_priority == "immediate_termination":
                 st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
             elif response_priority == "post_crisis_support":
