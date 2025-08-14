@@ -777,7 +777,8 @@ def detect_emotional_distress(message):
         'frustrated', 'stressed', 'anxious', 'worried', 'scared', 'sad', 
         'angry', 'overwhelmed', 'tired', 'upset', 'confused', 'lost',
         'hate this', 'can\'t do this', 'give up', 'too hard', 'stupid',
-        'impossible', 'crying', 'nervous', 'panic', 'afraid', 'bully', 'bullying'
+        'impossible', 'crying', 'nervous', 'panic', 'afraid', 'bully', 'bullying',
+        'alone', 'lonely', 'isolated', 'left out', 'excluded'  
     ]
     
     # Context matters - look for emotional language combined with intensity
