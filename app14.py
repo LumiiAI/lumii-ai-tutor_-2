@@ -152,7 +152,7 @@ def emergency_intervention(message, pattern_type, student_age, student_name=""):
     
     name_part = f"{student_name}, " if student_name else ""
     
-    if pattern_type == "SUSPICIOUS_GOODBYE_LETTERS":
+    if pattern_type == "CRISIS_GOODBYE_LETTERS":
         return f"""💙 {name_part}I notice you're asking about a goodbye letter. Before we continue, 
 I want to make sure you're okay. 
 
@@ -168,7 +168,7 @@ please know that you matter so much, and there are people who want to help:
 
 Can you tell me more about what's happening? I'm here to support you. 💙"""
 
-    elif pattern_type == "SUSPICIOUS_CONCERNING_GOODBYES":
+    elif pattern_type == "CRISIS_CONCERNING_GOODBYES":
         return f"""💙 {name_part}I'm concerned about what you're saying. It sounds like you might be 
 going through something really difficult right now.
 
@@ -180,19 +180,6 @@ and want to help. Please reach out to:
 • Suicide & Crisis Lifeline: 988
 
 I'm here to listen and support you. Would you like to talk about what's making you feel this way? 💙"""
-    
-    elif pattern_type == "SUSPICIOUS_INDIRECT_HARM":
-        return f"""💙 {name_part}It sounds like you're going through a really tough time. 
-I want you to know that you're not alone and you're not a burden.
-
-Your feelings are valid, but these thoughts you're having are temporary, even though 
-they feel overwhelming right now. Please talk to someone who can help:
-
-• Crisis Text Line: Text HOME to 741741
-• Suicide & Crisis Lifeline: 988
-• A trusted adult, counselor, or teacher
-
-You matter more than you know. Can we talk about what's been making you feel this way? 💙"""
     
     else:  # General harmful content blocked
         return f"""💙 {name_part}I care about your safety and wellbeing, and I can't help with that request.
@@ -390,6 +377,14 @@ st.markdown("""
         margin: 1rem 0;
         border-left: 5px solid #e55a5a;
     }
+    .concerning-response {
+        background: linear-gradient(135deg, #ff8c42, #ffa726);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #ff7043;
+    }
     .safety-response {
         background: linear-gradient(135deg, #ff4444, #ff6666);
         color: white;
@@ -425,6 +420,16 @@ st.markdown("""
     }
     .friend-badge {
         background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .concerning-badge {
+        background: linear-gradient(45deg, #ff8c42, #ffa726);
         color: white;
         padding: 0.3rem 0.8rem;
         border-radius: 20px;
@@ -840,7 +845,7 @@ def detect_emotional_distress(message):
         'angry', 'overwhelmed', 'tired', 'upset', 'confused', 'lost',
         'hate this', 'can\'t do this', 'give up', 'too hard', 'stupid',
         'impossible', 'crying', 'nervous', 'panic', 'afraid', 'bully', 'bullying',
-        'alone', 'lonely', 'isolated', 'left out', 'excluded'  
+        'alone', 'lonely', 'isolated', 'left out', 'excluded'  # ADDED THESE
     ]
     
     # Context matters - look for emotional language combined with intensity
@@ -899,7 +904,7 @@ def detect_priority_smart_with_safety(message):
     
     # PRIORITY 3: Math content (academic help requests)
     math_keywords = [
-        'solve', 'calculate', 'equation', 'problem', '+', '-', 'Ã—', 'Ã·',
+        'solve', 'calculate', 'equation', 'problem', '+', '-', '×', '÷',
         'addition', 'subtraction', 'multiplication', 'division',
         'what is', 'equals', 'answer', 'plus', 'minus', 'times', 'divided',
         'help me with', 'show me how', 'step by step'
@@ -1009,9 +1014,6 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
         response = f"🌟 {name_part}I'm here to help you learn and grow! What would you like to explore together today?"
         return response, "🌟 Lumii's Learning Support (Safe Mode)", "general"
 
-# In the generate_response_with_memory_safety() function, 
-# replace the safety handling section with this:
-
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with comprehensive memory safety and SAFETY CHECKS"""
     
@@ -1068,8 +1070,6 @@ You matter, and there are people who want to help you. Please reach out to them 
     
     # Reset harmful request count if safe message
     st.session_state.harmful_request_count = 0
-    
-    # Rest of the function continues as before...
     
     # Get student info from history and session state
     student_info = extract_student_info_from_history()
@@ -1155,8 +1155,11 @@ def generate_natural_follow_up(tool_used, priority, had_emotional_content=False)
     if any(topic in tool_used.lower() for topic in active_topics):
         return ""  # Topic is still active, no follow-up needed
     
-    if "Safety" in tool_used:
+    if "Safety" in tool_used or "Crisis" in tool_used:
         return "\n\n💙 **Remember, you're not alone. If you need to talk to someone, I'm here, and there are also trusted adults who care about you.**"
+        
+    elif "Enhanced Support" in tool_used:
+        return "\n\n🤗 **I'm here to listen and support you. Would you like to talk more about what's been happening, or is there something else I can help you with?**"
         
     elif "Emotional Support" in tool_used:
         return "\n\n🤗 **Now that we've talked about those feelings, would you like some help with the schoolwork that was bothering you?**"
@@ -1311,9 +1314,12 @@ for i, message in enumerate(st.session_state.messages):
             priority = message["priority"]
             tool_used = message["tool_used"]
             
-            if priority == "safety":
+            if priority == "safety" or priority == "crisis":
                 st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "concerning":
+                st.markdown(f'<div class="concerning-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="concerning-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
             elif priority == "emotional":
                 st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
@@ -1362,9 +1368,12 @@ if prompt := st.chat_input(prompt_placeholder):
                 response += follow_up
             
             # Display with appropriate styling and enhanced memory indicator
-            if response_priority == "safety":
+            if response_priority == "safety" or response_priority == "crisis":
                 st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif response_priority == "concerning":
+                st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
             elif response_priority == "emotional":
                 st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
