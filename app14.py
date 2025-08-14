@@ -50,8 +50,8 @@ def check_request_safety(message):
         if term in message_lower:
             return False, "BLOCKED_HARMFUL", term
     
-    # SUSPICIOUS PATTERNS - Need careful handling
-    SUSPICIOUS_PATTERNS = {
+    # CRISIS-LEVEL PATTERNS - Immediate intervention required
+    CRISIS_PATTERNS = {
         'goodbye_letters': [
             'goodbye letter', 'farewell letter', 'final letter',
             'last letter', 'goodbye note', 'farewell note',
@@ -62,12 +62,6 @@ def check_request_safety(message):
             'remember me when', "when i'm gone", 'leaving forever',
             'this is goodbye', 'final goodbye'
         ],
-        'indirect_harm': [
-            "doesn't matter anymore", "won't need this",
-            "giving away my", "want to disappear", 
-            "better without me", "burden to everyone",
-            "no point anymore", "can't take it"
-        ],
         'medication_queries': [
             'how many pills', 'what happens if take',
             'overdose', 'too much medicine', 'sleep forever',
@@ -75,11 +69,29 @@ def check_request_safety(message):
         ]
     }
     
-    # Check for suspicious patterns
-    for pattern_type, patterns in SUSPICIOUS_PATTERNS.items():
+    # CONCERNING PATTERNS - Enhanced emotional support needed
+    CONCERNING_PATTERNS = {
+        'negative_self_worth': [
+            "better without me", "burden to everyone",
+            "no point anymore", "doesn't matter anymore",
+            "won't need this", "can't take it"
+        ],
+        'giving_away_items': [
+            "giving away my", "don't want my stuff"
+        ]
+    }
+    
+    # Check for crisis-level patterns
+    for pattern_type, patterns in CRISIS_PATTERNS.items():
         for pattern in patterns:
             if pattern in message_lower:
-                return False, f"SUSPICIOUS_{pattern_type.upper()}", pattern
+                return False, f"CRISIS_{pattern_type.upper()}", pattern
+    
+    # Check for concerning patterns (enhanced support needed)
+    for pattern_type, patterns in CONCERNING_PATTERNS.items():
+        for pattern in patterns:
+            if pattern in message_lower:
+                return False, f"CONCERNING_{pattern_type.upper()}", pattern
     
     return True, "SAFE", None
 
@@ -194,6 +206,56 @@ If you're having thoughts of hurting yourself or others, please talk to:
 
 Would you like to talk about what you're feeling instead? Or we could work on something 
 positive together. I'm here for you. 💙"""
+
+def generate_enhanced_emotional_support(message, pattern_type, student_age, student_name=""):
+    """Enhanced emotional support for concerning but not crisis language"""
+    
+    name_part = f"{student_name}, " if student_name else ""
+    
+    if pattern_type == "CONCERNING_NEGATIVE_SELF_WORTH":
+        if student_age <= 11:  # Elementary
+            return f"""💙 {name_part}I can tell you're feeling really sad and heavy right now. Those are big, hard feelings.
+
+I want you to know something important: you are NOT a burden. You're a wonderful person, and the people who love you want to help you because that's what people do when they care about each other.
+
+Sometimes when we're really upset, our brain tells us things that aren't true. It might say "nobody wants me around" but that's not real - that's just the sad feelings talking.
+
+I think it would really help to talk to a grown-up who cares about you - like your mom, dad, a teacher, or the school counselor. They want to help you feel better.
+
+What's been making you feel so heavy inside? I'm here to listen. 💙"""
+            
+        elif student_age <= 14:  # Middle School  
+            return f"""💙 {name_part}I can hear how much pain you're in right now, and I'm really concerned about you. Those thoughts about being a burden sound incredibly heavy and painful.
+
+I want you to know something: you are NOT a burden. When people care about you, helping you isn't a burden - it's what they want to do. Your feelings might be telling you otherwise right now, but that's because you're struggling, not because it's true.
+
+These overwhelming feelings can make everything seem hopeless, but they ARE temporary, even though they feel permanent right now.
+
+I really think you need to talk to someone who can give you the support you deserve - maybe your school counselor, your mom, or another trusted adult. You shouldn't have to carry these heavy feelings alone.
+
+Can you tell me what's been happening that's made you feel this way? I'm here to listen and support you. 💙"""
+            
+        else:  # High School
+            return f"""💙 {name_part}I can hear the deep pain in what you're saying, and I'm genuinely concerned about you. Those thoughts about being a burden are a sign that you're struggling with some really heavy emotional weight.
+
+I need you to understand something important: you are NOT a burden. When you're dealing with difficult emotions, reaching out for help isn't being a burden - it's being human. The people who care about you want to support you through tough times.
+
+These feelings of worthlessness and despair can feel overwhelming and permanent, but they are symptoms of emotional distress, not facts about who you are or your value.
+
+I strongly encourage you to reach out to someone who can provide the kind of support you need right now - whether that's a school counselor, therapist, trusted family member, or another adult you trust. You don't have to navigate these feelings alone.
+
+What's been happening in your life that's brought you to this point? I'm here to listen without judgment. 💙"""
+    
+    else:  # Other concerning patterns
+        return f"""💙 {name_part}I'm concerned about what you're saying. It sounds like you're going through something really difficult right now.
+
+These feelings you're having are valid, but I want you to know that you don't have to face them alone. There are people who care about you and want to help.
+
+Please consider talking to:
+• A trusted adult like a parent, teacher, or counselor
+• Your school's guidance counselor
+
+I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
 # =============================================================================
 # CONVERSATION FLOW & ACTIVE TOPIC TRACKING
@@ -802,7 +864,12 @@ def detect_priority_smart_with_safety(message):
     # PRIORITY 0: SAFETY CHECK FIRST
     is_safe, safety_type, trigger = check_request_safety(message)
     if not is_safe:
-        return 'safety', safety_type, trigger
+        if safety_type.startswith('CRISIS_'):
+            return 'crisis', safety_type, trigger
+        elif safety_type.startswith('CONCERNING_'):
+            return 'concerning', safety_type, trigger
+        else:  # BLOCKED_HARMFUL
+            return 'safety', safety_type, trigger
     
     # PRIORITY 1: Clear emotional distress (ALWAYS FIRST after safety)
     if detect_emotional_distress(message):
@@ -832,7 +899,7 @@ def detect_priority_smart_with_safety(message):
     
     # PRIORITY 3: Math content (academic help requests)
     math_keywords = [
-        'solve', 'calculate', 'equation', 'problem', '+', '-', '×', '÷',
+        'solve', 'calculate', 'equation', 'problem', '+', '-', 'Ã—', 'Ã·',
         'addition', 'subtraction', 'multiplication', 'division',
         'what is', 'equals', 'answer', 'plus', 'minus', 'times', 'divided',
         'help me with', 'show me how', 'step by step'
@@ -942,11 +1009,42 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
         response = f"🌟 {name_part}I'm here to help you learn and grow! What would you like to explore together today?"
         return response, "🌟 Lumii's Learning Support (Safe Mode)", "general"
 
+# In the generate_response_with_memory_safety() function, 
+# replace the safety handling section with this:
+
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with comprehensive memory safety and SAFETY CHECKS"""
     
     # Handle safety interventions first
-    if priority == 'safety':
+    if priority == 'crisis':
+        st.session_state.harmful_request_count += 1
+        st.session_state.safety_interventions += 1
+        
+        # Check if conversation should be terminated
+        should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
+        if should_stop:
+            response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
+            
+This conversation needs to stop for your safety. Please talk to:
+• A parent or trusted adult RIGHT NOW
+• Crisis Text Line: Text HOME to 741741
+• Suicide & Crisis Lifeline: 988
+
+You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
+            
+            return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
+        
+        # Return crisis intervention
+        response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
+        return response, "🛡️ Lumii's Crisis Response", "crisis", "🚨 Crisis Level"
+    
+    elif priority == 'concerning':
+        # NEW: Enhanced emotional support for concerning language
+        st.session_state.safety_interventions += 1
+        response = generate_enhanced_emotional_support(message, safety_type, student_age, st.session_state.student_name)
+        return response, "💙 Lumii's Enhanced Support", "concerning", "⚠️ Concerning Language"
+    
+    elif priority == 'safety':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
         
@@ -970,6 +1068,8 @@ You matter, and there are people who want to help you. Please reach out to them 
     
     # Reset harmful request count if safe message
     st.session_state.harmful_request_count = 0
+    
+    # Rest of the function continues as before...
     
     # Get student info from history and session state
     student_info = extract_student_info_from_history()
