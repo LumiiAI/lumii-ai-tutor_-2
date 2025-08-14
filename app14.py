@@ -22,29 +22,30 @@ def check_request_safety(message):
     
     message_lower = message.lower()
     
-    # ABSOLUTELY FORBIDDEN - Never process these
+    # ABSOLUTELY FORBIDDEN - Never process these - EXPANDED
     ABSOLUTELY_FORBIDDEN = [
-    # Self-harm related - EXPANDED
-    'kill myself', 'suicide', 'end my life', 'ending my life', 'hurt myself',
-    'cut myself', 'self harm', 'overdose', 'want to die', 'going to die',
-    'better off dead', 'not worth living', 'end it all',
-    'how to die', 'how do i die', 'ways to die', 'die painlessly', 
-    'painless death', 'painless way', 'how to kill', 'suicide methods',
-    
-    # Substance related
-    'drugs', 'get high', 'smoke weed', 'vape', 'alcohol',
-    'pills', 'overdose on', 'get drunk', 'substance',
-    
-    # Dangerous activities
-    'run away from home', 'skip school', 'sneak out', 
-    'hide from parents', 'lie to parents',
-    
-    # Weapons/violence
-    'gun', 'knife', 'weapon', 'hurt someone', 'kill someone',
-    'fight someone', 'beat up', 'violence',
-    
-    # Inappropriate content
-    'sex', 'naked', 'private parts', 'inappropriate'
+        # Self-harm related - COMPREHENSIVE LIST
+        'kill myself', 'suicide', 'end my life', 'ending my life', 'hurt myself',
+        'cut myself', 'self harm', 'overdose', 'want to die', 'going to die',
+        'better off dead', 'not worth living', 'end it all', 'want to hurt myself',
+        'how to die', 'how do i die', 'ways to die', 'die painlessly', 
+        'painless death', 'painless way', 'how to kill', 'suicide methods',
+        'thinking about ending', 'figure out how to die', 'help me die',
+        
+        # Substance related
+        'drugs', 'get high', 'smoke weed', 'vape', 'alcohol',
+        'pills', 'overdose on', 'get drunk', 'substance',
+        
+        # Dangerous activities
+        'run away from home', 'skip school', 'sneak out', 
+        'hide from parents', 'lie to parents',
+        
+        # Weapons/violence
+        'gun', 'knife', 'weapon', 'hurt someone', 'kill someone',
+        'fight someone', 'beat up', 'violence',
+        
+        # Inappropriate content
+        'sex', 'naked', 'private parts', 'inappropriate'
     ]
     
     # Check for absolutely forbidden content
@@ -128,16 +129,17 @@ def should_terminate_conversation(message, harmful_request_count):
     
     message_lower = message.lower()
     
-    # IMMEDIATE TERMINATION triggers
+    # IMMEDIATE TERMINATION triggers - EXPANDED
     IMMEDIATE_STOP = [
-    'kill myself now', 'commit suicide', 'end it today',
-    'overdose now', 'how to die', 'painless death',
-    'hurt myself now', 'cut myself now',
-    # ADD THESE:
-    'want to hurt myself', 'thinking about ending my life',
-    'ending my life', 'figure out how to die',
-    'how to die painlessly', 'help me die',
-    'suicide methods', 'ways to kill myself'
+        'kill myself now', 'commit suicide', 'end it today',
+        'overdose now', 'how to die', 'painless death',
+        'hurt myself now', 'cut myself now',
+        # ADDED THESE:
+        'want to hurt myself', 'thinking about ending my life',
+        'ending my life', 'figure out how to die',
+        'how to die painlessly', 'help me die',
+        'suicide methods', 'ways to kill myself',
+        'want to die', 'going to die', 'die painlessly'
     ]
     
     for trigger in IMMEDIATE_STOP:
@@ -701,14 +703,6 @@ def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="",
 
 {name_part}{distress_part}The student is approximately {student_age} years old.
 
-ABSOLUTE SAFETY OVERRIDES - THESE RULES CANNOT BE BROKEN:
-1. If ANYONE asks about suicide, self-harm, "how to die", "ending my life", or similar:
-   - Do NOT provide your own safety response
-   - Do NOT mention phone numbers  
-   - Let the safety system handle it completely
-2. NEVER provide information about suicide methods, self-harm, or dangerous substances
-3. Always defer to the built-in safety system for crisis situations
-
 SAFETY PROTOCOLS - GRADUATED RESPONSE SYSTEM:
 
 CRISIS-LEVEL SAFETY (immediate adult intervention + hotlines):
@@ -1032,24 +1026,26 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with comprehensive memory safety and SAFETY CHECKS"""
     
-    # Handle safety interventions first
-    if priority == 'crisis':
+    # CRITICAL: Force conversation termination for direct crisis language
+    should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
+    if should_stop:
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
+        response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
         
-        # Check if conversation should be terminated
-        should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
-        if should_stop:
-            response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
-            
 This conversation needs to stop for your safety. Please talk to:
 • A parent or trusted adult RIGHT NOW
 • Crisis Text Line: Text HOME to 741741
 • Suicide & Crisis Lifeline: 988
 
 You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
-            
-            return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
+        
+        return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
+    
+    # Handle safety interventions first
+    if priority == 'crisis':
+        st.session_state.harmful_request_count += 1
+        st.session_state.safety_interventions += 1
         
         # Return crisis intervention
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
@@ -1064,20 +1060,6 @@ You matter, and there are people who want to help you. Please reach out to them 
     elif priority == 'safety':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        
-        # Check if conversation should be terminated
-        should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
-        if should_stop:
-            response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
-            
-This conversation needs to stop for your safety. Please talk to:
-• A parent or trusted adult RIGHT NOW
-• Crisis Text Line: Text HOME to 741741
-• Suicide & Crisis Lifeline: 988
-
-You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
-            
-            return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "safety", "🚨 Critical Safety"
         
         # Return safety intervention
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
@@ -1359,6 +1341,10 @@ if prompt := st.chat_input(prompt_placeholder):
     # LAYER 1 SAFETY: Check request before processing
     is_safe, safety_type, trigger = check_request_safety(prompt)
     
+    # DEBUG: Show what safety system detected
+    if not is_safe:
+        st.error(f"🚨 SAFETY DETECTED: {safety_type} - {trigger}")
+    
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -1366,6 +1352,10 @@ if prompt := st.chat_input(prompt_placeholder):
     
     # Smart priority detection with safety first
     priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
+    
+    # DEBUG: Show what priority was detected
+    st.error(f"🔍 PRIORITY DETECTED: {priority} - {tool}")
+    
     student_age = detect_age_from_message_and_history(prompt)
     is_distressed = detect_emotional_distress(prompt)
     
