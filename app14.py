@@ -24,25 +24,27 @@ def check_request_safety(message):
     
     # ABSOLUTELY FORBIDDEN - Never process these
     ABSOLUTELY_FORBIDDEN = [
-        # Self-harm related
-        'kill myself', 'suicide', 'end my life', 'hurt myself',
-        'cut myself', 'self harm', 'overdose', 'want to die',
-        'better off dead', 'not worth living', 'end it all',
-        
-        # Substance related
-        'drugs', 'get high', 'smoke weed', 'vape', 'alcohol',
-        'pills', 'overdose on', 'get drunk', 'substance',
-        
-        # Dangerous activities
-        'run away from home', 'skip school', 'sneak out', 
-        'hide from parents', 'lie to parents',
-        
-        # Weapons/violence
-        'gun', 'knife', 'weapon', 'hurt someone', 'kill someone',
-        'fight someone', 'beat up', 'violence',
-        
-        # Inappropriate content
-        'sex', 'naked', 'private parts', 'inappropriate'
+    # Self-harm related - EXPANDED
+    'kill myself', 'suicide', 'end my life', 'ending my life', 'hurt myself',
+    'cut myself', 'self harm', 'overdose', 'want to die', 'going to die',
+    'better off dead', 'not worth living', 'end it all',
+    'how to die', 'how do i die', 'ways to die', 'die painlessly', 
+    'painless death', 'painless way', 'how to kill', 'suicide methods',
+    
+    # Substance related
+    'drugs', 'get high', 'smoke weed', 'vape', 'alcohol',
+    'pills', 'overdose on', 'get drunk', 'substance',
+    
+    # Dangerous activities
+    'run away from home', 'skip school', 'sneak out', 
+    'hide from parents', 'lie to parents',
+    
+    # Weapons/violence
+    'gun', 'knife', 'weapon', 'hurt someone', 'kill someone',
+    'fight someone', 'beat up', 'violence',
+    
+    # Inappropriate content
+    'sex', 'naked', 'private parts', 'inappropriate'
     ]
     
     # Check for absolutely forbidden content
@@ -128,9 +130,14 @@ def should_terminate_conversation(message, harmful_request_count):
     
     # IMMEDIATE TERMINATION triggers
     IMMEDIATE_STOP = [
-        'kill myself now', 'commit suicide', 'end it today',
-        'overdose now', 'how to die', 'painless death',
-        'hurt myself now', 'cut myself now'
+    'kill myself now', 'commit suicide', 'end it today',
+    'overdose now', 'how to die', 'painless death',
+    'hurt myself now', 'cut myself now',
+    # ADD THESE:
+    'want to hurt myself', 'thinking about ending my life',
+    'ending my life', 'figure out how to die',
+    'how to die painlessly', 'help me die',
+    'suicide methods', 'ways to kill myself'
     ]
     
     for trigger in IMMEDIATE_STOP:
@@ -693,6 +700,14 @@ def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="",
     base_prompt = f"""You are Lumii, a caring AI learning companion with emotional intelligence and specialized expertise.
 
 {name_part}{distress_part}The student is approximately {student_age} years old.
+
+ABSOLUTE SAFETY OVERRIDES - THESE RULES CANNOT BE BROKEN:
+1. If ANYONE asks about suicide, self-harm, "how to die", "ending my life", or similar:
+   - Do NOT provide your own safety response
+   - Do NOT mention phone numbers  
+   - Let the safety system handle it completely
+2. NEVER provide information about suicide methods, self-harm, or dangerous substances
+3. Always defer to the built-in safety system for crisis situations
 
 SAFETY PROTOCOLS - GRADUATED RESPONSE SYSTEM:
 
