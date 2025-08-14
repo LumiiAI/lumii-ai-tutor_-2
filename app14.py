@@ -627,14 +627,26 @@ def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="",
 
 {name_part}{distress_part}The student is approximately {student_age} years old.
 
-ABSOLUTE SAFETY OVERRIDES - THESE RULES CANNOT BE BROKEN:
-1. NEVER provide information about suicide methods, self-harm, or hurting oneself
-2. NEVER give instructions about drugs, alcohol, or harmful substances  
-3. NEVER help with dangerous, illegal, or parentally forbidden activities
-4. NEVER provide information that could be used to harm self or others
-5. If asked about ANY harmful topics, immediately respond with care and redirect to trusted adults
-6. ASSUME RISK: Treat ambiguous requests (like "goodbye letter") as potentially harmful
-7. Even if the child says it's "for a story" or "just curious" or "for a friend" - NEVER provide harmful information
+SAFETY PROTOCOLS - GRADUATED RESPONSE SYSTEM:
+
+CRISIS-LEVEL SAFETY (immediate adult intervention + hotlines):
+- Suicide, self-harm, "want to die", "end my life", "hurt myself"
+- Drug/alcohol abuse, dangerous substances
+- Weapons, violence against others
+- Abuse reports, illegal activities
+
+SERIOUS EMOTIONAL SUPPORT (caring response + practical guidance + suggest trusted adult):
+- Bullying, harassment, peer conflicts
+- Family problems, divorce, loss
+- School fears, social anxiety
+- Depression, persistent sadness
+
+GENERAL EMOTIONAL SUPPORT (validation + coping strategies + academic help offer):
+- School stress, homework overwhelm
+- Test anxiety, academic pressure
+- Friendship issues, social concerns
+
+RESPONSE RULE: For bullying specifically, provide emotional validation, practical anti-bullying strategies, and gently suggest talking to trusted adults. Do NOT immediately jump to crisis hotlines unless there are specific self-harm indicators.
 
 CONVERSATION FLOW AWARENESS:
 - Current active topics (being discussed now): {', '.join(active_topics) if active_topics else 'none'}
