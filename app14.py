@@ -27,7 +27,8 @@ def check_request_safety(message):
         # Self-harm related - COMPREHENSIVE LIST
         'kill myself', 'suicide', 'end my life', 'ending my life', 'hurt myself',
         'cut myself', 'self harm', 'overdose', 'want to die', 'going to die',
-        'better off dead', 'not worth living', 'end it all', 'want to hurt myself',
+        'want to hurt myself', 'going to hurt myself',
+        'better off dead', 'not worth living', 'end it all',
         'how to die', 'how do i die', 'ways to die', 'die painlessly', 
         'painless death', 'painless way', 'how to kill', 'suicide methods',
         'thinking about ending', 'figure out how to die', 'help me die',
