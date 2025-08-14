@@ -27,8 +27,7 @@ def check_request_safety(message):
         # Self-harm related - COMPREHENSIVE LIST
         'kill myself', 'suicide', 'end my life', 'ending my life', 'hurt myself',
         'cut myself', 'self harm', 'overdose', 'want to die', 'going to die',
-        'want to hurt myself', 'going to hurt myself',
-        'better off dead', 'not worth living', 'end it all',
+        'better off dead', 'not worth living', 'end it all', 'want to hurt myself',
         'how to die', 'how do i die', 'ways to die', 'die painlessly', 
         'painless death', 'painless way', 'how to kill', 'suicide methods',
         'thinking about ending', 'figure out how to die', 'help me die',
@@ -498,6 +497,8 @@ if "memory_safe_mode" not in st.session_state:
     st.session_state.memory_safe_mode = False
 if "safety_interventions" not in st.session_state:
     st.session_state.safety_interventions = 0
+if "post_crisis_monitoring" not in st.session_state:
+    st.session_state.post_crisis_monitoring = False
 
 # =============================================================================
 # MEMORY MANAGEMENT & CONVERSATION MONITORING
@@ -873,8 +874,30 @@ def detect_emotional_distress(message):
     return has_distress_keyword or has_distress_phrase
 
 def detect_priority_smart_with_safety(message):
-    """Smart priority detection with SAFETY FIRST and enhanced interest pattern recognition"""
+    """Smart priority detection with SAFETY FIRST and enhanced post-crisis monitoring"""
     message_lower = message.lower()
+    
+    # ENHANCED POST-CRISIS MONITORING
+    if st.session_state.get('post_crisis_monitoring', False):
+        # Check for positive acknowledgment responses that can continue safely
+        positive_responses = [
+            'you are right', 'you\'re right', 'thank you', 'thanks', 'okay', 'ok',
+            'i understand', 'i will', 'i\'ll try', 'i\'ll talk', 'you\'re correct'
+        ]
+        is_positive_response = any(phrase in message_lower for phrase in positive_responses)
+        
+        # If ANY crisis language returns after termination - immediate final termination
+        crisis_return_words = [
+            'hurt myself', 'kill myself', 'end my life', 'ending my life', 'suicide', 
+            'want to die', 'how to die', 'painless', 'overdose', 'cut myself'
+        ]
+        has_crisis_return = any(word in message_lower for word in crisis_return_words)
+        
+        if has_crisis_return:
+            return 'crisis_return', 'FINAL_TERMINATION', 'post_crisis_violation'
+        elif is_positive_response:
+            # Allow supportive continuation for positive responses
+            return 'post_crisis_support', 'supportive_continuation', None
     
     # PRIORITY 0: SAFETY CHECK FIRST
     is_safe, safety_type, trigger = check_request_safety(message)
@@ -1032,6 +1055,7 @@ def generate_response_with_memory_safety(message, priority, tool, student_age=10
     if should_stop:
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
+        st.session_state.post_crisis_monitoring = True  # Enable enhanced monitoring
         response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
         
 This conversation needs to stop for your safety. Please talk to:
@@ -1043,10 +1067,41 @@ You matter, and there are people who want to help you. Please reach out to them 
         
         return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
     
+    # Handle crisis return after termination
+    if priority == 'crisis_return':
+        st.session_state.harmful_request_count += 1
+        st.session_state.safety_interventions += 1
+        response = f"""💙 I'm very concerned that you're still having these thoughts after we talked about safety.
+
+This conversation must end now. Please:
+• Call a trusted adult RIGHT NOW - don't wait
+• Crisis Text Line: Text HOME to 741741
+• Suicide & Crisis Lifeline: 988
+• Go to your nearest emergency room if you're in immediate danger
+
+Your safety is the most important thing. Please get help immediately. 💙"""
+        
+        return response, "🛡️ FINAL TERMINATION - Please Get Help Now", "crisis", "🚨 Final Warning"
+    
+    # Handle supportive continuation after crisis
+    if priority == 'post_crisis_support':
+        response = f"""💙 I'm really glad you're listening and willing to reach out for help. That takes so much courage.
+
+You're taking the right steps by acknowledging that there are people who care about you. Those trusted adults - your parents, teachers, school counselors - they want to help you through this difficult time.
+
+Please don't hesitate to talk to them today if possible. You don't have to carry these heavy feelings alone.
+
+Remember: You are important, you are valued, and there is hope. Even when things feel overwhelming, there are people and resources available to help you feel better.
+
+Is there anything positive we can focus on right now while you're getting the support you need? 💙"""
+        
+        return response, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
+    
     # Handle safety interventions first
     if priority == 'crisis':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
+        st.session_state.post_crisis_monitoring = True  # Enable enhanced monitoring
         
         # Return crisis intervention
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
@@ -1066,8 +1121,18 @@ You matter, and there are people who want to help you. Please reach out to them 
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
     
-    # Reset harmful request count if safe message
-    st.session_state.harmful_request_count = 0
+    # Reset harmful request count if safe message and reset post-crisis monitoring after sustained safety
+    if priority not in ['crisis', 'crisis_return', 'safety', 'concerning']:
+        st.session_state.harmful_request_count = 0
+        
+        # Reset post-crisis monitoring after 5 safe exchanges
+        if st.session_state.get('post_crisis_monitoring', False):
+            safe_exchanges = sum(1 for msg in st.session_state.messages[-10:] 
+                               if msg.get('role') == 'assistant' and 
+                               msg.get('priority') not in ['crisis', 'crisis_return', 'safety', 'concerning'])
+            if safe_exchanges >= 5:
+                st.session_state.post_crisis_monitoring = False
+                st.success("✅ Post-crisis monitoring deactivated - conversation appears stable")
     
     # Get student info from history and session state
     student_info = extract_student_info_from_history()
@@ -1312,9 +1377,12 @@ for i, message in enumerate(st.session_state.messages):
             priority = message["priority"]
             tool_used = message["tool_used"]
             
-            if priority == "safety" or priority == "crisis":
+            if priority == "safety" or priority == "crisis" or priority == "crisis_return":
                 st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "post_crisis_support":
+                st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
             elif priority == "concerning":
                 st.markdown(f'<div class="concerning-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="concerning-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
@@ -1374,9 +1442,12 @@ if prompt := st.chat_input(prompt_placeholder):
                 response += follow_up
             
             # Display with appropriate styling and enhanced memory indicator
-            if response_priority == "safety" or response_priority == "crisis":
+            if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return":
                 st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif response_priority == "post_crisis_support":
+                st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
             elif response_priority == "concerning":
                 st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
