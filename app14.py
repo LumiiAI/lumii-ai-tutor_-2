@@ -14,87 +14,95 @@ st.set_page_config(
 )
 
 # =============================================================================
-# CRITICAL SAFETY ARCHITECTURE - LAYER 1: PRE-GENERATION SAFETY
+# CONVERSATION CONTEXT TRACKING - NEW HELPER FUNCTIONS
+# =============================================================================
+
+def get_last_offer_context():
+    """Track what was offered in the last assistant message"""
+    if len(st.session_state.messages) > 0:
+        for msg in reversed(st.session_state.messages):
+            if msg["role"] == "assistant":
+                content = msg["content"].lower()
+                if any(offer in content for offer in ["would you like", "can i help", "let me help", "i can offer", "tips", "advice", "suggestions"]):
+                    return {"offered_help": True, "content": msg["content"]}
+                break
+    return {"offered_help": False, "content": None}
+
+def is_accepting_offer(message):
+    """Check if message is accepting a previous offer"""
+    message_lower = message.lower().strip()
+    acceptance_phrases = ["yes", "yes please", "sure", "okay", "ok", "yeah", "yep", "sounds good", "that would help", "please", "definitely", "absolutely"]
+    
+    # Check if this is an acceptance
+    for phrase in acceptance_phrases:
+        if message_lower == phrase or message_lower.startswith(phrase + " ") or message_lower.startswith(phrase + ","):
+            # Check if we offered something recently
+            last_offer = get_last_offer_context()
+            if last_offer["offered_help"]:
+                return True
+    return False
+
+# =============================================================================
+# CRITICAL SAFETY ARCHITECTURE - LAYER 1: PRE-GENERATION SAFETY (FIXED)
 # =============================================================================
 
 def check_request_safety(message):
-    """BEFORE AI even thinks about responding - comprehensive safety check"""
+    """BEFORE AI even thinks about responding - comprehensive safety check with context awareness"""
     
     message_lower = message.lower()
     
-    # ABSOLUTELY FORBIDDEN - Never process these - EXPANDED
-    ABSOLUTELY_FORBIDDEN = [
-        # Self-harm related - COMPREHENSIVE LIST
-        'kill myself', 'suicide', 'end my life', 'ending my life', 'hurt myself',
-        'cut myself', 'self harm', 'overdose', 'want to die', 'going to die',
-        'better off dead', 'not worth living', 'end it all', 'want to hurt myself',
-        'how to die', 'how do i die', 'ways to die', 'die painlessly', 
-        'painless death', 'painless way', 'how to kill', 'suicide methods',
-        'thinking about ending', 'figure out how to die', 'help me die',
+    # CRITICAL FIX: Check if this is a response to an offer FIRST
+    if is_accepting_offer(message):
+        return True, "SAFE", None  # Just accepting help - NOT a crisis
+    
+    # EXPLICIT CRISIS TERMS ONLY - Must be very specific
+    EXPLICIT_CRISIS_TERMS = [
+        # Self-harm - MUST be explicit and direct
+        'kill myself', 'suicide', 'end my life', 'ending my life', 
+        'cut myself', 'self harm', 'self-harm', 'overdose', 'want to die', 
+        'better off dead', 'not worth living', 'end it all',
+        'how to die', 'ways to die', 'die painlessly', 'painless death',
+        'suicide methods', 'help me die', 'want to hurt myself',
         
-        # Substance related
-        'drugs', 'get high', 'smoke weed', 'vape', 'alcohol',
-        'pills', 'overdose on', 'get drunk', 'substance',
+        # Explicit substance abuse (not just mentioning)
+        'get high on', 'smoke weed', 'take drugs', 'get drunk',
+        'how to get drugs', 'where to buy drugs',
         
-        # Dangerous activities
-        'run away from home', 'skip school', 'sneak out', 
-        'hide from parents', 'lie to parents',
+        # Explicit violence
+        'hurt someone', 'kill someone', 'beat someone up',
+        'how to make a weapon', 'how to get a gun',
         
-        # Weapons/violence
-        'gun', 'knife', 'weapon', 'hurt someone', 'kill someone',
-        'fight someone', 'beat up', 'violence',
-        
-        # Inappropriate content
-        'sex', 'naked', 'private parts', 'inappropriate'
+        # Dangerous activities with intent
+        'run away from home forever', 'never go back to school'
     ]
     
-    # Check for absolutely forbidden content
-    for term in ABSOLUTELY_FORBIDDEN:
+    # Only flag if EXPLICIT crisis terms present
+    for term in EXPLICIT_CRISIS_TERMS:
         if term in message_lower:
             return False, "BLOCKED_HARMFUL", term
     
-    # CRISIS-LEVEL PATTERNS - Immediate intervention required
-    CRISIS_PATTERNS = {
-        'goodbye_letters': [
-            'goodbye letter', 'farewell letter', 'final letter',
-            'last letter', 'goodbye note', 'farewell note',
-            'final message', 'last words', 'final words'
-        ],
-        'concerning_goodbyes': [
-            'say goodbye forever', 'never see me again', 
-            'remember me when', "when i'm gone", 'leaving forever',
-            'this is goodbye', 'final goodbye'
-        ],
-        'medication_queries': [
-            'how many pills', 'what happens if take',
-            'overdose', 'too much medicine', 'sleep forever',
-            'never wake up', 'painless way'
-        ]
-    }
+    # CRISIS-LEVEL PATTERNS - Need very clear indicators
+    # Check for goodbye letters only with clear finality
+    if ('goodbye letter' in message_lower or 'farewell letter' in message_lower) and \
+       ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower):
+        return False, "CRISIS_GOODBYE_LETTERS", "goodbye_letter"
     
-    # CONCERNING PATTERNS - Enhanced emotional support needed
-    CONCERNING_PATTERNS = {
-        'negative_self_worth': [
-            "better without me", "burden to everyone",
-            "no point anymore", "doesn't matter anymore",
-            "won't need this", "can't take it"
-        ],
-        'giving_away_items': [
-            "giving away my", "don't want my stuff"
-        ]
-    }
+    # Check for concerning patterns but with higher threshold
+    concerning_score = 0
     
-    # Check for crisis-level patterns
-    for pattern_type, patterns in CRISIS_PATTERNS.items():
-        for pattern in patterns:
-            if pattern in message_lower:
-                return False, f"CRISIS_{pattern_type.upper()}", pattern
+    # These need multiple indicators together
+    if "burden" in message_lower and ("everyone" in message_lower or "family" in message_lower):
+        concerning_score += 2
+    if "no point" in message_lower and ("anymore" in message_lower or "living" in message_lower):
+        concerning_score += 2
+    if "goodbye forever" in message_lower or "never see me again" in message_lower:
+        concerning_score += 3
+    if "giving away" in message_lower and "my stuff" in message_lower:
+        concerning_score += 2
     
-    # Check for concerning patterns (enhanced support needed)
-    for pattern_type, patterns in CONCERNING_PATTERNS.items():
-        for pattern in patterns:
-            if pattern in message_lower:
-                return False, f"CONCERNING_{pattern_type.upper()}", pattern
+    # Only flag if high concerning score (multiple indicators)
+    if concerning_score >= 4:
+        return False, "CONCERNING_MULTIPLE_FLAGS", "multiple_concerns"
     
     return True, "SAFE", None
 
@@ -105,17 +113,11 @@ def validate_ai_response(response):
     
     # FORBIDDEN IN RESPONSES - Never show these
     FORBIDDEN_IN_RESPONSE = [
-        # Instructional language around harmful topics
-        "here's how", "you could", "try this", "steps to",
-        "method for", "way to", "instructions for", "guide to",
-        
-        # Specific harmful instructions
-        "take pills", "cut yourself", "hurt yourself",
-        "end your life", "kill yourself",
-        
-        # Dangerous suggestions
-        "run away", "hide from", "don't tell",
-        "keep secret", "don't trust adults"
+        # Only check for actual harmful instructions
+        "how to hurt yourself", "how to kill yourself",
+        "take these pills", "cut yourself here",
+        "hide it from your parents", "don't tell anyone",
+        "ways to die", "methods of suicide"
     ]
     
     for phrase in FORBIDDEN_IN_RESPONSE:
@@ -125,35 +127,35 @@ def validate_ai_response(response):
     return True, None
 
 def should_terminate_conversation(message, harmful_request_count):
-    """Determine if conversation should be terminated for safety"""
+    """Determine if conversation should be terminated for safety - ONLY for real crisis"""
     
     message_lower = message.lower()
     
-    # IMMEDIATE TERMINATION triggers - EXPANDED
+    # Check if accepting offer first
+    if is_accepting_offer(message):
+        return False, None
+    
+    # IMMEDIATE TERMINATION triggers - Only for explicit crisis language
     IMMEDIATE_STOP = [
         'kill myself now', 'commit suicide', 'end it today',
         'overdose now', 'how to die', 'painless death',
         'hurt myself now', 'cut myself now',
-        # ADDED THESE:
-        'want to hurt myself', 'thinking about ending my life',
-        'ending my life', 'figure out how to die',
-        'how to die painlessly', 'help me die',
-        'suicide methods', 'ways to kill myself',
-        'want to die', 'going to die', 'die painlessly'
+        'want to hurt myself right now', 'ending my life today',
+        'going to kill myself', 'decided to die'
     ]
     
     for trigger in IMMEDIATE_STOP:
         if trigger in message_lower:
             return True, "CRITICAL_IMMEDIATE"
     
-    # Persistent harmful requests after warnings
-    if harmful_request_count >= 3:
+    # Persistent harmful requests after multiple warnings
+    if harmful_request_count >= 5:  # Increased threshold
         return True, "PERSISTENT_HARMFUL"
     
     return False, None
 
 # =============================================================================
-# EMERGENCY INTERVENTION SYSTEM
+# EMERGENCY INTERVENTION SYSTEM (KEPT AS-IS - ONLY FOR REAL CRISES)
 # =============================================================================
 
 def emergency_intervention(message, pattern_type, student_age, student_name=""):
@@ -208,7 +210,7 @@ def generate_enhanced_emotional_support(message, pattern_type, student_age, stud
     
     name_part = f"{student_name}, " if student_name else ""
     
-    if pattern_type == "CONCERNING_NEGATIVE_SELF_WORTH":
+    if pattern_type == "CONCERNING_MULTIPLE_FLAGS":
         if student_age <= 11:  # Elementary
             return f"""💙 {name_part}I can tell you're feeling really sad and heavy right now. Those are big, hard feelings.
 
@@ -271,14 +273,16 @@ def track_active_topics(messages):
             content_lower = msg['content'].lower()
             
             # Extract topics mentioned
-            if 'chess' in content_lower:
+            if 'chess' in content_lower and 'chess' not in active_topics:
                 active_topics.append('chess')
-            if 'math' in content_lower:
+            if 'math' in content_lower and 'math' not in active_topics:
                 active_topics.append('math')
-            if 'homework' in content_lower:
+            if 'homework' in content_lower and 'homework' not in active_topics:
                 active_topics.append('homework')
-            if 'school' in content_lower:
+            if 'school' in content_lower and 'school' not in active_topics:
                 active_topics.append('school')
+            if 'friends' in content_lower and 'friends' not in active_topics:
+                active_topics.append('friends')
     
     # Topics from earlier (before last 5 exchanges)
     if len(messages) > 10:
@@ -288,7 +292,8 @@ def track_active_topics(messages):
                 content_lower = msg['content'].lower()
                 if 'chess' in content_lower and 'chess' not in past_topics:
                     past_topics.append('chess')
-                # Add other topic detection as needed
+                if 'friends' in content_lower and 'friends' not in past_topics:
+                    past_topics.append('friends')
     
     return active_topics, past_topics
 
@@ -323,6 +328,10 @@ if 'harmful_request_count' not in st.session_state:
     st.session_state.harmful_request_count = 0
 if 'safety_warnings_given' not in st.session_state:
     st.session_state.safety_warnings_given = 0
+if "last_offer" not in st.session_state:
+    st.session_state.last_offer = None
+if "awaiting_response" not in st.session_state:
+    st.session_state.awaiting_response = False
 
 # Show disclaimer popup before allowing app access
 if not st.session_state.agreed_to_terms:
@@ -700,130 +709,106 @@ def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="",
     # Get active topics for context
     active_topics, past_topics = track_active_topics(st.session_state.messages)
     
+    # CRITICAL FIX: Add recent conversation context
+    recent_context = ""
+    last_offer = get_last_offer_context()
+    if last_offer["offered_help"]:
+        recent_context = f"""
+IMMEDIATE CONTEXT: You just offered help/tips/advice in your last message: "{last_offer['content'][:200]}..."
+If the student responds with acceptance (yes, sure, okay, please, etc.), 
+PROVIDE THE SPECIFIC HELP YOU OFFERED. Do NOT redirect to crisis resources unless they explicitly mention self-harm."""
+    
     # Enhanced base prompt with safety and conversation flow
     base_prompt = f"""You are Lumii, a caring AI learning companion with emotional intelligence and specialized expertise.
 
 {name_part}{distress_part}The student is approximately {student_age} years old.
 
-SAFETY PROTOCOLS - GRADUATED RESPONSE SYSTEM:
+{recent_context}
 
-CRISIS-LEVEL SAFETY (immediate adult intervention + hotlines):
-- Suicide, self-harm, "want to die", "end my life", "hurt myself"
-- Drug/alcohol abuse, dangerous substances
-- Weapons, violence against others
-- Abuse reports, illegal activities
+CRITICAL INSTRUCTION - CONTEXT-AWARE RESPONSES:
+1. If you offered something specific (tips, help, advice) and student accepts with "yes", "okay", "sure", "please" - DELIVER THAT HELP
+2. Only use crisis protocols for EXPLICIT crisis language like "kill myself", "hurt myself", "end my life"
+3. Normal sadness about school/friends needs support, NOT crisis intervention
+4. Track conversation flow - if you offered friendship tips and they say "yes please", give the tips!
 
-SERIOUS EMOTIONAL SUPPORT (caring response + practical guidance + suggest trusted adult):
-- Bullying, harassment, peer conflicts
-- Family problems, divorce, loss
-- School fears, social anxiety
-- Depression, persistent sadness
+SAFETY PROTOCOLS - USE SPARINGLY:
 
-GENERAL EMOTIONAL SUPPORT (validation + coping strategies + academic help offer):
-- School stress, homework overwhelm
-- Test anxiety, academic pressure
-- Friendship issues, social concerns
+ACTUAL CRISIS ONLY (explicit harmful language required):
+- Direct statements: "kill myself", "hurt myself", "end my life", "want to die"
+- These require immediate intervention with hotlines
 
-RESPONSE RULE: For bullying specifically, provide emotional validation, practical anti-bullying strategies, and gently suggest talking to trusted adults. Do NOT immediately jump to crisis hotlines unless there are specific self-harm indicators.
+NORMAL EMOTIONAL SUPPORT (provide help without crisis response):
+- Feeling sad about no friends → offer friendship tips
+- School stress → provide study strategies
+- Test anxiety → teach calming techniques
+- Lonely at new school → suggest ways to connect
 
-CONTEXT AWARENESS - PREVENT FALSE POSITIVES:
-- Normal sadness about school/friends + requests for advice = HELPFUL RESPONSE, not crisis
-- "Yes please", "yes", "okay", "sure" after offering help = PROVIDE THE HELP, not safety redirect
-- Distinguish between crisis situations vs normal emotional support requests
-- School transitions, making friends, normal academic stress = REGULAR SUPPORT
-- Only use safety protocols for actual self-harm, suicide, or dangerous content
-- When student accepts offered help, GIVE THE HELP - don't trigger safety protocols
+CONVERSATION RULES:
+- Remember what you offered in previous messages
+- When student accepts your offer, follow through immediately
+- Don't escalate normal sadness to crisis level
+- Maintain natural, helpful conversation flow
 
-RESPONSE RULE: If you offered help (like friendship tips) and student accepts, provide the helpful advice you offered. Do NOT redirect to crisis resources for normal help requests.
-
-CONVERSATION FLOW AWARENESS:
-(existing content continues...)
-
-CONVERSATION FLOW AWARENESS:
-- Current active topics (being discussed now): {', '.join(active_topics) if active_topics else 'none'}
-- Past topics (discussed earlier): {', '.join(past_topics) if past_topics else 'none'}
-- DO NOT follow up on active topics - they're still being discussed
-- Only reference past topics if they were discussed 10+ exchanges ago
-- Let conversations flow naturally without forced memory callbacks
-- Don't ask "How's the chess club?" if we just talked about it 5 minutes ago
-
-MEMORY USAGE GUIDELINES:
-- Be aware of conversation history but don't constantly reference it
-- Only bring up past topics when naturally relevant to current discussion
-- Focus on the current question/topic unless specifically asked about something previous
-- Don't force connections between topics
-
-CORE PHILOSOPHY: You are emotionally intelligent but not emotionally intrusive. Give excellent academic help with a warm, caring tone. Only focus heavily on emotions when the student is clearly distressed.
+Active topics being discussed: {', '.join(active_topics) if active_topics else 'none'}
 
 Communication style for age {student_age}:
-- Ages 5-11: Use simple, encouraging language. Be patient and nurturing. Keep responses shorter.
-- Ages 12-14: Be supportive and understanding. Acknowledge that school can be challenging.
-- Ages 15-18: Be respectful and mature while still being supportive. Provide detailed explanations.
+- Ages 5-11: Simple, encouraging language with shorter responses
+- Ages 12-14: Supportive and understanding of social pressures
+- Ages 15-18: Respectful and mature while still supportive
 
-Always be encouraging, patient, and warm. Focus on being genuinely helpful while maintaining natural conversation flow."""
+Core principle: Be genuinely helpful. If you offer help and they accept, provide that help!"""
 
     if tool_name == "Felicity":
         return base_prompt + """
 
-I'm Lumii, and I'm here for emotional support when you need it. This is one of my favorite ways to help students!
+I'm Lumii, here for emotional support! 
 
-My approach to emotional support:
-1. **Listen with deep empathy** - I validate your feelings completely and never dismiss them
-2. **Natural conversation** - I don't constantly remind you of everything we've talked about
-3. **Provide comfort and understanding** - I'm always here as a caring, supportive presence  
-4. **Offer age-appropriate coping strategies** - I know techniques that help students your age feel better
-5. **Watch for serious concerns** - If you mention self-harm, suicide, or abuse, I'll encourage you to speak with a trusted adult immediately
-6. **Connect back to learning naturally** - After we address your feelings, I can help with any schoolwork if you'd like
+My approach:
+1. **Listen with empathy** - Validate feelings without overreacting
+2. **Provide promised help** - If I offered tips and you said yes, I give those tips
+3. **Appropriate responses** - Normal sadness gets normal support, not crisis intervention
+4. **Practical strategies** - Age-appropriate coping techniques
+5. **Crisis detection** - Only for explicit self-harm language
 
-I care deeply about how you're feeling and I'm here to support you through anything that's on your mind."""
+I care about how you're feeling and want to help in the right way!"""
 
     elif tool_name == "Cali":
         return base_prompt + """
 
-I'm Lumii, and I'm great at helping with organization and managing schoolwork! This is one of my specialties.
+I'm Lumii, great at helping with organization!
 
-My approach to organization:
-1. **Focus on current needs** - I help with what you're dealing with right now
-2. **Understand your current situation** - I listen to what you're dealing with today
-3. **Break things into manageable pieces** - I turn overwhelming tasks into achievable steps
-4. **Help you prioritize** - I guide you to focus on what matters most
-5. **Build your confidence** - I show you that you can absolutely handle your workload
-6. **Natural progress tracking** - I celebrate wins without constantly reminding you of past plans
-
-I love helping students feel more organized and in control of their schoolwork. Let's tackle this together!"""
+My approach:
+1. **Break things down** - Make overwhelming tasks manageable
+2. **Prioritize wisely** - Focus on what matters most
+3. **Build confidence** - Show you can handle your workload
+4. **Follow through** - Deliver help when accepted"""
 
     elif tool_name == "Mira":
         return base_prompt + """
 
-I'm Lumii, and I absolutely love helping with math! Math is one of my favorite subjects to explore with students.
+I'm Lumii, and I love helping with math!
 
-My approach to math tutoring:
-1. **Focus on the current problem** - I help with what you're working on now
-2. **Solve problems step-by-step** - I break down math problems clearly and show you the reasoning
-3. **Explain the 'why' behind each step** - I help you understand the logic, not just the answer
-4. **Natural learning progression** - I adapt to your current needs without over-referencing past problems
-5. **Build your math confidence** - I emphasize your capability with numbers
-6. **Make it engaging** - I use examples and explanations that make math interesting and accessible
-
-If you seem frustrated with math, I'll address those feelings first because I know math anxiety is real. Then we'll work through the problem together with patience and encouragement."""
+My approach:
+1. **Step-by-step solutions** - Clear explanations
+2. **Build understanding** - Explain the 'why'
+3. **Patient guidance** - Work at your pace
+4. **Encouraging support** - Build math confidence"""
 
     else:  # General Lumii
         return base_prompt + """
 
-I'm Lumii, your learning companion! I love helping with all kinds of subjects and questions you might have.
+I'm Lumii, your learning companion!
 
-My approach to learning support:
-1. **Focus on your current question** - I provide excellent help for what you're asking now
-2. **Provide excellent help across subjects** - I'm knowledgeable about many topics and explain things clearly
-3. **Natural conversation flow** - I respond to your needs without constantly referencing past topics
-4. **Stay emotionally aware** - I notice if you're getting frustrated or stressed about learning
-5. **Guide you appropriately** - I know when you might benefit from specialized support
-6. **Celebrate progress naturally** - I encourage you without being repetitive
+My approach:
+1. **Answer questions helpfully** - Provide useful responses
+2. **Keep promises** - If I offer help and you accept, I deliver
+3. **Natural conversation** - Remember our discussion context
+4. **Appropriate support** - Match help to actual needs
 
-I'm warm, encouraging, and genuinely excited to help you learn and grow. Whatever you're curious about, I'm here to explore it with you!"""
+I'm here to help you learn and grow in a supportive, caring way!"""
 
 # =============================================================================
-# ENHANCED PRIORITY DETECTION WITH SAFETY FIRST
+# ENHANCED PRIORITY DETECTION WITH SAFETY FIRST (FIXED)
 # =============================================================================
 
 def extract_student_info_from_history():
@@ -860,120 +845,139 @@ def extract_student_info_from_history():
     return student_info
 
 def detect_emotional_distress(message):
-    """Detect if the student is showing clear emotional distress"""
+    """Detect if the student is showing clear emotional distress (NOT just mentioning feelings)"""
     message_lower = message.lower()
     
-    # Strong emotional distress indicators
-    distress_keywords = [
-        'frustrated', 'stressed', 'anxious', 'worried', 'scared', 'sad', 
-        'angry', 'overwhelmed', 'tired', 'upset', 'confused', 'lost',
-        'hate this', 'can\'t do this', 'give up', 'too hard', 'stupid',
-        'impossible', 'crying', 'nervous', 'panic', 'afraid', 'bully', 'bullying',
-        'alone', 'lonely', 'isolated', 'left out', 'excluded'  # ADDED THESE
-    ]
+    # Don't flag simple acceptances as distress
+    if message_lower.strip() in ["yes", "yes please", "okay", "sure", "please"]:
+        return False
     
-    # Context matters - look for emotional language combined with intensity
+    # Check if accepting an offer
+    if is_accepting_offer(message):
+        return False
+    
+    # Look for actual distress, not just mentioning emotions
+    distress_score = 0
+    
+    # Strong indicators (2 points each)
+    strong_indicators = [
+        'crying', 'panic', 'cant handle', "can't handle", 'too much for me', 
+        'overwhelming', 'breaking down', 'falling apart'
+    ]
+    for indicator in strong_indicators:
+        if indicator in message_lower:
+            distress_score += 2
+    
+    # Moderate indicators (1 point each) - but only with intensity
+    if ('really' in message_lower or 'very' in message_lower or 'so' in message_lower):
+        moderate_indicators = ['stressed', 'anxious', 'worried', 'scared', 'frustrated']
+        for indicator in moderate_indicators:
+            if indicator in message_lower:
+                distress_score += 1
+    
+    # Phrases that indicate real distress
     distress_phrases = [
-        'so frustrated', 'really stressed', 'totally confused', 'completely lost',
-        'hate homework', 'can\'t figure', 'don\'t understand', 'too difficult',
-        'want to quit', 'makes no sense', 'feel dumb', 'feel stupid',
-        'scared to go', 'makes me really', 'takes my lunch'
+        'hate my life', 'cant do this anymore', "can't do this anymore",
+        'everything is wrong', 'nothing ever works', 'always fail'
     ]
+    for phrase in distress_phrases:
+        if phrase in message_lower:
+            distress_score += 2
     
-    # Check for strong emotional indicators
-    has_distress_keyword = any(word in message_lower for word in distress_keywords)
-    has_distress_phrase = any(phrase in message_lower for phrase in distress_phrases)
+    # Context reduces distress score (normal academic stress)
+    normal_contexts = ['homework', 'test', 'quiz', 'project', 'assignment', 'math problem']
+    if any(context in message_lower for context in normal_contexts) and distress_score < 3:
+        distress_score = max(0, distress_score - 1)
     
-    return has_distress_keyword or has_distress_phrase
+    # Need significant distress indicators
+    return distress_score >= 2
 
 def detect_priority_smart_with_safety(message):
-    """Smart priority detection with TERMINATION CHECK FIRST"""
+    """Smart priority detection with FIXED context awareness"""
     message_lower = message.lower()
     
-    # CHECK CONVERSATION TERMINATION FIRST (before other safety checks)
+    # CRITICAL FIX: Check if accepting offer FIRST
+    if is_accepting_offer(message):
+        # User is accepting our offer - provide the help we offered
+        return 'general', 'lumii_main', None
+    
+    # CHECK CONVERSATION TERMINATION (only for explicit crisis)
     should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
     if should_stop:
         return 'immediate_termination', 'CONVERSATION_END', stop_reason
     
     # ENHANCED POST-CRISIS MONITORING
     if st.session_state.get('post_crisis_monitoring', False):
-        # Check for positive acknowledgment responses that can continue safely
+        # Check for positive acknowledgment that allows continuation
         positive_responses = [
-            'you are right', 'you\'re right', 'thank you', 'thanks', 'okay', 'ok',
-            'i understand', 'i will', 'i\'ll try', 'i\'ll talk', 'you\'re correct'
+            'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
+            'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
         ]
         is_positive_response = any(phrase in message_lower for phrase in positive_responses)
         
-        # If ANY crisis language returns after termination - immediate final termination
+        # Check for crisis language return
         crisis_return_words = [
-            'hurt myself', 'kill myself', 'end my life', 'ending my life', 'suicide', 
-            'want to die', 'how to die', 'painless', 'overdose', 'cut myself'
+            'hurt myself', 'kill myself', 'end my life', 'suicide', 
+            'want to die', 'how to die'
         ]
         has_crisis_return = any(word in message_lower for word in crisis_return_words)
         
         if has_crisis_return:
             return 'crisis_return', 'FINAL_TERMINATION', 'post_crisis_violation'
         elif is_positive_response:
-            # Allow supportive continuation for positive responses
             return 'post_crisis_support', 'supportive_continuation', None
     
-    # PRIORITY 0: SAFETY CHECK (after termination check)
+    # SAFETY CHECK with improved context awareness
     is_safe, safety_type, trigger = check_request_safety(message)
     if not is_safe:
         if safety_type.startswith('CRISIS_'):
             return 'crisis', safety_type, trigger
-        elif safety_type.startswith('CONCERNING_'):
+        elif safety_type == "CONCERNING_MULTIPLE_FLAGS":
             return 'concerning', safety_type, trigger
-        else:  # BLOCKED_HARMFUL
-            return 'safety', safety_type, trigger
+        elif safety_type == "BLOCKED_HARMFUL":
+            # Double-check it's really harmful
+            if trigger in ["kill myself", "hurt myself", "end my life", "suicide"]:
+                return 'crisis', safety_type, trigger
+            else:
+                return 'safety', safety_type, trigger
     
-    # PRIORITY 1: Clear emotional distress (ALWAYS FIRST after safety)
+    # Check for normal sadness (not crisis)
+    if 'sad' in message_lower or 'lonely' in message_lower or 'no friends' in message_lower:
+        # Check if it's normal context
+        normal_sad_contexts = ['new school', 'moved', 'miss', 'different', 'changed']
+        has_normal_context = any(context in message_lower for context in normal_sad_contexts)
+        
+        # Check for crisis language
+        has_crisis_language = any(crisis in message_lower for crisis in ['kill', 'die', 'hurt myself', 'end my life'])
+        
+        if has_normal_context and not has_crisis_language:
+            # Normal sadness - provide general support
+            return 'general', 'lumii_main', None
+    
+    # PRIORITY 1: Clear emotional distress (but not crisis)
     if detect_emotional_distress(message):
         return 'emotional', 'felicity', None
     
-    # PRIORITY 2: Multiple assignments/organization needs
+    # PRIORITY 2: Multiple assignments/organization
     organization_indicators = [
-        'assignments', 'homeworks', 'projects', 'tests', 'exams', 'quizzes',
-        'so much', 'too much', 'everything due', 'multiple', 'several',
-        'organize', 'schedule', 'deadline', 'manage', 'plan'
+        'multiple assignments', 'so much homework', 'everything due',
+        'need to organize', 'overwhelmed with work', 'too many projects'
     ]
-    
-    if any(word in message_lower for word in organization_indicators):
+    if any(indicator in message_lower for indicator in organization_indicators):
         return 'organization', 'cali', None
     
-    # ENHANCED INTEREST PATTERN DETECTION
-    # Check if it's sharing interest/opinion, not requesting help
-    interest_patterns = [
-        'i like', 'i love', 'i enjoy', 'i find', 'i think',
-        'is fun', 'is cool', 'is awesome', 'is interesting', 'is great', 'is pretty',
-        'seems fun', 'looks cool', 'sounds interesting', 'so fun', 'really fun',
-        'math is', 'science is', 'history is'  # Added subject opinion patterns
-    ]
-    
-    if any(pattern in message_lower for pattern in interest_patterns):
-        return 'general', 'lumii_main', None  # Conversation, not tutoring
-    
-    # PRIORITY 3: Math content (academic help requests)
-    math_keywords = [
-        'solve', 'calculate', 'equation', 'problem', '+', '-', '×', '÷',
-        'addition', 'subtraction', 'multiplication', 'division',
-        'what is', 'equals', 'answer', 'plus', 'minus', 'times', 'divided',
-        'help me with', 'show me how', 'step by step'
-    ]
-    
-    # Only trigger math tool for actual help requests
-    if any(word in message_lower for word in math_keywords):
+    # PRIORITY 3: Math content (actual problems)
+    math_pattern = r'\d+\s*[\+\-\*/]\s*\d+'
+    if re.search(math_pattern, message_lower) or 'solve' in message_lower or 'calculate' in message_lower:
         return 'math', 'mira', None
     
-    # Check for general math mentions (without help request)
-    general_math_words = ['math', 'algebra', 'geometry', 'fraction', 'decimal', 'percent']
-    if any(word in message_lower for word in general_math_words):
-        # If it's just mentioning math without asking for help, treat as general
-        help_indicators = ['help', 'solve', 'calculate', 'show me', 'explain']
-        if not any(help_word in message_lower for help_word in help_indicators):
-            return 'general', 'lumii_main', None
-        else:
-            return 'math', 'mira', None
+    # Check for sharing interests vs asking for help
+    interest_patterns = [
+        'i like', 'i love', 'i enjoy', 'is fun', 'is cool',
+        'is interesting', 'is awesome'
+    ]
+    if any(pattern in message_lower for pattern in interest_patterns):
+        return 'general', 'lumii_main', None
     
     # Default: General learning support
     return 'general', 'lumii_main', None
@@ -1001,20 +1005,15 @@ def detect_age_from_message_and_history(message):
     # Language complexity indicators
     elementary_indicators = [
         'mom', 'dad', 'mommy', 'daddy', 'teacher said', 'my teacher', 
-        'easy', 'fun', 'play', 'recess', 'lunch', 'story time',
-        'help me please', 'i dont know', 'this is hard'
+        'recess', 'lunch', 'story time'
     ]
     
     middle_indicators = [
-        'homework', 'quiz', 'test tomorrow', 'project', 'friends', 
-        'boring', 'annoying', 'middle school', 'grade', 'classroom',
-        'group project', 'presentation', 'study guide'
+        'homework', 'quiz', 'test tomorrow', 'project', 'presentation'
     ]
     
     high_indicators = [
-        'college', 'university', 'SAT', 'ACT', 'AP', 'advanced placement',
-        'GPA', 'transcript', 'scholarship', 'graduation', 'senior year',
-        'junior year', 'extracurricular', 'part-time job'
+        'college', 'university', 'SAT', 'ACT', 'AP', 'GPA', 'transcript'
     ]
     
     # Count indicators
@@ -1033,7 +1032,7 @@ def detect_age_from_message_and_history(message):
         return 10  # Safe default
 
 # =============================================================================
-# MEMORY-SAFE AI RESPONSE GENERATION WITH SAFETY
+# MEMORY-SAFE AI RESPONSE GENERATION WITH SAFETY (FIXED)
 # =============================================================================
 
 def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
@@ -1043,6 +1042,25 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
     student_info = extract_student_info_from_history()
     student_name = st.session_state.get('student_name', '') or student_info.get('name', '')
     name_part = f"{student_name}, " if student_name else ""
+    
+    # Check if this is accepting an offer
+    if is_accepting_offer(message):
+        # Provide the help that was offered
+        last_offer = get_last_offer_context()
+        if "friend" in last_offer["content"].lower():
+            response = f"""💙 {name_part}Great! Here are some tips for making new friends at your new school:
+
+1. **Join a club or activity** - Find something you enjoy like art, sports, or chess club
+2. **Be yourself** - The best friendships happen when you're genuine
+3. **Start small** - Even just saying "hi" to someone new each day helps
+4. **Ask questions** - People love talking about their interests
+5. **Be patient** - Good friendships take time to develop
+
+Remember, lots of kids feel nervous about making friends. You're not alone! 
+Would you like more specific advice for any of these?"""
+        else:
+            response = f"🌟 {name_part}Of course! Let me help you with that. What specific part would you like to work on?"
+        return response, "🌟 Lumii's Help (Safe Mode)", "general"
     
     if tool == 'safety':
         return emergency_intervention(message, "GENERAL", student_age, student_name), "🛡️ Lumii's Safety Response", "safety"
@@ -1066,30 +1084,13 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
         return response, "🌟 Lumii's Learning Support (Safe Mode)", "general"
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
-    """Generate AI responses with comprehensive memory safety and SAFETY CHECKS"""
+    """Generate AI responses with comprehensive memory safety and FIXED SAFETY CHECKS"""
     
-    # Handle immediate termination FIRST (this will now catch "I want to hurt myself")
+    # Handle immediate termination FIRST
     if priority == 'immediate_termination':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        st.session_state.post_crisis_monitoring = True  # Enable enhanced monitoring
-        response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
-        
-This conversation needs to stop for your safety. Please talk to:
-• A parent or trusted adult RIGHT NOW
-• Crisis Text Line: Text HOME to 741741
-• Suicide & Crisis Lifeline: 988
-
-You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
-        
-        return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
-    
-    # CRITICAL: Force conversation termination for direct crisis language (backup check)
-    should_stop, stop_reason = should_terminate_conversation(message, st.session_state.harmful_request_count)
-    if should_stop:
-        st.session_state.harmful_request_count += 1
-        st.session_state.safety_interventions += 1
-        st.session_state.post_crisis_monitoring = True  # Enable enhanced monitoring
+        st.session_state.post_crisis_monitoring = True
         response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
         
 This conversation needs to stop for your safety. Please talk to:
@@ -1125,24 +1126,19 @@ You're taking the right steps by acknowledging that there are people who care ab
 
 Please don't hesitate to talk to them today if possible. You don't have to carry these heavy feelings alone.
 
-Remember: You are important, you are valued, and there is hope. Even when things feel overwhelming, there are people and resources available to help you feel better.
-
 Is there anything positive we can focus on right now while you're getting the support you need? 💙"""
         
         return response, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
     
-    # Handle safety interventions first
+    # Handle safety interventions
     if priority == 'crisis':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        st.session_state.post_crisis_monitoring = True  # Enable enhanced monitoring
-        
-        # Return crisis intervention
+        st.session_state.post_crisis_monitoring = True
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Crisis Response", "crisis", "🚨 Crisis Level"
     
     elif priority == 'concerning':
-        # NEW: Enhanced emotional support for concerning language
         st.session_state.safety_interventions += 1
         response = generate_enhanced_emotional_support(message, safety_type, student_age, st.session_state.student_name)
         return response, "💙 Lumii's Enhanced Support", "concerning", "⚠️ Concerning Language"
@@ -1150,25 +1146,22 @@ Is there anything positive we can focus on right now while you're getting the su
     elif priority == 'safety':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        
-        # Return safety intervention
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
     
-    # Reset harmful request count if safe message and reset post-crisis monitoring after sustained safety
+    # Reset harmful request count for safe messages
     if priority not in ['crisis', 'crisis_return', 'safety', 'concerning', 'immediate_termination']:
         st.session_state.harmful_request_count = 0
         
-        # Reset post-crisis monitoring after 5 safe exchanges
+        # Reset post-crisis monitoring after sustained safety
         if st.session_state.get('post_crisis_monitoring', False):
             safe_exchanges = sum(1 for msg in st.session_state.messages[-10:] 
                                if msg.get('role') == 'assistant' and 
-                               msg.get('priority') not in ['crisis', 'crisis_return', 'safety', 'concerning', 'immediate_termination'])
+                               msg.get('priority') not in ['crisis', 'crisis_return', 'safety', 'concerning'])
             if safe_exchanges >= 5:
                 st.session_state.post_crisis_monitoring = False
-                st.success("✅ Post-crisis monitoring deactivated - conversation appears stable")
     
-    # Get student info from history and session state
+    # Get student info
     student_info = extract_student_info_from_history()
     student_name = st.session_state.get('student_name', '') or student_info.get('name', '')
     final_age = student_info.get('age') or student_age
@@ -1192,7 +1185,6 @@ Is there anything positive we can focus on right now while you're getting the su
             if ai_response and not needs_fallback:
                 return ai_response, "💙 Lumii's Emotional Support", "emotional", memory_indicator
             elif needs_fallback:
-                # Use memory-safe fallback
                 response, tool_used, priority = generate_memory_safe_fallback('felicity', final_age, is_distressed, message)
                 return response, tool_used, priority, memory_indicator
         
@@ -1223,6 +1215,10 @@ Is there anything positive we can focus on right now while you're getting the su
                 message, "Lumii", final_age, student_name, is_distressed, temperature=0.8
             )
             if ai_response and not needs_fallback:
+                # Track if we're making an offer
+                if any(offer in ai_response.lower() for offer in ["would you like", "can i help", "tips", "advice"]):
+                    st.session_state.last_offer = ai_response
+                    st.session_state.awaiting_response = True
                 return ai_response, "🌟 Lumii's Learning Support", "general", memory_indicator
             elif needs_fallback:
                 response, tool_used, priority = generate_memory_safe_fallback('general', final_age, is_distressed, message)
@@ -1230,27 +1226,26 @@ Is there anything positive we can focus on right now while you're getting the su
     
     except Exception as e:
         st.error(f"🚨 AI System Error: {e}")
-        # Always provide a helpful fallback
         response, tool_used, priority = generate_memory_safe_fallback(tool, final_age, is_distressed, message)
         return response, f"{tool_used} (Emergency Mode)", priority, "🚨 Safe Mode"
     
-    # Final fallback (shouldn't reach here, but safety first)
+    # Final fallback
     response, tool_used, priority = generate_memory_safe_fallback(tool, final_age, is_distressed, message)
     return response, tool_used, priority, "🛡️ Backup Mode"
 
 # =============================================================================
-# NATURAL FOLLOW-UP SYSTEM (Enhanced with Memory and Safety)
+# NATURAL FOLLOW-UP SYSTEM
 # =============================================================================
 
 def generate_natural_follow_up(tool_used, priority, had_emotional_content=False):
-    """Generate natural, helpful follow-ups without being pushy - respecting conversation flow"""
+    """Generate natural, helpful follow-ups without being pushy"""
     
-    # Check if follow-up is appropriate based on conversation flow
+    # Check if follow-up is appropriate
     active_topics, past_topics = track_active_topics(st.session_state.messages)
     
     # Don't generate follow-ups for active topics
     if any(topic in tool_used.lower() for topic in active_topics):
-        return ""  # Topic is still active, no follow-up needed
+        return ""
     
     if "Safety" in tool_used or "Crisis" in tool_used:
         return "\n\n💙 **Remember, you're not alone. If you need to talk to someone, I'm here, and there are also trusted adults who care about you.**"
@@ -1262,7 +1257,7 @@ def generate_natural_follow_up(tool_used, priority, had_emotional_content=False)
         return "\n\n🤗 **Now that we've talked about those feelings, would you like some help with the schoolwork that was bothering you?**"
         
     elif "Organization Help" in tool_used:
-        return "\n\n📝 **I've helped you organize things. Want help with any specific subjects or assignments now?**"
+        return "\n\n📚 **I've helped you organize things. Want help with any specific subjects or assignments now?**"
         
     elif "Math Expertise" in tool_used and not had_emotional_content:
         return "\n\n🧮 **Need help with another math problem, or questions about this concept?**"
@@ -1444,10 +1439,6 @@ if prompt := st.chat_input(prompt_placeholder):
     # LAYER 1 SAFETY: Check request before processing
     is_safe, safety_type, trigger = check_request_safety(prompt)
     
-    # DEBUG: Show what safety system detected
-    if not is_safe:
-        st.error(f"🚨 SAFETY DETECTED: {safety_type} - {trigger}")
-    
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -1456,13 +1447,10 @@ if prompt := st.chat_input(prompt_placeholder):
     # Smart priority detection with safety first
     priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
     
-    # DEBUG: Show what priority was detected
-    st.error(f"🔍 PRIORITY DETECTED: {priority} - {tool}")
-    
     student_age = detect_age_from_message_and_history(prompt)
     is_distressed = detect_emotional_distress(prompt)
     
-    # Generate response using enhanced memory-safe system with safety
+    # Generate response using enhanced memory-safe system
     with st.chat_message("assistant"):
         with st.spinner("🧠 Thinking safely with full memory of our conversation..."):
             time.sleep(1)
@@ -1470,12 +1458,12 @@ if prompt := st.chat_input(prompt_placeholder):
                 prompt, priority, tool, student_age, is_distressed, safety_type, safety_trigger
             )
             
-            # Add natural follow-up if appropriate (with conversation flow awareness)
+            # Add natural follow-up if appropriate
             follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
             if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
                 response += follow_up
             
-            # Display with appropriate styling and enhanced memory indicator
+            # Display with appropriate styling
             if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return" or response_priority == "immediate_termination":
                 st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
