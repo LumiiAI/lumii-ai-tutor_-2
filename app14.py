@@ -3,6 +3,7 @@ import requests
 import json
 import time
 import re
+import uuid
 from datetime import datetime
 
 # Page configuration
@@ -14,24 +15,36 @@ st.set_page_config(
 )
 
 # =============================================================================
-# CONVERSATION CONTEXT TRACKING - NEW HELPER FUNCTIONS
+# ENHANCED CONVERSATION CONTEXT TRACKING - CHATGPT + CLAUDE FIXES
 # =============================================================================
 
 def get_last_offer_context():
-    """Track what was offered in the last assistant message"""
+    """Track what was offered in the last assistant message - ENHANCED"""
     if len(st.session_state.messages) > 0:
         for msg in reversed(st.session_state.messages):
             if msg["role"] == "assistant":
                 content = msg["content"].lower()
-                if any(offer in content for offer in ["would you like", "can i help", "let me help", "i can offer", "tips", "advice", "suggestions"]):
+                # Enhanced detection patterns (Claude fix)
+                offer_patterns = [
+                    "would you like", "can i help", "let me help", "i can offer", 
+                    "tips", "advice", "suggestions", "would you like some",
+                    "want some help", "help you with", "give you some tips",
+                    "share some advice", "show you how"
+                ]
+                if any(offer in content for offer in offer_patterns):
                     return {"offered_help": True, "content": msg["content"]}
                 break
     return {"offered_help": False, "content": None}
 
 def is_accepting_offer(message):
-    """Check if message is accepting a previous offer"""
+    """Check if message is accepting a previous offer - ENHANCED"""
     message_lower = message.lower().strip()
-    acceptance_phrases = ["yes", "yes please", "sure", "okay", "ok", "yeah", "yep", "sounds good", "that would help", "please", "definitely", "absolutely"]
+    # Enhanced acceptance phrases (ChatGPT + Claude)
+    acceptance_phrases = [
+        "yes", "yes please", "sure", "okay", "ok", "yeah", "yep", 
+        "sounds good", "that would help", "please", "definitely", 
+        "absolutely", "yup", "sure thing", "okay please", "sounds great"
+    ]
     
     # Check if this is an acceptance
     for phrase in acceptance_phrases:
@@ -43,7 +56,21 @@ def is_accepting_offer(message):
     return False
 
 # =============================================================================
-# CRITICAL SAFETY ARCHITECTURE - LAYER 1: PRE-GENERATION SAFETY (FIXED)
+# ENHANCED CRISIS RESOURCE DETECTION - CHATGPT FIX
+# =============================================================================
+
+def _contains_crisis_resource(text: str) -> bool:
+    """Detect crisis/hotline language that shouldn't appear during normal help acceptance"""
+    t = text.lower()
+    crisis_markers = [
+        "988", "crisis text line", "text home to 741741", "741741",
+        "suicide & crisis", "hotline", "trusted adult", "emergency room",
+        "immediate danger", "call a trusted adult", "suicide & crisis lifeline"
+    ]
+    return any(m in t for m in crisis_markers)
+
+# =============================================================================
+# ENHANCED SAFETY ARCHITECTURE - LAYER 1: PRE-GENERATION SAFETY (FIXED)
 # =============================================================================
 
 def check_request_safety(message):
@@ -55,42 +82,42 @@ def check_request_safety(message):
     if is_accepting_offer(message):
         return True, "SAFE", None  # Just accepting help - NOT a crisis
     
-    # EXPLICIT CRISIS TERMS ONLY - Must be very specific
-    EXPLICIT_CRISIS_TERMS = [
-        # Self-harm - MUST be explicit and direct
-        'kill myself', 'suicide', 'end my life', 'ending my life', 
-        'cut myself', 'self harm', 'self-harm', 'overdose', 'want to die', 
-        'better off dead', 'not worth living', 'end it all',
-        'how to die', 'ways to die', 'die painlessly', 'painless death',
-        'suicide methods', 'help me die', 'want to hurt myself',
-        
-        # Explicit substance abuse (not just mentioning)
-        'get high on', 'smoke weed', 'take drugs', 'get drunk',
-        'how to get drugs', 'where to buy drugs',
-        
-        # Explicit violence
-        'hurt someone', 'kill someone', 'beat someone up',
-        'how to make a weapon', 'how to get a gun',
-        
-        # Dangerous activities with intent
-        'run away from home forever', 'never go back to school'
-    ]
+    # CHATGPT FIX: More precise crisis terms with word boundaries
+    # Using regex for exact matches to avoid false positives like "skill" → "kill"
+    has_explicit_crisis = bool(
+        re.search(r"\bkill myself\b", message_lower)
+        or re.search(r"\bhurt myself\b", message_lower)
+        or re.search(r"\bend my life\b", message_lower)
+        or re.search(r"\b(?:want|wanted|wanna)\s+to\s+die\b", message_lower)
+        or re.search(r"\bcommit suicide\b", message_lower)
+        or "suicide" in message_lower
+        or "overdose" in message_lower
+        or "cut myself" in message_lower
+        or "self harm" in message_lower
+        or "self-harm" in message_lower
+        or "better off dead" in message_lower
+        or "not worth living" in message_lower
+        or "end it all" in message_lower
+    )
     
-    # Only flag if EXPLICIT crisis terms present
-    for term in EXPLICIT_CRISIS_TERMS:
-        if term in message_lower:
-            return False, "BLOCKED_HARMFUL", term
+    if has_explicit_crisis:
+        return False, "BLOCKED_HARMFUL", "explicit_crisis"
     
     # CRISIS-LEVEL PATTERNS - Need very clear indicators
-    # Check for goodbye letters only with clear finality
     if ('goodbye letter' in message_lower or 'farewell letter' in message_lower) and \
        ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower):
         return False, "CRISIS_GOODBYE_LETTERS", "goodbye_letter"
     
-    # Check for concerning patterns but with higher threshold
+    # CHATGPT FIX: Demoted over-broad triggers to concerning (not crisis)
     concerning_score = 0
     
-    # These need multiple indicators together
+    # Academic stress context awareness (Claude fix)
+    academic_context = any(word in message_lower for word in [
+        'homework', 'test', 'quiz', 'assignment', 'project', 'school',
+        'math', 'science', 'english', 'study', 'exam'
+    ])
+    
+    # Enhanced context-aware concerning detection
     if "burden" in message_lower and ("everyone" in message_lower or "family" in message_lower):
         concerning_score += 2
     if "no point" in message_lower and ("anymore" in message_lower or "living" in message_lower):
@@ -99,6 +126,17 @@ def check_request_safety(message):
         concerning_score += 3
     if "giving away" in message_lower and "my stuff" in message_lower:
         concerning_score += 2
+    
+    # CHATGPT FIX: Demoted triggers (moved from explicit crisis to concerning)
+    if "run away" in message_lower and "forever" in message_lower:
+        concerning_score += 2
+    if "never go back to school" in message_lower:
+        concerning_score += 2
+    
+    # CLAUDE FIX: Don't flag normal academic stress as concerning
+    if any(word in message_lower for word in ['stressed', 'worried', 'anxious']):
+        if academic_context and concerning_score < 3:
+            concerning_score = 0  # Reset for normal academic stress
     
     # Only flag if high concerning score (multiple indicators)
     if concerning_score >= 4:
@@ -256,11 +294,15 @@ Please consider talking to:
 I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
 # =============================================================================
-# CONVERSATION FLOW & ACTIVE TOPIC TRACKING
+# ENHANCED CONVERSATION FLOW & ACTIVE TOPIC TRACKING - CLAUDE FIX
 # =============================================================================
 
 def track_active_topics(messages):
-    """Track what topics are currently active vs past"""
+    """Track what topics are currently active vs past - FIXED memory leak"""
+    
+    # CLAUDE FIX: Limit processing to prevent memory bloat
+    if len(messages) > 50:
+        messages = messages[-50:]  # Only process last 50 messages
     
     active_topics = []  # Topics from last 5 exchanges
     past_topics = []    # Topics from earlier in conversation
@@ -321,7 +363,7 @@ def is_appropriate_followup_time(topic, messages):
 # PRIVACY DISCLAIMER POPUP - LAUNCH REQUIREMENT
 # =============================================================================
 
-# Initialize disclaimer agreement state
+# Initialize enhanced session state with family separation
 if 'agreed_to_terms' not in st.session_state:
     st.session_state.agreed_to_terms = False
 if 'harmful_request_count' not in st.session_state:
@@ -332,6 +374,13 @@ if "last_offer" not in st.session_state:
     st.session_state.last_offer = None
 if "awaiting_response" not in st.session_state:
     st.session_state.awaiting_response = False
+
+# CLAUDE FIX: Family separation support
+if "family_id" not in st.session_state:
+    st.session_state.family_id = str(uuid.uuid4())[:8]  # Short family ID
+
+if "student_profiles" not in st.session_state:
+    st.session_state.student_profiles = {}
 
 # Show disclaimer popup before allowing app access
 if not st.session_state.agreed_to_terms:
@@ -672,6 +721,21 @@ def get_groq_response_with_memory_safety(current_message, tool_name, student_age
             result = response.json()
             ai_content = result['choices'][0]['message']['content']
             
+            # CHATGPT FIX: prevent crisis language on simple offer acceptance
+            if is_accepting_offer(current_message) and _contains_crisis_resource(ai_content):
+                last_offer = get_last_offer_context()
+                if last_offer["offered_help"] and last_offer["content"] and "friend" in last_offer["content"].lower():
+                    ai_content = (
+                        "💙 Great! Here are some friendly ideas to try:\n"
+                        "• Join one club/activity you like this week\n"
+                        "• Say hi to someone you sit near and ask a small question\n"
+                        "• Invite a classmate to play at recess or sit together at lunch\n"
+                        "• Notice who enjoys similar things (games, drawing, sports) and chat about it\n"
+                        "• Keep it gentle and patient — friendships grow with time 🌱"
+                    )
+                else:
+                    ai_content = "🌟 Sure — let's start with the part that feels most helpful. What would you like first?"
+            
             # LAYER 2 SAFETY: Validate response before returning
             is_safe, harmful_phrase = validate_ai_response(ai_content)
             if not is_safe:
@@ -915,12 +979,13 @@ def detect_priority_smart_with_safety(message):
         ]
         is_positive_response = any(phrase in message_lower for phrase in positive_responses)
         
-        # Check for crisis language return
-        crisis_return_words = [
-            'hurt myself', 'kill myself', 'end my life', 'suicide', 
-            'want to die', 'how to die'
-        ]
-        has_crisis_return = any(word in message_lower for word in crisis_return_words)
+        # CHATGPT FIX: Check for crisis language return with word boundaries
+        has_crisis_return = bool(
+            re.search(r"\bhurt myself\b", message_lower)
+            or re.search(r"\bkill myself\b", message_lower)
+            or re.search(r"\bend my life\b", message_lower)
+            or "suicide" in message_lower
+        )
         
         if has_crisis_return:
             return 'crisis_return', 'FINAL_TERMINATION', 'post_crisis_violation'
@@ -947,8 +1012,13 @@ def detect_priority_smart_with_safety(message):
         normal_sad_contexts = ['new school', 'moved', 'miss', 'different', 'changed']
         has_normal_context = any(context in message_lower for context in normal_sad_contexts)
         
-        # Check for crisis language
-        has_crisis_language = any(crisis in message_lower for crisis in ['kill', 'die', 'hurt myself', 'end my life'])
+        # CHATGPT FIX: Check for crisis language with word boundaries
+        has_crisis_language = bool(
+            re.search(r"\bkill\b", message_lower)
+            or re.search(r"\bdie\b", message_lower) 
+            or re.search(r"\bhurt myself\b", message_lower)
+            or re.search(r"\bend my life\b", message_lower)
+        )
         
         if has_normal_context and not has_crisis_language:
             # Normal sadness - provide general support
@@ -983,7 +1053,7 @@ def detect_priority_smart_with_safety(message):
     return 'general', 'lumii_main', None
 
 def detect_age_from_message_and_history(message):
-    """Enhanced age detection using both current message and conversation history"""
+    """Enhanced age detection using both current message and conversation history - CLAUDE FIX"""
     
     # First, check conversation history
     student_info = extract_student_info_from_history()
@@ -1021,15 +1091,15 @@ def detect_age_from_message_and_history(message):
     middle_count = sum(1 for indicator in middle_indicators if indicator in message_lower)
     high_count = sum(1 for indicator in high_indicators if indicator in message_lower)
     
-    # Decision logic
+    # CLAUDE FIX: Decision logic - REQUIRE MULTIPLE INDICATORS
     if high_count >= 2:
         return 16  # High school
-    elif elementary_count >= 2:
-        return 8  # Elementary
-    elif middle_count > 0:
+    elif elementary_count >= 3:  # INCREASED from 2
+        return 8   # Elementary  
+    elif middle_count >= 2:      # INCREASED from 1
         return 12  # Middle school
     else:
-        return 10  # Safe default
+        return 12  # CHANGED: Safer default (was 10)
 
 # =============================================================================
 # MEMORY-SAFE AI RESPONSE GENERATION WITH SAFETY (FIXED)
@@ -1085,6 +1155,30 @@ Would you like more specific advice for any of these?"""
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with comprehensive memory safety and FIXED SAFETY CHECKS"""
+    
+    # CHATGPT FIX: acceptance short-circuit (must run before any crisis logic)
+    if is_accepting_offer(message):
+        # Deliver the specific help we offered, bypassing the model entirely
+        last_offer = get_last_offer_context()
+        student_info = extract_student_info_from_history()
+        final_age = student_info.get('age') or student_age
+
+        # If we recently offered friendship tips, provide them explicitly
+        if last_offer["offered_help"] and last_offer["content"] and "friend" in last_offer["content"].lower():
+            response = (
+                "💙 Great! Here are some tips for making new friends at your new school:\n\n"
+                "1) **Join an activity you enjoy** (art, sports, chess, choir)\n"
+                "2) **Start small** — say hi to one new person each day\n"
+                "3) **Ask questions** — "What game are you playing?" "How's your day?"\n"
+                "4) **Find common ground** — lunch, recess, after-school clubs\n"
+                "5) **Be patient and kind to yourself** — real friendships take time\n\n"
+                "Want help planning what to try this week? We can make a mini friendship plan together. 😊"
+            )
+            return response, "🌟 Lumii's Learning Support", "general", "🧠 With Memory"
+        else:
+            # Generic acceptance handler
+            response = "🌟 Awesome — tell me which part you'd like to start with and we'll do it together!"
+            return response, "🌟 Lumii's Learning Support", "general", "🧠 With Memory"
     
     # Handle immediate termination FIRST
     if priority == 'immediate_termination':
@@ -1324,6 +1418,10 @@ with st.sidebar:
     with col2:
         st.metric("Emotional Support", st.session_state.emotional_support_count)
         st.metric("Organization Help", st.session_state.organization_help_count)
+    
+    # Show family ID for tracking
+    if st.session_state.family_id:
+        st.caption(f"Family ID: {st.session_state.family_id}")
     
     # Safety monitoring
     if st.session_state.safety_interventions > 0:
