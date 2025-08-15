@@ -1132,7 +1132,7 @@ def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
 
 1. **Join a club or activity** - Find something you enjoy like art, sports, or chess club
 2. **Be yourself** - The best friendships happen when you're genuine
-3. **Start small** - Even just saying "hi" to someone new each day helps
+3. **Start small** - Even just saying 'hi' to someone new each day helps
 4. **Ask questions** - People love talking about their interests
 5. **Be patient** - Good friendships take time to develop
 
@@ -1179,7 +1179,7 @@ def generate_response_with_memory_safety(message, priority, tool, student_age=10
                 "💙 Great! Here are some tips for making new friends at your new school:\n\n"
                 "1) **Join an activity you enjoy** (art, sports, chess, choir)\n"
                 "2) **Start small** — say hi to one new person each day\n"
-                "3) **Ask questions** — "What game are you playing?" "How's your day?"\n"
+                "3) **Ask questions** — 'What game are you playing?' 'How's your day?'\n"
                 "4) **Find common ground** — lunch, recess, after-school clubs\n"
                 "5) **Be patient and kind to yourself** — real friendships take time\n\n"
                 "Want help planning what to try this week? We can make a mini friendship plan together. 😊"
