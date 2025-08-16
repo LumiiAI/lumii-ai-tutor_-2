@@ -134,25 +134,25 @@ def global_crisis_guard(message):
             resources = get_crisis_resources()
             
             # Generate immediate intervention response
-            intervention = f"""🚨 POMEMBNO - TAKOJ POIŠČI POMOČ 🚨
+            intervention = f"""🚨 IMPORTANT - GET HELP IMMEDIATELY 🚨
 
-Skrbi me zate in to, kar praviš. Tvoja varnost je najpomembnejša.
+I'm very concerned about what you're saying. Your safety is the most important thing.
 
-TAKOJ se obrni na:
+PLEASE reach out RIGHT NOW to:
 • {resources['crisis_line']}
 • {resources['suicide_line']}  
 • {resources['emergency']}
 • {resources['additional']}
 
-LAHKO tudi greš k:
-• Staršem ali skrbnikom
-• Šolskemu svetovalcu
-• Zdravniku
-• Katerikoli odrasli osebi, ki ji zaupaš
+You can also go to:
+• Your parents or guardians
+• A school counselor
+• A doctor
+• Any trusted adult
 
-Nisi sam/a v tem. Obstajajo ljudje, ki ti želijo pomagati. Prosim, poišči pomoč TAKOJ.
+You are not alone in this. There are people who want to help you. Please get help IMMEDIATELY.
 
-Ta pogovor se zaključuje zaradi tvoje varnosti. Prosim, pokliči eno od zgornjih številk ZDAJ."""
+This conversation is ending for your safety. Please call one of the numbers above RIGHT NOW."""
             
             return True, intervention
     
@@ -2250,14 +2250,14 @@ else:
             # IMMEDIATE TERMINATION - display crisis intervention
             with st.chat_message("assistant"):
                 st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
-                st.markdown('<div class="safety-badge">🚨 VARNOSTNI UKREP - Pogovor zaključen</div>', unsafe_allow_html=True)
+                st.markdown('<div class="safety-badge">🚨 SAFETY INTERVENTION - Conversation Ended</div>', unsafe_allow_html=True)
             
             # Add to messages and stop processing
             st.session_state.messages.append({
                 "role": "assistant", 
                 "content": crisis_intervention,
                 "priority": "crisis_termination",
-                "tool_used": "🚨 VARNOSTNI UKREP",
+                "tool_used": "🚨 SAFETY INTERVENTION",
                 "safety_triggered": True
             })
             st.session_state.interaction_count += 1
