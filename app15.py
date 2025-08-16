@@ -28,8 +28,54 @@ def get_groq_api_key():
         # For local development
         return st.text_input("Enter Groq API Key (for testing):", type="password")
 
-def call_groq_api(messages, max_tokens=1000, temperature=0.7):
-    """Call Groq API with error handling"""
+# =============================================================================
+# ENHANCED OUTPUT VALIDATION (ChatGPT's suggestion + existing safety patterns)
+# =============================================================================
+
+# Combine ChatGPT's suggestions with existing comprehensive safety patterns
+FORBIDDEN_RESPONSE_PATTERNS = [
+    # ChatGPT's suggestions
+    re.compile(r"\b(suicide methods?|how to kill|hide from parents)\b", re.IGNORECASE),
+    re.compile(r"\b(overdose|mix\s+(?:drugs|pills|chemicals))\b", re.IGNORECASE),
+    
+    # Existing comprehensive patterns from app15.py
+    re.compile(r"\bhow to hurt yourself\b"),
+    re.compile(r"\bhow to kill yourself\b"),
+    re.compile(r"\btake these pills\b"),
+    re.compile(r"\bcut yourself here\b"),
+    re.compile(r"\bdon't tell anyone\b"),
+    re.compile(r"\bways to die\b"),
+    re.compile(r"\bmethods of suicide\b"),
+    re.compile(r"\bkeep this secret\b"),
+    re.compile(r"\buse a blade\b"),
+    re.compile(r"\bmix(ed)?\s+(pills|drugs|chemicals)\b"),
+    re.compile(r"\bsearch for methods\b"),
+    re.compile(r"\bingest\s+(pills|chemicals|substances)\b"),
+    re.compile(r"\btake\s+\d+\s+(pills|tablets)\b"),
+    re.compile(r"\b(you should|i suggest you|try to)\s+hide\s+(this|that|it)\s+from\s+(parents|family)\b"),
+    re.compile(r"\b(how can you|ways to)\s+hide\s+from\s+(parents|family)\b"),
+]
+
+def validate_groq_output(text: str) -> str:
+    """Check AI output for unsafe content before displaying to students"""
+    text_lower = text.lower()
+    
+    # Check against forbidden patterns
+    for pattern in FORBIDDEN_RESPONSE_PATTERNS:
+        if pattern.search(text_lower):
+            return "⚠️ I can't share that information. If you're struggling with something serious, please talk to a trusted adult who can help you properly."
+    
+    # Check for crisis hotline numbers appearing inappropriately
+    crisis_indicators = ["988", "741741", "crisis text line", "suicide & crisis lifeline"]
+    if any(indicator in text_lower for indicator in crisis_indicators):
+        # Only allow these in actual crisis responses
+        if not any(safe_phrase in text_lower for safe_phrase in ["please talk to", "reach out to", "if you need help"]):
+            return "⚠️ I want to make sure you get the right kind of help. Please talk to a trusted adult about what's on your mind."
+    
+    return text
+
+def call_groq_api(messages, max_tokens=1000, temperature=0.7, max_retries=3):
+    """Call Groq API with retry logic, error handling, and output validation"""
     api_key = get_groq_api_key()
     
     if not api_key:
@@ -48,19 +94,46 @@ def call_groq_api(messages, max_tokens=1000, temperature=0.7):
         "stream": False
     }
     
-    try:
-        response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        
-        result = response.json()
-        return result["choices"][0]["message"]["content"]
-        
-    except requests.exceptions.Timeout:
-        return "⏰ Sorry, I'm thinking a bit slowly right now. Please try again!"
-    except requests.exceptions.RequestException as e:
-        return f"🔧 Having some technical difficulties. Error: {str(e)}"
-    except Exception as e:
-        return f"💭 Something went wrong with my thinking process. Please try again!"
+    backoff = 2  # seconds
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
+            
+            # Handle rate limiting with exponential backoff
+            if response.status_code == 429:  # rate limit
+                if attempt < max_retries - 1:
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                return "⏳ I'm a bit busy right now, can you try again in a moment?"
+            
+            # Handle server errors with retry
+            if response.status_code >= 500:
+                if attempt < max_retries - 1:
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                return "🔧 I'm having some trouble connecting. Please try again soon!"
+            
+            response.raise_for_status()
+            result = response.json()
+            content = result["choices"][0]["message"]["content"]
+            
+            # CRITICAL: Validate output before returning to student
+            return validate_groq_output(content)
+            
+        except requests.exceptions.Timeout:
+            return "⏰ Sorry, I'm thinking a bit slowly. Please try again!"
+        except requests.exceptions.RequestException:
+            if attempt < max_retries - 1:
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            return "🔧 I'm having some trouble connecting. Please try again soon!"
+        except Exception:
+            return "💭 Hmm, something went wrong with my thinking. Can we try again?"
+    
+    return "⚠️ Sorry, I couldn't get a safe response right now. Please try again or talk to a trusted adult if you need help."
 
 # =============================================================================
 # LUMII SYSTEM PROMPTS
