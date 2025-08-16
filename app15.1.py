@@ -25,8 +25,12 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b", re.IGNORECASE),
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
     
-    # Euphemisms and indirect expressions
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+disappear\s+(?:forever|permanently)\b", re.IGNORECASE),
+    # Euphemisms and indirect expressions - FIXED TO CATCH "want to disappear" + typos
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b", re.IGNORECASE),  # Standard spelling, optional "to"
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*dissapear\b", re.IGNORECASE),  # Common typo, optional "to"
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disapear\b", re.IGNORECASE),   # Another typo, optional "to"
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*vanish\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*(?:go\s+away|fade\s+away)\b", re.IGNORECASE),
     re.compile(r"\b(?:don'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b", re.IGNORECASE),
     re.compile(r"\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b", re.IGNORECASE),
     re.compile(r"\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b", re.IGNORECASE),
