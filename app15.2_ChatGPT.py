@@ -6,21 +6,6 @@ import re
 import uuid
 from datetime import datetime
 
-def http_post_with_retry(url, headers, payload, timeout=20, max_attempts=2, backoff_seconds=1.2):
-    """Simple retry wrapper for POST requests (handles 429 and timeouts)"""
-    for attempt in range(max_attempts):
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-            if resp.status_code == 429 and attempt < max_attempts - 1:
-                time.sleep(backoff_seconds)
-                continue
-            return resp
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-            if attempt < max_attempts - 1:
-                time.sleep(backoff_seconds)
-                continue
-            raise
-
 # Page configuration
 st.set_page_config(
     page_title="My Friend Lumii - Your AI Learning Companion",
@@ -39,6 +24,7 @@ CRISIS_PATTERNS = [
     re.compile(r"\bhurt myself\b"),
     re.compile(r"\bend my life\b"),
     re.compile(r"\b(?:want|wanted|wanna)\s+to\s+die\b"),
+    re.compile(r"\bcommit suicide\b"),
     re.compile(r"\bcut myself\b"),
     re.compile(r"\bself harm\b"),
     re.compile(r"\bself-harm\b"),
@@ -46,7 +32,6 @@ CRISIS_PATTERNS = [
     re.compile(r"\bnot worth living\b"),
     re.compile(r"\bend it all\b"),
     re.compile(r"\bdecided to die\b"),
-    # ChatGPT Refinement: Add euphemistic/self-worth phrases
     re.compile(r"\bdon't want to be here anymore\b"),
     re.compile(r"\bno reason to live\b"),
     re.compile(r"\bnothing to live for\b"),
@@ -56,13 +41,13 @@ CRISIS_PATTERNS = [
     re.compile(r"\bwant to disappear forever\b"),
     re.compile(r"\bend the pain\b"),
     re.compile(r"\bstop existing\b"),
-    
-re.compile(r"\bunalive\b"),
-re.compile(r"\bkys\b"),
-re.compile(r"\bkms\b"),
-re.compile(r"\bself[-\s]?delete\b"),
-re.compile(r"\boff myself\b"),
-re.compile(r"\bi (?:don'?t|do not) want to exist\b"),
+    # slang/euphemisms
+    re.compile(r"\bunalive\b"),
+    re.compile(r"\bkys\b"),
+    re.compile(r"\bkms\b"),
+    re.compile(r"\bself[-\s]?delete\b"),
+    re.compile(r"\boff myself\b"),
+    re.compile(r"\bi (?:don'?t|do not) want to exist\b"),
 ]
 
 IMMEDIATE_TERMINATION_PATTERNS = [
@@ -76,7 +61,6 @@ IMMEDIATE_TERMINATION_PATTERNS = [
     re.compile(r"\bwant to hurt myself right now\b"),
     re.compile(r"\bending my life today\b"),
     re.compile(r"\bgoing to kill myself\b"),
-    re.compile(r"\bdecided to die\b"),
 ]
 
 # ChatGPT Fix #8 - Locale-aware crisis resources
@@ -170,29 +154,27 @@ def get_last_offer_context():
     return {"offered_help": False, "content": None}
 
 def is_accepting_offer(message):
-    """Check if message is accepting a previous offer - FIXED CRITICAL VULNERABILITY (ChatGPT Fix #1)"""
+    """Check if message is accepting a previous offer - hardened"""
     msg = message.strip().lower()
-    accept_heads = ("yes", "yes please", "sure", "okay", "ok", "yeah", "yep", 
-                   "sounds good", "that would help", "definitely", 
-                   "absolutely", "yup", "sure thing", "okay please", "sounds great")
-    
+    accept_heads = (
+        "yes", "yes please", "sure", "okay", "ok", "yeah", "yep",
+        "sounds good", "that would help", "definitely",
+        "absolutely", "yup", "sure thing", "okay please", "sounds great"
+    )
     last_offer = get_last_offer_context()
     if not last_offer["offered_help"]:
         return False
-    
-    # Must be exactly an acceptance OR acceptance + benign tail
+
     for head in accept_heads:
         if msg == head:
             return True
         if msg.startswith(head + " "):
             tail = msg[len(head):].strip()
-            # CRITICAL FIX: Check for crisis terms in tail
             if any(pattern.search(tail) for pattern in (CRISIS_PATTERNS + IMMEDIATE_TERMINATION_PATTERNS)):
                 return False  # Not a safe acceptance
             return True
     return False
 
-# =============================================================================
 # ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED (ChatGPT Fix #3 & #6)
 # =============================================================================
 
@@ -223,7 +205,6 @@ def _contains_crisis_resource(text: str) -> bool:
 # =============================================================================
 
 def global_crisis_override_check(message):
-
     """ALWAYS check for crisis first - overrides ALL other states including timeout"""
     message_lower = message.lower()
 
@@ -237,103 +218,16 @@ def global_crisis_override_check(message):
 
     # Crisis-level patterns
     if ('goodbye letter' in message_lower or 'farewell letter' in message_lower) and \
-       ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower         or 'never coming back' in message_lower or 'no one will see me again' in message_lower):
+       ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower or \
+        'never coming back' in message_lower or 'no one will see me again' in message_lower):
         return True, "CRISIS_GOODBYE_LETTERS", "explicit_crisis"
 
     # After all crisis checks, allow acceptance handling
     if is_accepting_offer(message):
         return False, None, None
 
-    # Safety checks passed
     return False, None, None
 
-
-def check_request_safety(message):
-    """Enhanced safety check with proper priority ordering"""
-    
-    # CRITICAL: Global crisis check FIRST (ChatGPT Fix #2)
-    is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
-    if is_crisis:
-        return False, crisis_type, crisis_trigger
-    
-    message_lower = message.lower()
-    concerning_score = 0
-    
-    # Academic stress context awareness
-    academic_context = any(word in message_lower for word in [
-        'homework', 'test', 'quiz', 'assignment', 'project', 'school',
-        'math', 'science', 'english', 'study', 'exam'
-    ])
-    
-    # Enhanced context-aware concerning detection
-    if "burden" in message_lower and ("everyone" in message_lower or "family" in message_lower):
-        concerning_score += 2
-    if "no point" in message_lower and ("anymore" in message_lower or "living" in message_lower):
-        concerning_score += 2
-    if "goodbye forever" in message_lower or "never see me again" in message_lower:
-        concerning_score += 3
-    if "giving away" in message_lower and "my stuff" in message_lower:
-        concerning_score += 2
-    if "run away" in message_lower and "forever" in message_lower:
-        concerning_score += 2
-    if "never go back to school" in message_lower:
-        concerning_score += 2
-    
-    # Don't flag normal academic stress as concerning
-    if any(word in message_lower for word in ['stressed', 'worried', 'anxious']):
-        if academic_context and concerning_score < 3:
-            concerning_score = 0
-    
-    # Only flag if high concerning score
-    if concerning_score >= 4:
-        return False, "CONCERNING_MULTIPLE_FLAGS", "multiple_concerns"
-    
-    return True, "SAFE", None
-
-def validate_user_input(message):
-    """Check user input BEFORE sending to API - prevents jailbreak attempts"""
-    message_lower = message.lower()
-    
-    # Check against forbidden input patterns
-    for pattern in FORBIDDEN_INPUT_PATTERNS:
-        if pattern.search(message_lower):
-            return False, pattern.pattern
-    
-    return True, None
-
-def validate_ai_response(response):
-    """Enhanced response validator with broader safety coverage (ChatGPT Fix #6)"""
-    response_lower = response.lower()
-    
-    # Check against enhanced forbidden patterns
-    for pattern in FORBIDDEN_RESPONSE_PATTERNS:
-        if pattern.search(response_lower):
-            return False, pattern.pattern
-    
-    return True, None
-
-def should_terminate_conversation(message, harmful_request_count):
-
-    """Unified termination logic (ChatGPT Fix #3)"""
-    # Use centralized immediate termination check first
-    if has_immediate_termination_language(message):
-        return True, "CRITICAL_IMMEDIATE"
-
-    # Then explicit crisis check
-    if has_explicit_crisis_language(message):
-        return True, "EXPLICIT_CRISIS"
-
-    # Accepting a safe offer should not terminate
-    if is_accepting_offer(message):
-        return False, None
-
-    # Persistent harmful requests after multiple warnings
-    if harmful_request_count >= 3:
-        return True, "REPEATED_HARMFUL_REQUESTS"
-
-    return False, None
-
-# =============================================================================
 # CRISIS RESOURCES WITH LOCALE SUPPORT (ChatGPT Fix #8)
 # =============================================================================
 
@@ -500,24 +394,6 @@ def detect_non_educational_topics(message):
     """Detect topics outside K-12 educational scope - refer to appropriate adults (REFINED)"""
     message_lower = message.lower()
     
-    # Educational context allowlist override (homework/assignment/class)
-    educational_context = [
-        r"\bhomework\b", r"\bassignment\b", r"\bfor (?:my|our) (?:class|school|essay|project)\b",
-        r"\bessay\b", r"\bfor (?:history|civics|social studies|religion class)\b", r"\bancient\b",
-        r"\bfor school\b", r"\bworksheet\b", r"\bstudy guide\b", r"\bcompare and contrast\b", r"\bexplain\b"
-    ]
-    if any(re.search(p, message_lower) for p in educational_context):
-        return None
-
-    # Self-report of substance use (route regardless of advice-seeking)
-    self_report_substance = [
-        r"\b(i\s*(?:am|'m)?|im)\s+(?:vaping|smoking|drinking)\b",
-        r"\b(i\s*(?:am|'m)?|im)\s+(?:using\s+(?:weed|marijuana|cannabis)|taking\s+edibles)\b",
-        r"\bi have a (?:vape|juul)\b"
-    ]
-    if any(re.search(p, message_lower) for p in self_report_substance):
-        return "substance_legal"
-
     # ChatGPT Refinement: Only trigger on advice-seeking patterns to avoid false positives
     advice_seeking_patterns = [
         r"\bhow\s+(do i|should i|can i)\b",
@@ -534,7 +410,12 @@ def detect_non_educational_topics(message):
     if not is_advice_seeking:
         return None
     
-    # Health/Medical/Wellness (refined to avoid false positives like "healthy friendships")
+    
+    # Allowlist for clear school/homework context to prevent false positives
+    homework_allow = ["homework", "assignment", "for class", "for school", "essay", "history", "civics", "ancient", "project", "report", "presentation"]
+    if any(k in message_lower for k in homework_allow):
+        return None
+# Health/Medical/Wellness (refined to avoid false positives like "healthy friendships")
     health_patterns = [
         r"\b(diet|nutrition|weight loss|exercise routine|medicine|drugs|medical|doctor|sick|symptoms|diagnosis)\b",
         r"\bmental health\s+(treatment|therapy|counseling)\b",
@@ -563,7 +444,24 @@ def detect_non_educational_topics(message):
         r"\bfinancial\b", r"\bstocks\b", r"\bcryptocurrency\b"
     ]
     
-    # Check patterns with word boundaries for precision
+    # Check patterns with wo
+def should_terminate_conversation(message, harmful_request_count):
+    """Unified termination logic (ChatGPT Fix #3)"""
+    # Use centralized immediate termination check first
+    if has_immediate_termination_language(message):
+        return True, "CRITICAL_IMMEDIATE"
+
+    # Then allow acceptance
+    if is_accepting_offer(message):
+        return False, None
+
+    # Persistent harmful requests after multiple warnings
+    if harmful_request_count >= 5:
+        return True, "PERSISTENT_HARMFUL"
+
+    return False, None
+
+rd boundaries for precision
     if any(re.search(pattern, message_lower) for pattern in health_patterns):
         return "health_wellness"
     elif any(re.search(pattern, message_lower) for pattern in family_patterns):
@@ -1155,7 +1053,7 @@ def create_conversation_summary(messages):
         
         summary = f"""📋 Conversation Summary:
 Student: {student_info.get('name', 'Unknown')} (Age: {student_info.get('age', 'Unknown')})
-Topics discussed: {', '.join(set(topics_discussed[-3:]))}
+Topics discussed: {', '.join(set(topics_discussed[-3:]))}  
 Emotional support provided: {len(emotional_moments)} times
 Learning progress: Math problems solved, organization help provided"""
         
@@ -1382,7 +1280,10 @@ Let's focus on something positive we can work on together. How can I help you wi
             "stream": False
         }
         
-        response = http_post_with_retry(GROQ_API_URL, headers, payload, timeout=20)
+        response = requests.post(GROQ_API_URL, 
+                               headers=headers, 
+                               json=payload, 
+                               timeout=20)
         
         if response.status_code == 200:
             result = response.json()
@@ -2192,7 +2093,7 @@ st.info("""
 
 🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
 
-🌈 **Identity Support:** I provide supportive, inclusive guidance for LGBTQ+ identity questions
+🌈 **Identity Boundary:** For LGBTQ+ identity topics, I’ll encourage you to talk with a parent/guardian or another trusted adult. I can listen and be kind, but I won’t give personal advice
 
 👨‍👩‍👧‍👦 **Family Guidance:** Some topics are best discussed with your parents or guardians first
 
