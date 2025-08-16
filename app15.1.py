@@ -6,21 +6,6 @@ import re
 import uuid
 from datetime import datetime
 
-def http_post_with_retry(url, headers, payload, timeout=20, max_attempts=2, backoff_seconds=1.2):
-    """Simple retry wrapper for POST requests (handles 429 and timeouts)"""
-    for attempt in range(max_attempts):
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-            if resp.status_code == 429 and attempt < max_attempts - 1:
-                time.sleep(backoff_seconds)
-                continue
-            return resp
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-            if attempt < max_attempts - 1:
-                time.sleep(backoff_seconds)
-                continue
-            raise
-
 # Page configuration
 st.set_page_config(
     page_title="My Friend Lumii - Your AI Learning Companion",
@@ -39,6 +24,7 @@ CRISIS_PATTERNS = [
     re.compile(r"\bhurt myself\b"),
     re.compile(r"\bend my life\b"),
     re.compile(r"\b(?:want|wanted|wanna)\s+to\s+die\b"),
+    re.compile(r"\bcommit suicide\b"),
     re.compile(r"\bcut myself\b"),
     re.compile(r"\bself harm\b"),
     re.compile(r"\bself-harm\b"),
@@ -56,17 +42,11 @@ CRISIS_PATTERNS = [
     re.compile(r"\bwant to disappear forever\b"),
     re.compile(r"\bend the pain\b"),
     re.compile(r"\bstop existing\b"),
-    
-re.compile(r"\bunalive\b"),
-re.compile(r"\bkys\b"),
-re.compile(r"\bkms\b"),
-re.compile(r"\bself[-\s]?delete\b"),
-re.compile(r"\boff myself\b"),
-re.compile(r"\bi (?:don'?t|do not) want to exist\b"),
 ]
 
 IMMEDIATE_TERMINATION_PATTERNS = [
     re.compile(r"\bkill myself now\b"),
+    re.compile(r"\bcommit suicide\b"),
     re.compile(r"\bend it today\b"),
     re.compile(r"\boverdose now\b"),
     re.compile(r"\bhow to die\b"),
@@ -96,31 +76,12 @@ CRISIS_RESOURCES = {
         "suicide_line": "Local crisis helpline or 112",
         "emergency": "Call 112 for immediate emergency"
     },
-    "SI": {
-        "crisis_line": "European Emergency: 112",
-        "suicide_line": "Local crisis helpline or 112",
-        "emergency": "Call 112 for immediate emergency"
-    },
     "DEFAULT": {
         "crisis_line": "Local crisis helpline",
         "suicide_line": "Emergency services or trusted adult",
         "emergency": "Call emergency services immediately"
     }
 }
-
-# ChatGPT Fix #5 - Split identity vs sexual health detection
-SEXUAL_HEALTH_KEYWORDS = [
-    'sex', 'sexual', 'puberty', 'pregnancy', 'babies come from',
-    'reproduction', 'birth control', 'menstruation', 'period', 'periods',
-    'masturbation', 'erection', 'vagina', 'penis', 'breast development', 
-    'wet dreams', 'body changes during puberty', 'hormones and puberty'
-]
-
-IDENTITY_KEYWORDS = [
-    'gay', 'lesbian', 'transgender', 'bisexual', 'lgbtq', 'gender identity',
-    'sexual orientation', 'coming out', 'am i gay', 'am i trans', 'gender dysphoria',
-    'non-binary', 'queer', 'questioning sexuality', 'questioning gender'
-]
 
 # Enhanced response validator patterns (ChatGPT Fix #6 + Refinements)
 FORBIDDEN_RESPONSE_PATTERNS = [
@@ -167,13 +128,14 @@ def get_last_offer_context():
                 ]
                 if any(offer in content for offer in offer_patterns):
                     return {"offered_help": True, "content": msg["content"]}
+                break
     return {"offered_help": False, "content": None}
 
 def is_accepting_offer(message):
     """Check if message is accepting a previous offer - FIXED CRITICAL VULNERABILITY (ChatGPT Fix #1)"""
     msg = message.strip().lower()
     accept_heads = ("yes", "yes please", "sure", "okay", "ok", "yeah", "yep", 
-                   "sounds good", "that would help", "definitely", 
+                   "sounds good", "that would help", "please", "definitely", 
                    "absolutely", "yup", "sure thing", "okay please", "sounds great")
     
     last_offer = get_last_offer_context()
@@ -187,7 +149,7 @@ def is_accepting_offer(message):
         if msg.startswith(head + " "):
             tail = msg[len(head):].strip()
             # CRITICAL FIX: Check for crisis terms in tail
-            if any(pattern.search(tail) for pattern in (CRISIS_PATTERNS + IMMEDIATE_TERMINATION_PATTERNS)):
+            if any(pattern.search(tail) for pattern in CRISIS_PATTERNS):
                 return False  # Not a safe acceptance
             return True
     return False
@@ -212,9 +174,7 @@ def _contains_crisis_resource(text: str) -> bool:
     crisis_markers = [
         "988", "crisis text line", "text home to 741741", "741741",
         "suicide & crisis", "hotline", "trusted adult", "emergency room",
-        "immediate danger", "call a trusted adult", "suicide & crisis lifeline",
-        "911", "999", "112", "call 911", "call 999", "call 112", "emergency services",
-        "go to the er", "a&e", "accident and emergency"
+        "immediate danger", "call a trusted adult", "suicide & crisis lifeline"
     ]
     return any(m in t for m in crisis_markers)
 
@@ -223,30 +183,27 @@ def _contains_crisis_resource(text: str) -> bool:
 # =============================================================================
 
 def global_crisis_override_check(message):
-
     """ALWAYS check for crisis first - overrides ALL other states including timeout"""
     message_lower = message.lower()
-
+    
+    # Skip if accepting an offer (but ensure acceptance is safe)
+    if is_accepting_offer(message):
+        return False, None, None
+    
     # Check for explicit crisis language
     if has_explicit_crisis_language(message):
         return True, "BLOCKED_HARMFUL", "explicit_crisis"
-
+    
     # Check for immediate termination needs
     if has_immediate_termination_language(message):
         return True, "IMMEDIATE_TERMINATION", "critical_immediate"
-
+    
     # Crisis-level patterns
     if ('goodbye letter' in message_lower or 'farewell letter' in message_lower) and \
-       ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower         or 'never coming back' in message_lower or 'no one will see me again' in message_lower):
-        return True, "CRISIS_GOODBYE_LETTERS", "explicit_crisis"
-
-    # After all crisis checks, allow acceptance handling
-    if is_accepting_offer(message):
-        return False, None, None
-
-    # Safety checks passed
+       ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower):
+        return True, "CRISIS_GOODBYE_LETTERS", "goodbye_letter"
+    
     return False, None, None
-
 
 def check_request_safety(message):
     """Enhanced safety check with proper priority ordering"""
@@ -313,24 +270,19 @@ def validate_ai_response(response):
     return True, None
 
 def should_terminate_conversation(message, harmful_request_count):
-
     """Unified termination logic (ChatGPT Fix #3)"""
-    # Use centralized immediate termination check first
-    if has_immediate_termination_language(message):
-        return True, "CRITICAL_IMMEDIATE"
-
-    # Then explicit crisis check
-    if has_explicit_crisis_language(message):
-        return True, "EXPLICIT_CRISIS"
-
-    # Accepting a safe offer should not terminate
+    # Check if accepting offer first
     if is_accepting_offer(message):
         return False, None
-
+    
+    # Use centralized immediate termination check
+    if has_immediate_termination_language(message):
+        return True, "CRITICAL_IMMEDIATE"
+    
     # Persistent harmful requests after multiple warnings
-    if harmful_request_count >= 3:
-        return True, "REPEATED_HARMFUL_REQUESTS"
-
+    if harmful_request_count >= 5:
+        return True, "PERSISTENT_HARMFUL"
+    
     return False, None
 
 # =============================================================================
@@ -394,103 +346,67 @@ Would you like to talk about what you're feeling instead? Or we could work on so
 positive together. I'm here for you. 💙"""
 
 # =============================================================================
-# ENHANCED TOPIC DETECTION - SPLIT IDENTITY VS SEXUAL HEALTH (ChatGPT Fix #5)
+# FAMILY REFERRAL TOPICS DETECTION (UNIFIED SEXUAL HEALTH & IDENTITY)
 # =============================================================================
 
-def detect_sexual_health_topics(message):
-    """Detect sexual health/puberty questions that should be referred to parents/guardians"""
-    return any(keyword in message.lower() for keyword in SEXUAL_HEALTH_KEYWORDS)
+def detect_family_referral_topics(message):
+    """Detect topics that should be referred to parents/guardians"""
+    family_referral_keywords = [
+        # Sexual health/puberty topics
+        'sex', 'sexual', 'puberty', 'pregnancy', 'babies come from',
+        'reproduction', 'birth control', 'menstruation', 'period', 'periods',
+        'masturbation', 'erection', 'vagina', 'penis', 'breast development', 
+        'wet dreams', 'body changes during puberty', 'hormones and puberty',
+        
+        # Identity topics - now referred to parents/guardians
+        'gay', 'lesbian', 'transgender', 'bisexual', 'lgbtq', 'gender identity',
+        'sexual orientation', 'coming out', 'am i gay', 'am i trans', 
+        'gender dysphoria', 'non-binary', 'queer', 'questioning sexuality', 
+        'questioning gender'
+    ]
+    return any(keyword in message.lower() for keyword in family_referral_keywords)
 
-def detect_identity_topics(message):
-    """Detect LGBTQ+ identity questions that need supportive, non-sexual guidance"""
-    return any(keyword in message.lower() for keyword in IDENTITY_KEYWORDS)
-
-def generate_sexual_health_response(student_age, student_name=""):
-    """Generate age-appropriate response referring to parents/guardians for sexual health topics"""
+def generate_family_referral_response(student_age, student_name=""):
+    """Generate unified response referring both sexual health AND identity topics to parents/guardians"""
     name_part = f"{student_name}, " if student_name else ""
     
     if student_age <= 11:  # Elementary
-        return f"""🌟 {name_part}That's a really good question! Those are important topics that are best discussed with your parents or guardians first.
+        return f"""🌟 {name_part}That's a really important question! 
 
-They know you best and can give you the right information in the way that's best for your family. You could ask your mom, dad, or another trusted adult in your family.
+I'm your learning buddy who helps with school subjects. For big questions like this, the best people to talk to are:
+• Your mom, dad, or family
+• Your teacher or school counselor
+• Another trusted grown-up
 
-If you have other questions about school, learning, or other topics, I'm here to help! What else would you like to talk about? 😊"""
+These are important topics that your family can help you understand in the way that's right for your family.
+
+I'm great at helping with homework and making school fun! What would you like to learn about? 😊"""
         
     elif student_age <= 14:  # Middle School
-        return f"""🌟 {name_part}That's an important and completely normal question to have! These topics are really important to understand as you grow up.
+        return f"""🌟 {name_part}That's an important question! 
 
-The best place to start is with your parents or guardians - they care about you and want to make sure you get accurate, age-appropriate information that fits with your family's values.
-
-You could also talk to:
-• Your school counselor or nurse
+I'm your learning companion focused on school subjects and studying. For questions about personal topics like this, the best people to talk to are:
+• Your parents or guardians
+• Your school counselor
 • A trusted family member
-• Your doctor during a check-up
+• Another trusted adult
 
-I'm here to help with school subjects, learning strategies, and other topics. What else can I help you with today? 📚"""
+These are important personal topics that your family and trusted adults can help you understand with care and in the way that's right for your family.
+
+I'm here to help make your schoolwork easier and support your learning! What subject can we work on? 📖"""
         
     else:  # High School
-        return f"""🌟 {name_part}That's a very valid and important question! These are crucial topics for understanding your health and development.
+        return f"""🌟 {name_part}That's an important personal question! 
 
-I'd recommend discussing this with:
-• Your parents or guardians first - they want to support you with accurate information
-• Your school counselor or health teacher
-• A healthcare provider like your doctor
-• Trusted educational resources they can help you find
+I'm your learning companion focused on helping with school subjects and academic support. For personal questions like this, I'd recommend discussing with:
+• Your parents or guardians
+• Your school counselor
+• A trusted family member or adult
+• Your healthcare provider if appropriate
 
-These conversations might feel awkward at first, but the adults in your life want to help you understand these important aspects of health and development.
+These are important personal topics that deserve thoughtful guidance from people who know you and care about you in your real life.
 
-For school subjects and academic support, I'm here to help! Is there anything else I can assist you with? 📖"""
-
-def generate_identity_support_response(student_age, student_name=""):
-    """Generate supportive, age-appropriate response for identity questions (ChatGPT Fix #5)"""
-    name_part = f"{student_name}, " if student_name else ""
-    
-    if student_age <= 11:  # Elementary
-        return f"""🌈 {name_part}Thank you for sharing that with me. Questions about who you are and how you feel are really important and completely normal.
-
-Everyone deserves to feel safe, accepted, and valued for who they are. If you're feeling confused or have questions, some great people to talk to are:
-• Your school counselor (they're trained to help with these feelings)
-• A teacher you trust
-• Your parents or family when you feel ready
-
-Remember: You are amazing just as you are, and there are people who care about you and want to support you.
-
-I'm here to help with your schoolwork and learning too! What would you like to work on? 🌟"""
-        
-    elif student_age <= 14:  # Middle School  
-        return f"""🌈 {name_part}Thank you for trusting me with that question. Identity and feelings about who you are can be really complex, especially during middle school years.
-
-What I want you to know is: You deserve to feel safe, accepted, and supported no matter what. These feelings and questions are completely normal, and you're not alone.
-
-Some supportive resources:
-• Your school counselor (confidential and trained in LGBTQ+ support)
-• PFLAG (pflag.org) - supportive community for families
-• The Trevor Project (if you ever feel unsafe or need someone to talk to)
-• A trusted teacher or adult
-
-You don't have to figure everything out right now. Take your time, be kind to yourself, and know that there are people who care about you.
-
-For school support and learning, I'm always here! What can we work on today? 📚🌈"""
-        
-    else:  # High School
-        return f"""🌈 {name_part}Thank you for sharing that question with me. Identity exploration is a normal and important part of growing up, and these feelings and questions are completely valid.
-
-You deserve to feel safe, supported, and valued for who you are. Here are some supportive resources:
-
-**Immediate Support:**
-• Your school counselor (trained in LGBTQ+ issues and confidential)
-• PFLAG (pflag.org) - community support for LGBTQ+ people and families
-• The Trevor Project (thetrevorproject.org) - crisis support and resources
-• GLAAD (glaad.org) - educational resources and support
-
-**When You're Ready:**
-• Trusted friends who are supportive
-• Family members when you feel comfortable
-• LGBTQ+ student groups at school if available
-
-Remember: There's no rush to figure everything out. You're valid, you matter, and you deserve love and acceptance. Take your time and be gentle with yourself.
-
-I'm here to support your academic learning too! What school subject can I help you with? 📖🌈"""
+I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"""
 
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED)
@@ -500,24 +416,6 @@ def detect_non_educational_topics(message):
     """Detect topics outside K-12 educational scope - refer to appropriate adults (REFINED)"""
     message_lower = message.lower()
     
-    # Educational context allowlist override (homework/assignment/class)
-    educational_context = [
-        r"\bhomework\b", r"\bassignment\b", r"\bfor (?:my|our) (?:class|school|essay|project)\b",
-        r"\bessay\b", r"\bfor (?:history|civics|social studies|religion class)\b", r"\bancient\b",
-        r"\bfor school\b", r"\bworksheet\b", r"\bstudy guide\b", r"\bcompare and contrast\b", r"\bexplain\b"
-    ]
-    if any(re.search(p, message_lower) for p in educational_context):
-        return None
-
-    # Self-report of substance use (route regardless of advice-seeking)
-    self_report_substance = [
-        r"\b(i\s*(?:am|'m)?|im)\s+(?:vaping|smoking|drinking)\b",
-        r"\b(i\s*(?:am|'m)?|im)\s+(?:using\s+(?:weed|marijuana|cannabis)|taking\s+edibles)\b",
-        r"\bi have a (?:vape|juul)\b"
-    ]
-    if any(re.search(p, message_lower) for p in self_report_substance):
-        return "substance_legal"
-
     # ChatGPT Refinement: Only trigger on advice-seeking patterns to avoid false positives
     advice_seeking_patterns = [
         r"\bhow\s+(do i|should i|can i)\b",
@@ -968,22 +866,6 @@ st.markdown("""
         border-left: 5px solid #7b1fa2;
         font-weight: bold;
     }
-    .sexual-health-response {
-        background: linear-gradient(135deg, #607d8b, #90a4ae);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #455a64;
-    }
-    .identity-support-response {
-        background: linear-gradient(135deg, #e91e63, #f06292);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #c2185b;
-    }
     .educational-boundary-response {
         background: linear-gradient(135deg, #795548, #a1887f);
         color: white;
@@ -1048,26 +930,6 @@ st.markdown("""
     }
     .behavior-badge {
         background: linear-gradient(45deg, #9c27b0, #7b1fa2);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .sexual-health-badge {
-        background: linear-gradient(45deg, #607d8b, #455a64);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .identity-support-badge {
-        background: linear-gradient(45deg, #e91e63, #c2185b);
         color: white;
         padding: 0.3rem 0.8rem;
         border-radius: 20px;
@@ -1155,7 +1017,7 @@ def create_conversation_summary(messages):
         
         summary = f"""📋 Conversation Summary:
 Student: {student_info.get('name', 'Unknown')} (Age: {student_info.get('age', 'Unknown')})
-Topics discussed: {', '.join(set(topics_discussed[-3:]))}
+Topics discussed: {', '.join(set(topics_discussed[-3:]))}  # Last 3 unique topics
 Emotional support provided: {len(emotional_moments)} times
 Learning progress: Math problems solved, organization help provided"""
         
@@ -1382,7 +1244,10 @@ Let's focus on something positive we can work on together. How can I help you wi
             "stream": False
         }
         
-        response = http_post_with_retry(GROQ_API_URL, headers, payload, timeout=20)
+        response = requests.post(GROQ_API_URL, 
+                               headers=headers, 
+                               json=payload, 
+                               timeout=20)
         
         if response.status_code == 200:
             result = response.json()
@@ -1554,11 +1419,9 @@ def detect_priority_smart_with_safety(message):
     if is_accepting_offer(message):
         return 'general', 'lumii_main', None
     
-    # STEP 5: SEXUAL HEALTH VS IDENTITY ROUTING (ChatGPT Fix #5)
-    if detect_sexual_health_topics(message):
-        return 'sexual_health', 'sexual_health_referral', None
-    elif detect_identity_topics(message):
-        return 'identity_support', 'identity_guidance', None
+    # STEP 5: FAMILY REFERRAL TOPICS (UNIFIED SEXUAL HEALTH & IDENTITY)
+    if detect_family_referral_topics(message):
+        return 'family_referral', 'parent_guidance', None
     
     # STEP 6: NON-EDUCATIONAL TOPICS
     non_educational_topic = detect_non_educational_topics(message)
@@ -1873,15 +1736,10 @@ Is there anything positive we can focus on right now while you're getting the su
         
         return response, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
     
-    # NEW: Handle sexual health topics
-    if priority == 'sexual_health':
-        response = generate_sexual_health_response(student_age, st.session_state.student_name)
-        return response, "👨‍👩‍👧‍👦 Lumii's Family Referral", "sexual_health", "📖 Parent Guidance"
-    
-    # NEW: Handle identity support (ChatGPT Fix #5)
-    if priority == 'identity_support':
-        response = generate_identity_support_response(student_age, st.session_state.student_name)
-        return response, "🌈 Lumii's Identity Support", "identity_support", "🏳️‍🌈 Inclusive Care"
+    # Handle family referral topics (UNIFIED SEXUAL HEALTH & IDENTITY)
+    if priority == 'family_referral':
+        response = generate_family_referral_response(student_age, st.session_state.student_name)
+        return response, "👨‍👩‍👧‍👦 Lumii's Family Referral", "family_referral", "📖 Parent Guidance"
     
     # Handle non-educational topics  
     if priority == 'non_educational':
@@ -2140,11 +1998,9 @@ with st.sidebar:
     st.markdown("""
     **🛡️ Safety First** - I'll always protect you from harmful content
     
-    **🎓 Educational Focus** - I focus on K-12 school subjects (health, family, and legal topics go to appropriate adults)
+    **🎓 Educational Focus** - I focus on K-12 school subjects (personal, health, and family topics go to appropriate adults)
     
-    **🌈 Identity Support** - I provide supportive, inclusive guidance for identity questions
-    
-    **👨‍👩‍👧‍👦 Family Topics** - Some topics are best discussed with parents/guardians first
+    **👨‍👩‍👧‍👦 Family Guidance** - Important personal topics are best discussed with your parents or guardians first
     
     **🤝 Respectful Learning** - I expect kind, respectful communication
     
@@ -2192,9 +2048,7 @@ st.info("""
 
 🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
 
-🌈 **Identity Support:** I provide supportive, inclusive guidance for LGBTQ+ identity questions
-
-👨‍👩‍👧‍👦 **Family Guidance:** Some topics are best discussed with your parents or guardians first
+👨‍👩‍👧‍👦 **Family Guidance:** Important personal topics are best discussed with your parents or guardians first
 
 💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
 
@@ -2217,12 +2071,9 @@ for i, message in enumerate(st.session_state.messages):
             if priority == "safety" or priority == "crisis" or priority == "crisis_return" or priority == "immediate_termination":
                 st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority == "sexual_health":
-                st.markdown(f'<div class="sexual-health-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="sexual-health-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority == "identity_support":
-                st.markdown(f'<div class="identity-support-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="identity-support-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "family_referral":
+                st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
             elif priority == "educational_boundary":
                 st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
@@ -2294,12 +2145,9 @@ else:
                 if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return" or response_priority == "immediate_termination":
                     st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
-                elif response_priority == "sexual_health":
-                    st.markdown(f'<div class="sexual-health-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="sexual-health-badge">{tool_used}</div>', unsafe_allow_html=True)
-                elif response_priority == "identity_support":
-                    st.markdown(f'<div class="identity-support-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="identity-support-badge">{tool_used}</div>', unsafe_allow_html=True)
+                elif response_priority == "family_referral":
+                    st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
                 elif response_priority == "educational_boundary":
                     st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
@@ -2348,7 +2196,7 @@ st.markdown("""
 <div style='text-align: center; color: #667; margin-top: 2rem;'>
     <p><strong>My Friend Lumii</strong> - Your safe, emotionally intelligent AI learning companion 🛡️💙</p>
     <p>🛡️ Safety first • 🧠 Remembers conversations • 🎯 Smart emotional support • 📚 Natural conversation flow • 🌟 Always protective</p>
-    <p>🤝 Respectful learning • 🌈 Inclusive identity support • 👨‍👩‍👧‍👦 Family guidance • 🔒 Multi-layer safety • 📞 Crisis resources • ⚡ Error recovery • 💪 Always helpful, never harmful</p>
+    <p>🤝 Respectful learning • 👨‍👩‍👧‍👦 Family guidance • 🔒 Multi-layer safety • 📞 Crisis resources • ⚡ Error recovery • 💪 Always helpful, never harmful</p>
     <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe</em></p>
 </div>
 """, unsafe_allow_html=True)
