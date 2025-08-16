@@ -74,66 +74,171 @@ def validate_groq_output(text: str) -> str:
     
     return text
 
-def call_groq_api(messages, max_tokens=1000, temperature=0.7, max_retries=3):
-    """Call Groq API with retry logic, error handling, and output validation"""
-    api_key = get_groq_api_key()
+def get_groq_response_with_memory_safety(current_message, tool_name, student_age, student_name="", is_distressed=False, temperature=0.7):
+    """Get response from Groq API with enhanced memory safety and error handling - WORKING VERSION"""
+    
+    try:
+        api_key = st.secrets["GROQ_API_KEY"]
+    except Exception as e:
+        return None, "No API key configured", False
     
     if not api_key:
-        return "⚠️ API key not configured. Please add GROQ_API_KEY to Streamlit secrets."
+        return None, "No API key configured", False
     
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
-    payload = {
-        "model": "llama3-70b-8192",
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-        "stream": False
-    }
-    
-    backoff = 2  # seconds
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
-            
-            # Handle rate limiting with exponential backoff
-            if response.status_code == 429:  # rate limit
-                if attempt < max_retries - 1:
-                    time.sleep(backoff)
-                    backoff *= 2
-                    continue
-                return "⏳ I'm a bit busy right now, can you try again in a moment?"
-            
-            # Handle server errors with retry
-            if response.status_code >= 500:
-                if attempt < max_retries - 1:
-                    time.sleep(backoff)
-                    backoff *= 2
-                    continue
-                return "🔧 I'm having some trouble connecting. Please try again soon!"
-            
-            response.raise_for_status()
+    try:
+        # Build system prompt with enhanced safety
+        system_prompt = create_ai_system_prompt_with_safety(tool_name, student_age, student_name, is_distressed)
+        
+        # Build conversation with memory safety
+        conversation_history = build_conversation_history()
+        
+        # Create the full message sequence with length limits
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Limit conversation history to prevent API overload
+        if len(conversation_history) > 20:
+            conversation_history = conversation_history[-20:]  # Keep last 20 messages
+        
+        messages.extend(conversation_history)
+        messages.append({"role": "user", "content": current_message})
+        
+        payload = {
+            "model": "llama3-70b-8192",
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 1000,
+            "stream": False
+        }
+        
+        response = requests.post(GROQ_API_URL, 
+                               headers=headers, 
+                               json=payload, 
+                               timeout=20)  # Increased timeout
+        
+        if response.status_code == 200:
             result = response.json()
-            content = result["choices"][0]["message"]["content"]
+            ai_content = result['choices'][0]['message']['content']
             
-            # CRITICAL: Validate output before returning to student
-            return validate_groq_output(content)
+            # CRITICAL: Validate output before returning
+            validated_content = validate_groq_output(ai_content)
             
-        except requests.exceptions.Timeout:
-            return "⏰ Sorry, I'm thinking a bit slowly. Please try again!"
-        except requests.exceptions.RequestException:
-            if attempt < max_retries - 1:
-                time.sleep(backoff)
-                backoff *= 2
-                continue
-            return "🔧 I'm having some trouble connecting. Please try again soon!"
-        except Exception:
-            return "💭 Hmm, something went wrong with my thinking. Can we try again?"
+            return validated_content, None, False
+        else:
+            error_msg = f"API Error: {response.status_code}"
+            if response.status_code == 429:
+                error_msg += " (Rate limit - please wait a moment)"
+            return None, error_msg, True
+            
+    except requests.exceptions.Timeout:
+        return None, "Request timeout - please try again", True
+    except requests.exceptions.ConnectionError:
+        return None, "Connection error - please check internet", True
+    except Exception as e:
+        return None, f"Unexpected error: {str(e)}", True
+
+def build_conversation_history():
+    """Build the full conversation history for AI context with safety checks"""
+    conversation_messages = []
     
-    return "⚠️ Sorry, I couldn't get a safe response right now. Please try again or talk to a trusted adult if you need help."
+    # Add recent messages from session
+    for msg in st.session_state.messages:
+        if msg["role"] in ["user", "assistant"]:
+            conversation_messages.append({
+                "role": msg["role"], 
+                "content": msg["content"]
+            })
+    
+    return conversation_messages
+
+def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="", is_distressed=False):
+    """Create unified Lumii personality prompts with ENHANCED SAFETY and conversation flow awareness"""
+    
+    name_part = f"The student's name is {student_name}. " if student_name else ""
+    distress_part = "The student is showing signs of emotional distress, so prioritize emotional support. " if is_distressed else ""
+    
+    # Enhanced base prompt with safety and conversation flow
+    base_prompt = f"""You are Lumii, a caring AI learning companion with emotional intelligence and specialized expertise.
+
+{name_part}{distress_part}The student is approximately {student_age} years old.
+
+CRITICAL INSTRUCTION - CONTEXT-AWARE RESPONSES:
+1. If you offered something specific (tips, help, advice) and student accepts with "yes", "okay", "sure", "please" - DELIVER THAT HELP
+2. Only use crisis protocols for EXPLICIT crisis language like "kill myself", "hurt myself", "end my life"
+3. Normal sadness about school/friends needs support, NOT crisis intervention
+4. Track conversation flow - if you offered friendship tips and they say "yes please", give the tips!
+
+SAFETY PROTOCOLS - USE SPARINGLY:
+
+ACTUAL CRISIS ONLY (explicit harmful language required):
+- Direct statements: "kill myself", "hurt myself", "end my life", "want to die"
+- These require immediate intervention with hotlines
+
+NORMAL EMOTIONAL SUPPORT (provide help without crisis response):
+- Feeling sad about no friends → offer friendship tips
+- School stress → provide study strategies
+- Test anxiety → teach calming techniques
+- Lonely at new school → suggest ways to connect
+
+Communication style for age {student_age}:
+- Ages 5-11: Simple, encouraging language with shorter responses
+- Ages 12-14: Supportive and understanding of social pressures
+- Ages 15-18: Respectful and mature while still supportive
+
+Core principle: Be genuinely helpful. If you offer help and they accept, provide that help!"""
+
+    if tool_name == "Felicity":
+        return base_prompt + """
+
+I'm Lumii, here for emotional support! 
+
+My approach:
+1. **Listen with empathy** - Validate feelings without overreacting
+2. **Provide promised help** - If I offered tips and you said yes, I give those tips
+3. **Appropriate responses** - Normal sadness gets normal support, not crisis intervention
+4. **Practical strategies** - Age-appropriate coping techniques
+5. **Crisis detection** - Only for explicit self-harm language
+
+I care about how you're feeling and want to help in the right way!"""
+
+    elif tool_name == "Cali":
+        return base_prompt + """
+
+I'm Lumii, great at helping with organization!
+
+My approach:
+1. **Break things down** - Make overwhelming tasks manageable
+2. **Prioritize wisely** - Focus on what matters most
+3. **Build confidence** - Show you can handle your workload
+4. **Follow through** - Deliver help when accepted"""
+
+    elif tool_name == "Mira":
+        return base_prompt + """
+
+I'm Lumii, and I love helping with math!
+
+My approach:
+1. **Step-by-step solutions** - Clear explanations
+2. **Build understanding** - Explain the 'why'
+3. **Patient guidance** - Work at your pace
+4. **Encouraging support** - Build math confidence"""
+
+    else:  # General Lumii
+        return base_prompt + """
+
+I'm Lumii, your learning companion!
+
+My approach:
+1. **Answer questions helpfully** - Provide useful responses
+2. **Keep promises** - If I offer help and you accept, I deliver
+3. **Natural conversation** - Remember our discussion context
+4. **Appropriate support** - Match help to actual needs
+
+I'm here to help you learn and grow in a supportive, caring way!"""
 
 # =============================================================================
 # LUMII SYSTEM PROMPTS
@@ -337,7 +442,7 @@ def detect_age_from_message_and_history(message):
 # =============================================================================
 
 def generate_lumii_response(message, priority, trigger, student_age, student_name=""):
-    """Generate intelligent response using Groq API with Lumii's personality"""
+    """Generate intelligent response using Groq API with Lumii's personality - WORKING VERSION"""
     
     # Handle crisis situations with immediate hardcoded responses
     if priority == 'crisis':
@@ -351,30 +456,38 @@ Please talk to a trusted adult RIGHT NOW:
 
 You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
     
-    # For all other priorities, use Groq API
-    system_prompt = get_lumii_system_prompt(priority, student_age, student_name)
+    # For all other priorities, use Groq API with working structure
+    tool_name = "Lumii"  # Default
+    is_distressed = False
     
-    # Build conversation context
-    conversation_context = []
+    if priority == 'emotional':
+        tool_name = "Felicity"
+        is_distressed = True
+    elif priority == 'organization':
+        tool_name = "Cali"
+    elif priority == 'math':
+        tool_name = "Mira"
     
-    # Add recent conversation history for context
-    recent_messages = st.session_state.messages[-6:] if len(st.session_state.messages) > 6 else st.session_state.messages
-    for msg in recent_messages:
-        role = "user" if msg["role"] == "user" else "assistant"
-        conversation_context.append({"role": role, "content": msg["content"]})
-    
-    # Prepare messages for API
-    messages = [
-        {"role": "system", "content": system_prompt},
-        *conversation_context,
-        {"role": "user", "content": message}
-    ]
-    
-    # Call Groq API
+    # Call the working API function
     with st.spinner("🧠 Lumii is thinking with care..."):
-        response = call_groq_api(messages, max_tokens=800, temperature=0.7)
+        ai_response, error, needs_fallback = get_groq_response_with_memory_safety(
+            message, tool_name, student_age, student_name, is_distressed, temperature=0.7
+        )
     
-    return response
+    if ai_response and not needs_fallback:
+        return ai_response
+    elif needs_fallback or error:
+        # Use fallback response
+        if priority == 'emotional':
+            return f"💙 I can tell you're feeling something difficult right now. That's completely normal, and I'm here to support you. What's been on your mind?"
+        elif priority == 'math':
+            return f"🧮 I'd love to help you with this math problem! Let me work through it step by step with you. Can you show me what you're working on?"
+        elif priority == 'organization':
+            return f"📚 I can help you organize your schoolwork! Let's break down what you're dealing with into manageable pieces. What assignments are you working on?"
+        else:
+            return f"🌟 I'm here to help you learn and grow! What would you like to explore together today?"
+    
+    return "🌟 I'm here to help you learn and grow! What would you like to explore together today?"
 
 # =============================================================================
 # SESSION STATE INITIALIZATION
