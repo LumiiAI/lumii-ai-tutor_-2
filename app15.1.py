@@ -15,33 +15,35 @@ st.set_page_config(
 )
 
 # =============================================================================
-# CENTRALIZED SAFETY CONFIGURATION (ChatGPT Fix #7)
+# ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (FIXED)
 # =============================================================================
 
-# Pre-compiled regexes for performance (ChatGPT Fix #9) + Expanded Coverage
-CRISIS_PATTERNS = [
-    re.compile(r"\bkill myself\b"),
-    re.compile(r"\bhurt myself\b"),
-    re.compile(r"\bend my life\b"),
-    re.compile(r"\b(?:want|wanted|wanna)\s+to\s+die\b"),
-    re.compile(r"\bcommit suicide\b"),
-    re.compile(r"\bcut myself\b"),
-    re.compile(r"\bself harm\b"),
-    re.compile(r"\bself-harm\b"),
-    re.compile(r"\bbetter off dead\b"),
-    re.compile(r"\bnot worth living\b"),
-    re.compile(r"\bend it all\b"),
-    re.compile(r"\bdecided to die\b"),
-    # ChatGPT Refinement: Add euphemistic/self-worth phrases
-    re.compile(r"\bdon't want to be here anymore\b"),
-    re.compile(r"\bno reason to live\b"),
-    re.compile(r"\bnothing to live for\b"),
-    re.compile(r"\bworld better without me\b"),
-    re.compile(r"\beveryone would be better off\b"),
-    re.compile(r"\bcan't take it anymore\b"),
-    re.compile(r"\bwant to disappear forever\b"),
-    re.compile(r"\bend the pain\b"),
-    re.compile(r"\bstop existing\b"),
+# Enhanced crisis patterns with typo tolerance and euphemisms
+ENHANCED_CRISIS_PATTERNS = [
+    # Core self-harm patterns with typo tolerance
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
+    
+    # Euphemisms and indirect expressions
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+disappear\s+(?:forever|permanently)\b", re.IGNORECASE),
+    re.compile(r"\b(?:don'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b", re.IGNORECASE),
+    re.compile(r"\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b", re.IGNORECASE),
+    re.compile(r"\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b", re.IGNORECASE),
+    re.compile(r"\beveryone\s+(?:would\s+be\s+)?better\s+off\s+(?:without\s+me|if\s+i\s+was\s+gone)\b", re.IGNORECASE),
+    
+    # Direct expressions (original patterns maintained)
+    re.compile(r"\bkill\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bhurt\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bend\s+my\s+life\b", re.IGNORECASE),
+    re.compile(r"\bcommit\s+suicide\b", re.IGNORECASE),
+    re.compile(r"\bcut\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bself\s*-?\s*harm\b", re.IGNORECASE),
+    
+    # Immediate action patterns
+    re.compile(r"\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b", re.IGNORECASE),
+    re.compile(r"\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b", re.IGNORECASE),
 ]
 
 IMMEDIATE_TERMINATION_PATTERNS = [
@@ -59,31 +61,31 @@ IMMEDIATE_TERMINATION_PATTERNS = [
     re.compile(r"\bdecided to die\b"),
 ]
 
-# ChatGPT Fix #8 - Locale-aware crisis resources
+# Slovenia/EU Crisis Resources (FIXED LOCALE)
+SLOVENIA_CRISIS_RESOURCES = {
+    "crisis_line": "TOM telefon za otroke in mladostnike: 116 111 (brezplačno, 24/7)",
+    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)", 
+    "emergency": "Klic v sili: 113 (policija) ali 112 (vse nujne službe)",
+    "additional": "Klic v duševni stiski: 01 520 99 00"
+}
+
 CRISIS_RESOURCES = {
+    "SI": SLOVENIA_CRISIS_RESOURCES,
+    "EU": {
+        "crisis_line": "European Emergency Line: 116 123",
+        "suicide_line": "Local crisis helpline or 116 123", 
+        "emergency": "Emergency services: 112",
+        "additional": "Contact local mental health services"
+    },
     "US": {
         "crisis_line": "Crisis Text Line: Text HOME to 741741",
         "suicide_line": "Suicide & Crisis Lifeline: 988",
         "emergency": "Call 911 for immediate emergency"
     },
-    "UK": {
-        "crisis_line": "Samaritans: Text 116 123",
-        "suicide_line": "Samaritans: 116 123 (free, 24/7)",
-        "emergency": "Call 999 for immediate emergency"
-    },
-    "EU": {
-        "crisis_line": "European Emergency: 112",
-        "suicide_line": "Local crisis helpline or 112",
-        "emergency": "Call 112 for immediate emergency"
-    },
-    "DEFAULT": {
-        "crisis_line": "Local crisis helpline",
-        "suicide_line": "Emergency services or trusted adult",
-        "emergency": "Call emergency services immediately"
-    }
+    "DEFAULT": SLOVENIA_CRISIS_RESOURCES  # Changed default to Slovenia
 }
 
-# Enhanced response validator patterns (ChatGPT Fix #6 + Refinements)
+# Enhanced response validator patterns
 FORBIDDEN_RESPONSE_PATTERNS = [
     re.compile(r"\bhow to hurt yourself\b"),
     re.compile(r"\bhow to kill yourself\b"),
@@ -96,7 +98,7 @@ FORBIDDEN_RESPONSE_PATTERNS = [
     re.compile(r"\bhide from parents\b"),
     re.compile(r"\bkeep this secret\b"),
     re.compile(r"\buse a blade\b"),
-    re.compile(r"\bmix(ed)?\s+(pills|drugs|chemicals)\b"),  # More precise
+    re.compile(r"\bmix(ed)?\s+(pills|drugs|chemicals)\b"),
     re.compile(r"\bsearch for methods\b"),
     re.compile(r"\bingest\s+(pills|chemicals|substances)\b"),
     re.compile(r"\btake\s+\d+\s+(pills|tablets)\b"),
@@ -110,7 +112,142 @@ FORBIDDEN_INPUT_PATTERNS = FORBIDDEN_RESPONSE_PATTERNS + [
 ]
 
 # =============================================================================
-# ENHANCED CONVERSATION CONTEXT TRACKING - FIXED (ChatGPT Fix #1)
+# GLOBAL CRISIS GUARD - RUNS FIRST ON EVERY MESSAGE (NEW)
+# =============================================================================
+
+def global_crisis_guard(message):
+    """
+    GLOBAL CRISIS GUARD - Runs FIRST on every message
+    Returns: (is_crisis, intervention_response)
+    If is_crisis=True, IMMEDIATELY return intervention_response and END processing
+    """
+    message_lower = message.lower().strip()
+    
+    # Check enhanced crisis patterns including typos and euphemisms
+    for pattern in ENHANCED_CRISIS_PATTERNS:
+        if pattern.search(message_lower):
+            # IMMEDIATE CRISIS INTERVENTION - NO FURTHER PROCESSING
+            st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+            st.session_state.post_crisis_monitoring = True
+            
+            # Get appropriate resources
+            resources = get_crisis_resources()
+            
+            # Generate immediate intervention response
+            intervention = f"""🚨 POMEMBNO - TAKOJ POIŠČI POMOČ 🚨
+
+Skrbi me zate in to, kar praviš. Tvoja varnost je najpomembnejša.
+
+TAKOJ se obrni na:
+• {resources['crisis_line']}
+• {resources['suicide_line']}  
+• {resources['emergency']}
+• {resources['additional']}
+
+LAHKO tudi greš k:
+• Staršem ali skrbnikom
+• Šolskemu svetovalcu
+• Zdravniku
+• Katerikoli odrasli osebi, ki ji zaupaš
+
+Nisi sam/a v tem. Obstajajo ljudje, ki ti želijo pomagati. Prosim, poišči pomoč TAKOJ.
+
+Ta pogovor se zaključuje zaradi tvoje varnosti. Prosim, pokliči eno od zgornjih številk ZDAJ."""
+            
+            return True, intervention
+    
+    return False, None
+
+def get_crisis_resources():
+    """Get locale-appropriate crisis resources - DEFAULTS TO SLOVENIA"""
+    try:
+        locale = st.secrets.get("LOCALE", "SI")  # Changed default to SI
+        return CRISIS_RESOURCES.get(locale, SLOVENIA_CRISIS_RESOURCES)
+    except:
+        return SLOVENIA_CRISIS_RESOURCES
+
+# =============================================================================
+# CONVERSATION FLOW FIXES (NEW)
+# =============================================================================
+
+def is_polite_decline(message):
+    """Detect polite declines that shouldn't end conversation"""
+    message_lower = message.lower().strip()
+    
+    polite_declines = [
+        "no thanks", "not now", "maybe later", "not right now",
+        "no thank you", "i'm good", "i'm ok", "not today",
+        "maybe tomorrow", "later", "nah", "no"
+    ]
+    
+    # Only consider it a polite decline if it's EXACTLY one of these phrases
+    # or starts with one followed by minimal words
+    for decline in polite_declines:
+        if message_lower == decline:
+            return True
+        if message_lower.startswith(decline + " ") and len(message_lower) < len(decline) + 20:
+            return True
+    
+    return False
+
+def handle_polite_decline(student_age, student_name=""):
+    """Handle polite declines without ending conversation"""
+    name_part = f"{student_name}, " if student_name else ""
+    
+    if student_age <= 11:
+        return f"""😊 {name_part}That's totally okay! 
+
+Would you like to:
+• Just chat about something fun?
+• Take some deep breaths together?
+• Tell me about your day?
+• Or just sit quietly for a bit?
+
+I'm here whenever you're ready! 🌟"""
+    
+    elif student_age <= 14:
+        return f"""😊 {name_part}No worries at all! 
+
+Maybe you'd like to:
+• Talk about something else that's on your mind?
+• Try some quick stress-relief tips?
+• Share what's going well today?
+• Or just have a casual conversation?
+
+I'm here when you want to chat about anything! 💙"""
+    
+    else:  # High school
+        return f"""😊 {name_part}Absolutely fine! 
+
+Feel free to:
+• Bring up anything else you'd like to discuss
+• Try some quick mindfulness techniques
+• Tell me about something positive in your day
+• Or just have a relaxed conversation
+
+I'm here to support you however feels right! 🤗"""
+
+def is_duplicate_response(new_response):
+    """Check if new response is duplicate of last response"""
+    if len(st.session_state.messages) > 0:
+        for msg in reversed(st.session_state.messages):
+            if msg["role"] == "assistant":
+                return new_response[:100].strip() == msg["content"][:100].strip()
+    return False
+
+def add_variation_to_response(base_response):
+    """Add variation to prevent exact duplicates"""
+    import random
+    variations = [
+        "\n\n🌟 Let's try a different approach this time!",
+        "\n\n💡 Here's another way to think about it:",
+        "\n\n🎯 Want to explore this from a new angle?",
+        "\n\n✨ Let me add something helpful:",
+    ]
+    return base_response + random.choice(variations)
+
+# =============================================================================
+# ENHANCED CONVERSATION CONTEXT TRACKING - FIXED
 # =============================================================================
 
 def get_last_offer_context():
@@ -132,7 +269,7 @@ def get_last_offer_context():
     return {"offered_help": False, "content": None}
 
 def is_accepting_offer(message):
-    """Check if message is accepting a previous offer - FIXED CRITICAL VULNERABILITY (ChatGPT Fix #1)"""
+    """Check if message is accepting a previous offer - FIXED CRITICAL VULNERABILITY"""
     msg = message.strip().lower()
     accept_heads = ("yes", "yes please", "sure", "okay", "ok", "yeah", "yep", 
                    "sounds good", "that would help", "please", "definitely", 
@@ -149,37 +286,36 @@ def is_accepting_offer(message):
         if msg.startswith(head + " "):
             tail = msg[len(head):].strip()
             # CRITICAL FIX: Check for crisis terms in tail
-            if any(pattern.search(tail) for pattern in CRISIS_PATTERNS):
+            if any(pattern.search(tail) for pattern in ENHANCED_CRISIS_PATTERNS):
                 return False  # Not a safe acceptance
             return True
     return False
 
+def _contains_crisis_resource(text: str) -> bool:
+    """Detect crisis/hotline language that shouldn't appear during normal help acceptance"""
+    t = text.lower()
+    crisis_markers = [
+        "116 111", "116 123", "112", "113", "crisis", "suicide", "samarijan", "tom telefon",
+        "hotline", "trusted adult", "emergency", "klic v sili", "duševni stiski"
+    ]
+    return any(m in t for m in crisis_markers)
+
 # =============================================================================
-# ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED (ChatGPT Fix #3 & #6)
+# ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED
 # =============================================================================
 
 def has_explicit_crisis_language(message):
-    """Centralized crisis detection using pre-compiled patterns"""
+    """Centralized crisis detection using enhanced patterns"""
     message_lower = message.lower()
-    return any(pattern.search(message_lower) for pattern in CRISIS_PATTERNS) or "suicide" in message_lower
+    return any(pattern.search(message_lower) for pattern in ENHANCED_CRISIS_PATTERNS) or "suicide" in message_lower
 
 def has_immediate_termination_language(message):
     """Check for immediate termination triggers"""
     message_lower = message.lower()
     return any(pattern.search(message_lower) for pattern in IMMEDIATE_TERMINATION_PATTERNS)
 
-def _contains_crisis_resource(text: str) -> bool:
-    """Detect crisis/hotline language that shouldn't appear during normal help acceptance"""
-    t = text.lower()
-    crisis_markers = [
-        "988", "crisis text line", "text home to 741741", "741741",
-        "suicide & crisis", "hotline", "trusted adult", "emergency room",
-        "immediate danger", "call a trusted adult", "suicide & crisis lifeline"
-    ]
-    return any(m in t for m in crisis_markers)
-
 # =============================================================================
-# ENHANCED SAFETY ARCHITECTURE - CRISIS ALWAYS WINS (ChatGPT Fix #2)
+# ENHANCED SAFETY ARCHITECTURE - CRISIS ALWAYS WINS
 # =============================================================================
 
 def global_crisis_override_check(message):
@@ -208,7 +344,7 @@ def global_crisis_override_check(message):
 def check_request_safety(message):
     """Enhanced safety check with proper priority ordering"""
     
-    # CRITICAL: Global crisis check FIRST (ChatGPT Fix #2)
+    # CRITICAL: Global crisis check FIRST
     is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
     if is_crisis:
         return False, crisis_type, crisis_trigger
@@ -219,7 +355,7 @@ def check_request_safety(message):
     # Academic stress context awareness
     academic_context = any(word in message_lower for word in [
         'homework', 'test', 'quiz', 'assignment', 'project', 'school',
-        'math', 'science', 'english', 'study', 'exam'
+        'math', 'science', 'english', 'history', 'art', 'music'
     ])
     
     # Enhanced context-aware concerning detection
@@ -259,7 +395,7 @@ def validate_user_input(message):
     return True, None
 
 def validate_ai_response(response):
-    """Enhanced response validator with broader safety coverage (ChatGPT Fix #6)"""
+    """Enhanced response validator with broader safety coverage"""
     response_lower = response.lower()
     
     # Check against enhanced forbidden patterns
@@ -270,7 +406,7 @@ def validate_ai_response(response):
     return True, None
 
 def should_terminate_conversation(message, harmful_request_count):
-    """Unified termination logic (ChatGPT Fix #3)"""
+    """Unified termination logic"""
     # Check if accepting offer first
     if is_accepting_offer(message):
         return False, None
@@ -284,18 +420,6 @@ def should_terminate_conversation(message, harmful_request_count):
         return True, "PERSISTENT_HARMFUL"
     
     return False, None
-
-# =============================================================================
-# CRISIS RESOURCES WITH LOCALE SUPPORT (ChatGPT Fix #8)
-# =============================================================================
-
-def get_crisis_resources():
-    """Get locale-appropriate crisis resources"""
-    try:
-        locale = st.secrets.get("LOCALE", "US")
-        return CRISIS_RESOURCES.get(locale, CRISIS_RESOURCES["DEFAULT"])
-    except:
-        return CRISIS_RESOURCES["DEFAULT"]
 
 def emergency_intervention(message, pattern_type, student_age, student_name=""):
     """Immediate safe response with locale-aware crisis resources"""
@@ -416,7 +540,7 @@ def detect_non_educational_topics(message):
     """Detect topics outside K-12 educational scope - refer to appropriate adults (REFINED)"""
     message_lower = message.lower()
     
-    # ChatGPT Refinement: Only trigger on advice-seeking patterns to avoid false positives
+    # Only trigger on advice-seeking patterns to avoid false positives
     advice_seeking_patterns = [
         r"\bhow\s+(do i|should i|can i)\b",
         r"\bshould i\b",
@@ -717,7 +841,7 @@ def is_appropriate_followup_time(topic, messages):
     return exchanges_since >= 10
 
 # =============================================================================
-# ENHANCED SESSION STATE INITIALIZATION (ChatGPT Fix #10)
+# ENHANCED SESSION STATE INITIALIZATION
 # =============================================================================
 
 def initialize_session_state():
@@ -1053,7 +1177,7 @@ def summarize_conversation_if_needed():
     return False
 
 # =============================================================================
-# UNIFIED GROQ LLM INTEGRATION (ChatGPT Fix #4 - Deduplicated)
+# UNIFIED GROQ LLM INTEGRATION
 # =============================================================================
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -1080,7 +1204,7 @@ def build_conversation_history():
     return conversation_messages
 
 def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="", is_distressed=False):
-    """Unified system prompt builder (ChatGPT Fix #4)"""
+    """Unified system prompt builder"""
     
     name_part = f"The student's name is {student_name}. " if student_name else ""
     distress_part = "The student is showing signs of emotional distress, so prioritize emotional support. " if is_distressed else ""
@@ -1187,9 +1311,9 @@ My approach:
 I'm here to help you learn and grow in a supportive, caring way!"""
 
 def get_groq_response_with_memory_safety(current_message, tool_name, student_age, student_name="", is_distressed=False, temperature=0.7):
-    """Unified Groq API integration (ChatGPT Fix #4) + Input Validation"""
+    """Unified Groq API integration + Input Validation"""
     
-    # ChatGPT Refinement: Validate input BEFORE sending to API
+    # Validate input BEFORE sending to API
     is_safe_input, harmful_pattern = validate_user_input(current_message)
     if not is_safe_input:
         resources = get_crisis_resources()
@@ -1297,7 +1421,7 @@ Let's focus on something positive we can work on together. How can I help you wi
         return None, f"Unexpected error: {str(e)}", True
 
 # =============================================================================
-# ENHANCED PRIORITY DETECTION WITH SAFETY FIRST (RESTRUCTURED - ChatGPT Fix #2)
+# ENHANCED PRIORITY DETECTION WITH SAFETY FIRST (RESTRUCTURED)
 # =============================================================================
 
 def extract_student_info_from_history():
@@ -1382,16 +1506,11 @@ def detect_emotional_distress(message):
     return distress_score >= 2
 
 def detect_priority_smart_with_safety(message):
-    """RESTRUCTURED: Crisis detection ALWAYS wins - proper ordering (ChatGPT Fix #2)"""
+    """RESTRUCTURED: Crisis detection ALWAYS wins - proper ordering"""
     message_lower = message.lower()
     
-    # STEP 1: GLOBAL CRISIS OVERRIDE - ALWAYS FIRST (ChatGPT Fix #2)
-    is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
-    if is_crisis:
-        if crisis_type == "IMMEDIATE_TERMINATION":
-            return 'immediate_termination', 'CONVERSATION_END', crisis_trigger
-        else:
-            return 'crisis', crisis_type, crisis_trigger
+    # STEP 1: GLOBAL CRISIS OVERRIDE - ALREADY HANDLED BY global_crisis_guard()
+    # This function is only called AFTER crisis guard passes
     
     # STEP 2: POST-CRISIS MONITORING (if active)
     if st.session_state.get('post_crisis_monitoring', False):
@@ -1407,9 +1526,9 @@ def detect_priority_smart_with_safety(message):
         elif is_positive_response:
             return 'post_crisis_support', 'supportive_continuation', None
     
-    # STEP 3: BEHAVIOR TIMEOUT WITH CRISIS OVERRIDE (ChatGPT Fix #2)
+    # STEP 3: BEHAVIOR TIMEOUT WITH CRISIS OVERRIDE
     if st.session_state.behavior_timeout:
-        # CRITICAL: Still check for crisis even in timeout (ChatGPT Fix #2)
+        # CRITICAL: Still check for crisis even in timeout
         if has_explicit_crisis_language(message):
             return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
         else:
@@ -1481,7 +1600,7 @@ def detect_priority_smart_with_safety(message):
     if any(indicator in message_lower for indicator in organization_indicators):
         return 'organization', 'cali', None
     
-    # Math content - enhanced detection (ChatGPT Refinement: Require problem-solving context)
+    # Math content - enhanced detection
     math_pattern = r'\d+\s*[\+\-\*/]\s*\d+'
     
     # Refined math keywords - require problem-solving context
@@ -1554,7 +1673,7 @@ def detect_age_from_message_and_history(message):
     middle_count = sum(1 for indicator in middle_indicators if indicator in message_lower)
     high_count = sum(1 for indicator in high_indicators if indicator in message_lower)
     
-    # ChatGPT Refinement: Decision logic - require multiple indicators + CONSERVATIVE default
+    # Decision logic - require multiple indicators + CONSERVATIVE default
     if high_count >= 2:
         return 16  # High school
     elif middle_count >= 3:  # INCREASED threshold
@@ -1667,9 +1786,9 @@ Please consider talking to:
 I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
-    """Generate AI responses with ALL ChatGPT fixes applied"""
+    """Generate AI responses with ALL fixes applied"""
     
-    # FIXED: Acceptance short-circuit with safe tail checking (ChatGPT Fix #1)
+    # FIXED: Acceptance short-circuit with safe tail checking
     if is_accepting_offer(message):
         last_offer = get_last_offer_context()
         student_info = extract_student_info_from_history()
@@ -2097,6 +2216,9 @@ for i, message in enumerate(st.session_state.messages):
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
             elif priority == "summary":
                 st.info(f"📋 {message['content']}")
+            elif priority == "polite_decline":
+                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
@@ -2122,73 +2244,119 @@ else:
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        # Smart priority detection with safety first (RESTRUCTURED ORDER)
-        priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
+        # STEP 1: GLOBAL CRISIS GUARD FIRST (HIGHEST PRIORITY)
+        is_crisis, crisis_intervention = global_crisis_guard(prompt)
+        if is_crisis:
+            # IMMEDIATE TERMINATION - display crisis intervention
+            with st.chat_message("assistant"):
+                st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="safety-badge">🚨 VARNOSTNI UKREP - Pogovor zaključen</div>', unsafe_allow_html=True)
+            
+            # Add to messages and stop processing
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": crisis_intervention,
+                "priority": "crisis_termination",
+                "tool_used": "🚨 VARNOSTNI UKREP",
+                "safety_triggered": True
+            })
+            st.session_state.interaction_count += 1
+            st.rerun()
+            st.stop()  # Completely stop processing
         
-        student_age = detect_age_from_message_and_history(prompt)
-        is_distressed = detect_emotional_distress(prompt)
+        # STEP 2: Check for polite decline
+        if is_polite_decline(prompt):
+            student_age = detect_age_from_message_and_history(prompt)
+            response = handle_polite_decline(student_age, st.session_state.student_name)
+            
+            with st.chat_message("assistant"):
+                st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="friend-badge">😊 Lumii\'s Understanding</div>', unsafe_allow_html=True)
+            
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": response,
+                "priority": "polite_decline",
+                "tool_used": "😊 Lumii's Understanding"
+            })
+            st.session_state.interaction_count += 1
+            st.rerun()
         
-        # Generate response using enhanced memory-safe system
-        with st.chat_message("assistant"):
-            with st.spinner("🧠 Thinking safely with full memory of our conversation..."):
-                time.sleep(1)
-                response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
-                    prompt, priority, tool, student_age, is_distressed, None, safety_trigger
-                )
-                
-                # Add natural follow-up if appropriate
-                follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
-                if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
-                    response += follow_up
-                
-                # Display with appropriate styling
-                if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return" or response_priority == "immediate_termination":
-                    st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
-                elif response_priority == "family_referral":
-                    st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-                elif response_priority == "educational_boundary":
-                    st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-                elif response_priority in ["behavior", "behavior_final", "behavior_timeout"]:
-                    st.markdown(f'<div class="behavior-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
-                elif response_priority == "post_crisis_support":
-                    st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
-                elif response_priority == "concerning":
-                    st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                elif response_priority == "emotional":
-                    st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                elif response_priority == "math":
-                    st.markdown(f'<div class="math-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                elif response_priority == "organization":
-                    st.markdown(f'<div class="organization-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-        
-        # Add assistant response to chat with enhanced metadata
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": response,
-            "priority": response_priority,
-            "tool_used": tool_used,
-            "was_distressed": is_distressed,
-            "student_age_detected": student_age,
-            "safety_triggered": False
-        })
-        
-        # Update interaction count
-        st.session_state.interaction_count += 1
-        
-        # Rerun to update sidebar stats and memory display
-        st.rerun()
+        # STEP 3: Continue with existing priority detection for non-crisis messages
+        else:
+            # Existing priority detection code continues here...
+            priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
+            student_age = detect_age_from_message_and_history(prompt)
+            is_distressed = detect_emotional_distress(prompt)
+            
+            # Generate response using enhanced memory-safe system
+            with st.chat_message("assistant"):
+                with st.spinner("🧠 Thinking safely with full memory..."):
+                    time.sleep(1)
+                    response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
+                        prompt, priority, tool, student_age, is_distressed, None, safety_trigger
+                    )
+                    
+                    # Check for duplicates and add variation if needed
+                    if is_duplicate_response(response):
+                        response = add_variation_to_response(response)
+                    
+                    # Add natural follow-up if appropriate
+                    follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
+                    if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
+                        response += follow_up
+                    
+                    # Display with appropriate styling
+                    if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return" or response_priority == "immediate_termination":
+                        st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "family_referral":
+                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "educational_boundary":
+                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority in ["behavior", "behavior_final", "behavior_timeout"]:
+                        st.markdown(f'<div class="behavior-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "post_crisis_support":
+                        st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
+                    elif response_priority == "concerning":
+                        st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+                    elif response_priority == "emotional":
+                        st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+                    elif response_priority == "math":
+                        st.markdown(f'<div class="math-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+                    elif response_priority == "organization":
+                        st.markdown(f'<div class="organization-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+                    elif response_priority == "polite_decline":
+                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+            
+            # Add assistant response to chat with enhanced metadata
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": response,
+                "priority": response_priority,
+                "tool_used": tool_used,
+                "was_distressed": is_distressed,
+                "student_age_detected": student_age,
+                "safety_triggered": False
+            })
+            
+            # Update interaction count
+            st.session_state.interaction_count += 1
+            
+            # Rerun to update sidebar stats and memory display
+            st.rerun()
 
 # Footer with enhanced safety and memory info
 st.markdown("---")
