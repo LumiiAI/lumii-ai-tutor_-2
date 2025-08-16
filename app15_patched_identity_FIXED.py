@@ -329,17 +329,14 @@ For school subjects and academic support, I'm here to help! Is there anything el
 def generate_identity_support_response(student_age, student_name=""):
     name_part = f"{student_name}, " if student_name else ""
     base = (
-        f"🌈 {name_part}Thanks for sharing. Feelings about who you are matter and it’s okay to have questions.
-
-"
+        f"🌈 {name_part}Thanks for sharing. Feelings about who you are matter and it’s okay to have questions.\n\n"
         "I can listen and be kind, but I don’t give personal advice about identity. "
         "The best next step is to talk with a parent/guardian or another trusted adult (like a school counselor or teacher). "
-        "They know you and can support you.
-
-"
+        "They know you and can support you.\n\n"
         "If you want, we can switch to schoolwork now—what would you like help with? 📚"
     )
     return base
+
 
 Everyone deserves to feel safe, accepted, and valued for who they are. If you're feeling confused or have questions, some great people to talk to are:
 • Your school counselor (they're trained to help with these feelings)
