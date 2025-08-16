@@ -338,50 +338,6 @@ def generate_identity_support_response(student_age, student_name=""):
     return base
 
 
-Everyone deserves to feel safe, accepted, and valued for who they are. If you're feeling confused or have questions, some great people to talk to are:
-• Your school counselor (they're trained to help with these feelings)
-• A teacher you trust
-• Your parents or family when you feel ready
-
-Remember: You are amazing just as you are, and there are people who care about you and want to support you.
-
-I'm here to help with your schoolwork and learning too! What would you like to work on? 🌟"""
-        
-    elif student_age <= 14:  # Middle School  
-        return f"""🌈 {name_part}Thank you for trusting me with that question. Identity and feelings about who you are can be really complex, especially during middle school years.
-
-What I want you to know is: You deserve to feel safe, accepted, and supported no matter what. These feelings and questions are completely normal, and you're not alone.
-
-Some supportive resources:
-• Your school counselor (confidential and trained in LGBTQ+ support)
-• PFLAG (pflag.org) - supportive community for families
-• The Trevor Project (if you ever feel unsafe or need someone to talk to)
-• A trusted teacher or adult
-
-You don't have to figure everything out right now. Take your time, be kind to yourself, and know that there are people who care about you.
-
-For school support and learning, I'm always here! What can we work on today? 📚🌈"""
-        
-    else:  # High School
-        return f"""🌈 {name_part}Thank you for sharing that question with me. Identity exploration is a normal and important part of growing up, and these feelings and questions are completely valid.
-
-You deserve to feel safe, supported, and valued for who you are. Here are some supportive resources:
-
-**Immediate Support:**
-• Your school counselor (trained in LGBTQ+ issues and confidential)
-• PFLAG (pflag.org) - community support for LGBTQ+ people and families
-• The Trevor Project (thetrevorproject.org) - crisis support and resources
-• GLAAD (glaad.org) - educational resources and support
-
-**When You're Ready:**
-• Trusted friends who are supportive
-• Family members when you feel comfortable
-• LGBTQ+ student groups at school if available
-
-Remember: There's no rush to figure everything out. You're valid, you matter, and you deserve love and acceptance. Take your time and be gentle with yourself.
-
-I'm here to support your academic learning too! What school subject can I help you with? 📖🌈"""
-
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED)
 # =============================================================================
