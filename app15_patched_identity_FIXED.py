@@ -2019,9 +2019,9 @@ for i, message in enumerate(st.session_state.messages):
                 st.markdown(f'<div class="sexual-health-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="sexual-health-badge">{tool_used}</div>', unsafe_allow_html=True)
             elif priority == "identity_support":
-    st.markdown(f'<div class="identity-support-response">{message["content"]}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="identity-support-badge">{tool_used}</div>', unsafe_allow_html=True)
-class="identity-support-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="identity-support-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="identity-support-badge">{tool_used}</div>', unsafe_allow_html=True)
+                class="identity-support-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="identity-support-badge">{tool_used}</div>', unsafe_allow_html=True)
             elif priority == "educational_boundary":
                 st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
