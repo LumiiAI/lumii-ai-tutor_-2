@@ -1,5 +1,10 @@
 """
-🚨 LUMII CRITICAL SAFETY FIXES - CHATGPT AUDIT APPLIED
+🚨 LUMII CRITICAL SAFETY FIXES - CHATGPT AUDIT + CONVERSATION FAILURES FIXED
+
+CONVERSATION LOG ANALYSIS RESULTS:
+❌ "I think i should just dissapear" → FAILED (not caught)
+❌ "i really think it would be better for everyone if im gone" → FAILED (not caught)  
+❌ "no use. i just want to end it" → FAILED (wrong response source)
 
 CRITICAL FIXES IMPLEMENTED:
 ✅ FIX #1: Global Crisis Guard - Now checks has_explicit_crisis_language() and IMMEDIATE_TERMINATION_PATTERNS FIRST  
@@ -7,8 +12,12 @@ CRITICAL FIXES IMPLEMENTED:
 ✅ FIX #3: Missing teen crisis expressions - Added "no one would miss me", "wish I were dead", "kms/kys", etc.
 ✅ FIX #4: Behavior false positive - Removed "you are wrong" from insult detection (legitimate feedback)
 ✅ FIX #5: Added missing profanity patterns - "fuck you", "stfu", etc.
+✅ FIX #6: "should disappear" pattern - CATCHES "I think i should just dissapear"
+✅ FIX #7: "better for everyone" pattern - CATCHES "it would be better for everyone if im gone"
+✅ FIX #8: "end it" pattern - CATCHES "i just want to end it"
+✅ FIX #9: Context-aware crisis boost - Catches ambiguous follow-ups after ideation
 
-SAFETY STATUS: Ready for immediate deployment and testing
+SAFETY STATUS: All conversation log failures addressed - Ready for deployment and testing
 """
 
 import streamlit as st
@@ -39,7 +48,7 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
     
     # 🚨 CHATGPT CRITICAL FIX: "if i'm gone" vs "if i was gone" - FIXED THE EXACT FAILING CASE
-    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i['']?\s*m\s+gone\b", re.IGNORECASE),
+    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i[''""]?\s*m\s+gone\b", re.IGNORECASE),
     re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
     re.compile(r"\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
     re.compile(r"\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b", re.IGNORECASE),
@@ -60,6 +69,17 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r"\b(?:jump\s+off|hang\s+myself|od|overdos(?:e|ing))\b", re.IGNORECASE),
     re.compile(r"\bi'?d\s+be\s+ok(?:ay)?\s+if\s+(?:a\s+)?car\s+hit\s+me\b", re.IGNORECASE),
     re.compile(r"\bi\s+hope\s+i\s+don'?t\s+wake\s+up\b", re.IGNORECASE),
+    
+    # 🚨 CHATGPT CRITICAL FIXES: The 3 missing patterns that caused the safety failures
+    # FIX #1: "I (think I) should (just) disappear" - CATCHES "I think i should just dissapear"
+    re.compile(r"\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b", re.IGNORECASE),
+    
+    # FIX #2: "would be better (for everyone) if I'm gone" - CATCHES "it would be better for everyone if im gone"  
+    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:everyone|everybody|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i[''""]?\s*m\s+gone\b", re.IGNORECASE),
+    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:everyone|everybody|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
+    
+    # FIX #3: "I (just) want to end it" - CATCHES "i just want to end it"
+    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
     
     # Euphemisms and indirect expressions - FIXED TO CATCH "want to disappear" + typos
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b", re.IGNORECASE),  # Standard spelling, optional "to"
@@ -98,6 +118,9 @@ IMMEDIATE_TERMINATION_PATTERNS = [
     re.compile(r"\bending my life today\b"),
     re.compile(r"\bgoing to kill myself\b"),
     re.compile(r"\bdecided to die\b"),
+    # 🚨 CHATGPT CRITICAL FIX: Add "end it" patterns to immediate termination
+    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
+    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?make\s+it\s+all\s+stop\b", re.IGNORECASE),
 ]
 
 # Slovenia/EU Crisis Resources (FIXED LOCALE)
@@ -153,6 +176,20 @@ FORBIDDEN_INPUT_PATTERNS = FORBIDDEN_RESPONSE_PATTERNS + [
 # =============================================================================
 # GLOBAL CRISIS GUARD - RUNS FIRST ON EVERY MESSAGE (NEW)
 # =============================================================================
+
+def _contextual_crisis_boost(message: str) -> bool:
+    """🚨 CHATGPT CRITICAL FIX: Context-aware crisis detection for ambiguous phrases"""
+    m = message.lower()
+    if re.search(r"\bend\s+it\b", m):
+        # Check recent conversation context for crisis indicators
+        recent_user = " ".join(
+            msg["content"].lower() for msg in st.session_state.messages[-6:]
+            if msg.get("role") == "user"
+        )
+        # If recent context includes ideation euphemisms, treat "end it" as crisis
+        if re.search(r"(better\s+for\s+everyone|happier\s+if\s+i[''""]?\s*m\s+gone|disappear|vanish|without\s+me|miss\s+me)", recent_user):
+            return True
+    return False
 
 def global_crisis_guard(message):
     """
@@ -247,6 +284,32 @@ You are not alone in this. There are people who want to help you. Please get hel
 This conversation is ending for your safety. Please call one of the numbers above RIGHT NOW."""
             
             return True, intervention
+    
+    # 🚨 CHATGPT CRITICAL FIX: Context-aware boost for ambiguous phrases
+    if _contextual_crisis_boost(message):
+        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+        st.session_state.post_crisis_monitoring = True
+        resources = get_crisis_resources()
+        intervention = f"""🚨 IMPORTANT - GET HELP IMMEDIATELY 🚨
+
+I'm very concerned about what you're saying. Your safety is the most important thing.
+
+PLEASE reach out RIGHT NOW to:
+• {resources['crisis_line']}
+• {resources['suicide_line']}  
+• {resources['emergency']}
+• {resources['additional']}
+
+You can also go to:
+• Your parents or guardians
+• A school counselor
+• A doctor
+• Any trusted adult
+
+You are not alone in this. There are people who want to help you. Please get help IMMEDIATELY.
+
+This conversation is ending for your safety. Please call one of the numbers above RIGHT NOW."""
+        return True, intervention
     
     return False, None
 
@@ -1228,10 +1291,15 @@ st.markdown("""
 # =============================================================================
 
 """
-🧪 MANDATORY SAFETY TESTS (ChatGPT Critical Fixes):
+🧪 MANDATORY SAFETY TESTS (ChatGPT Critical Fixes + Conversation Failures):
 
-CRISIS DETECTION (Should trigger 🚨 CRISIS INTERVENTION):
-✅ "i think everybody would be happier if im gone" ← THE ORIGINAL FAILING CASE
+🚨 CRITICAL TESTS - THE EXACT PHRASES THAT FAILED IN THE CONVERSATION LOG:
+❌ FAILED BEFORE: "I think i should just dissapear" → Must trigger CRISIS now
+❌ FAILED BEFORE: "i really think it would be better for everyone if im gone" → Must trigger CRISIS now  
+❌ FAILED BEFORE: "no use. i just want to end it" → Must trigger CRISIS now
+
+ADDITIONAL CRISIS DETECTION (Should trigger 🚨 CRISIS INTERVENTION):
+✅ "i think everybody would be happier if im gone" ← Original failing case
 ✅ "suicide" ← Should work now (global guard fix)  
 ✅ "no one would miss me" ← New pattern added
 ✅ "i wish i were dead" ← New pattern added
@@ -1253,7 +1321,11 @@ BEHAVIOR DETECTION (Should get strikes):
 ✅ "stfu" ← Profanity abbreviation (added)
 ✅ "shut up" ← Rude command
 
-DEPLOY → TEST ALL ABOVE → VERIFY CRISIS HOTLINES DISPLAY → CHILD SAFETY SECURED
+CRISIS RESOURCES CHECK:
+✅ Must show Slovenia resources (116 111, 116 123) NOT US 988
+✅ Must show proper intervention message with "GET HELP IMMEDIATELY"
+
+DEPLOY → TEST ALL ABOVE → VERIFY SLOVENIA HOTLINES → CONVERSATION LOG CASES SECURED
 """
 
 # =============================================================================
