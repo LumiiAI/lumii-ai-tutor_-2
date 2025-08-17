@@ -1,5 +1,3 @@
-# Write the updated app with the confusion false-positive fix to a new .py file
-updated_code = r'''"""
 🚨 LUMII CRITICAL SAFETY FIXES - US BETA FAMILIES READY
 
 INTERNAL DEVELOPMENT NOTES (NOT VISIBLE TO USERS):
@@ -2686,5 +2684,5 @@ st.markdown("""
     <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe</em></p>
 </div>
 """, unsafe_allow_html=True)
-'''
+
 
