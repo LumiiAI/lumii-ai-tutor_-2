@@ -2687,8 +2687,4 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 '''
-out_path = "/mnt/data/app15.3.5_confusion_fix.py"
-with open(out_path, "w", encoding="utf-8") as f:
-    f.write(updated_code)
 
-out_path
