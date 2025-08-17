@@ -1,4 +1,5 @@
-"""
+# Write the updated app with the confusion false-positive fix to a new .py file
+updated_code = r'''"""
 🚨 LUMII CRITICAL SAFETY FIXES - US BETA FAMILIES READY
 
 INTERNAL DEVELOPMENT NOTES (NOT VISIBLE TO USERS):
@@ -1743,8 +1744,8 @@ def detect_emotional_distress(message):
         'hate my life', 'cant do this anymore', "can't do this anymore",
         'everything is wrong', 'nothing ever works', 'always fail'
     ]
-    for phrase in distress_phrases:
-        if phrase in message_lower:
+    for phrase in message_lower.split(";"):
+        if any(dp in phrase for dp in distress_phrases):
             distress_score += 2
     
     # Context reduces distress score (normal academic stress)
@@ -2681,3 +2682,9 @@ st.markdown("""
     <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe</em></p>
 </div>
 """, unsafe_allow_html=True)
+'''
+out_path = "/mnt/data/app15.3.5_confusion_fix.py"
+with open(out_path, "w", encoding="utf-8") as f:
+    f.write(updated_code)
+
+out_path
