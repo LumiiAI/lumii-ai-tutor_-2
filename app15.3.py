@@ -8,6 +8,7 @@ INTERNAL DEVELOPMENT NOTES (NOT VISIBLE TO USERS):
 - Age-adaptive messaging for Elementary vs Middle/High School
 - Behavior detection fixed to avoid false positives
 - All safety gaps from conversation testing addressed
+- ✅ NEW: Confusion detection added to prevent false positives on legitimate student confusion
 
 SAFETY STATUS: 🇺🇸 OPTIMIZED FOR US BETA FAMILIES
 """
@@ -19,6 +20,26 @@ import time
 import re
 import uuid
 from datetime import datetime
+
+# =============================================================================
+# NORMALIZATION FUNCTION FOR BETTER PATTERN MATCHING
+# =============================================================================
+
+def normalize_message(message: str) -> str:
+    """Normalize message for better pattern matching"""
+    msg = message.strip()
+    
+    # Contractions + punctuation
+    msg = re.sub(r''', "'", msg)
+    msg = re.sub(r'\bim\b', "i'm", msg, flags=re.IGNORECASE)
+    
+    # Confusion typos (common in K-12)
+    msg = re.sub(r'\bcofused\b', 'confused', msg, flags=re.IGNORECASE)
+    msg = re.sub(r'\bconfusd\b', 'confused', msg, flags=re.IGNORECASE)
+    msg = re.sub(r'\bconufsed\b', 'confused', msg, flags=re.IGNORECASE)
+    msg = re.sub(r'\bcnofused\b', 'confused', msg, flags=re.IGNORECASE)
+    
+    return msg
 
 # Page configuration
 st.set_page_config(
@@ -39,8 +60,8 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b', re.IGNORECASE),
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b', re.IGNORECASE),
     
-    # 🚨 FIXED: “if i'm gone” vs “if i was gone”
-    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    # 🚨 FIXED: "if i'm gone" vs "if i was gone"
+    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
     re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
     re.compile(r'\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
     re.compile(r'\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b', re.IGNORECASE),
@@ -64,13 +85,13 @@ ENHANCED_CRISIS_PATTERNS = [
     
     # 🚨 Critical fixes
     re.compile(r'\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b', re.IGNORECASE),
-    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
     re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
     re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
     
-    # “I want to end it”
+    # "I want to end it"
     re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
     
     # Euphemisms / typos
@@ -97,6 +118,27 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r'\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b', re.IGNORECASE),
 ]
 
+# =============================================================================
+# CONFUSION PATTERNS FOR LEGITIMATE STUDENT CONFUSION
+# =============================================================================
+
+CONFUSION_PATTERNS = [
+    # "i'm so confused" + common misspellings
+    re.compile(r"\bi\s*(?:am|['']?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b", re.IGNORECASE),
+    
+    # "i don't get/understand/follow"
+    re.compile(r"\b(?:i\s+)?don['']?t\s+(?:get|understand|follow)\b", re.IGNORECASE),
+    
+    # "this/that/it makes no sense"
+    re.compile(r"\b(?:this|that|it)\s+makes?\s+no\s+sense\b", re.IGNORECASE),
+    
+    # "idk" or "i don't know"
+    re.compile(r"\b(?:idk|i\s+don['']?t\s+know)\b", re.IGNORECASE),
+    
+    # "i'm lost/stuck"
+    re.compile(r"\bi\s*(?:am|['']?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
+]
+
 IMMEDIATE_TERMINATION_PATTERNS = [
     # Direct + time-bound
     re.compile(r'\bkill\s+myself\s+(?:now|right\s+now|today|tonight|this\s+(?:minute|instant|evening|afternoon))\b', re.IGNORECASE),
@@ -108,15 +150,15 @@ IMMEDIATE_TERMINATION_PATTERNS = [
     re.compile(r'\bcommit\s+suicide\b', re.IGNORECASE),
     re.compile(r'\b(?:overdos(?:e|ing)|od)\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
 
-    # “End it” / make it stop (immediate)
+    # "End it" / make it stop (immediate)
     re.compile(r'\bend\s+it\s+(?:now|today|tonight)\b', re.IGNORECASE),
     re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
     re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?make\s+it\s+all\s+stop\b', re.IGNORECASE),
 
     # Future intent phrased as immediate plan
-    # Covers: "I'm/I’m/Im going to/gonna ... myself" and "I will ..."
+    # Covers: "I'm/I'm/Im going to/gonna ... myself" and "I will ..."
     re.compile(
-        r'\b(?:i\s*(?:am|[\'’]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b',
+        r'\b(?:i\s*(?:am|[\'′]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b',
         re.IGNORECASE
     ),
     re.compile(r'\bi\s+will\s+(?:kill|hurt|end)\s+myself\b', re.IGNORECASE),
@@ -190,6 +232,15 @@ FORBIDDEN_INPUT_PATTERNS = FORBIDDEN_RESPONSE_PATTERNS + [
 ]
 
 # =============================================================================
+# CONFUSION DETECTION FOR LEGITIMATE STUDENT CONFUSION
+# =============================================================================
+
+def detect_confusion(message):
+    """Detect legitimate confusion expressions that should NOT trigger behavior strikes"""
+    normalized_msg = normalize_message(message)
+    return any(pattern.search(normalized_msg) for pattern in CONFUSION_PATTERNS)
+
+# =============================================================================
 # GLOBAL CRISIS GUARD - RUNS FIRST ON EVERY MESSAGE (NEW)
 # =============================================================================
 
@@ -216,7 +267,9 @@ def global_crisis_guard(message):
     Returns: (is_crisis, intervention_response)
     If is_crisis=True, IMMEDIATELY return intervention_response and END processing
     """
-    message_lower = message.lower().strip()
+    # 🚨 NEW: Normalize message first
+    normalized_message = normalize_message(message)
+    message_lower = normalized_message.lower().strip()
     
     # Detect student age for age-appropriate response
     student_age = detect_age_from_message_and_history(message)
@@ -743,6 +796,11 @@ I'm excellent at helping with homework, test prep, and study strategies! What ac
 
 def detect_problematic_behavior(message):
     """🚨 FIXED: Detect rude, disrespectful, or boundary-testing behavior - NO MORE FALSE POSITIVES"""
+    
+    # 🚨 NEW: CHECK FOR CONFUSION FIRST - Never flag confused students
+    if detect_confusion(message):
+        return None  # Confused students should get help, not strikes
+    
     message_lower = message.lower().strip()
     
     # 🚨 CRITICAL FIX: Filter out self-criticism and content criticism
@@ -1015,6 +1073,30 @@ def initialize_session_state():
 initialize_session_state()
 
 # =============================================================================
+# 🧪 TEMPORARY TEST FUNCTION - Remove after testing
+# =============================================================================
+
+def test_confusion_detection():
+    """Test that confusion detection works correctly"""
+    test_cases = [
+        "im so cofused",
+        "i'm so confused", 
+        "i dont get it",
+        "this makes no sense",
+        "idk",
+        "i'm lost"
+    ]
+    
+    print("🧪 Testing confusion detection:")
+    for test in test_cases:
+        is_confused = detect_confusion(test)
+        priority, tool, trigger = detect_priority_smart_with_safety(test)
+        print(f"'{test}' → Confused: {is_confused}, Priority: {priority}")
+
+# Uncomment to test:
+# test_confusion_detection()
+
+# =============================================================================
 # PRIVACY DISCLAIMER POPUP - LAUNCH REQUIREMENT
 # =============================================================================
 
@@ -1220,6 +1302,14 @@ st.markdown("""
 ❌ FAILED BEFORE: "I think i should just dissapear" → Must trigger CRISIS now
 ❌ FAILED BEFORE: "i really think it would be better for everyone if im gone" → Must trigger CRISIS now  
 ❌ FAILED BEFORE: "no use. i just want to end it" → Must trigger CRISIS now
+
+✅ NEW CONFUSION TESTS - Should get HELP, not behavior strikes:
+✅ "im so cofused" → Should get confusion help, not behavior warning
+✅ "i dont get it" → Should get learning assistance  
+✅ "this makes no sense" → Should offer explanation options
+✅ "idk what to do" → Should provide supportive guidance
+✅ "i'm lost" → Should get step-by-step help
+✅ "i'm stuck" → Should get confusion support
 
 ADDITIONAL CRISIS DETECTION (Should trigger 🚨 CRISIS INTERVENTION):
 ✅ "i think everybody would be happier if im gone" ← Original failing case
@@ -1698,16 +1788,20 @@ def detect_priority_smart_with_safety(message):
     if is_accepting_offer(message):
         return 'general', 'lumii_main', None
     
-    # STEP 5: FAMILY REFERRAL TOPICS (UNIFIED SEXUAL HEALTH & IDENTITY)
+    # 🚨 NEW STEP 5: CONFUSION DETECTION (before other checks)
+    if detect_confusion(message):
+        return 'confusion', 'lumii_main', None
+    
+    # STEP 6: FAMILY REFERRAL TOPICS (UNIFIED SEXUAL HEALTH & IDENTITY)
     if detect_family_referral_topics(message):
         return 'family_referral', 'parent_guidance', None
     
-    # STEP 6: NON-EDUCATIONAL TOPICS
+    # STEP 7: NON-EDUCATIONAL TOPICS
     non_educational_topic = detect_non_educational_topics(message)
     if non_educational_topic:
         return 'non_educational', 'educational_boundary', non_educational_topic
     
-    # STEP 7: PROBLEMATIC BEHAVIOR DETECTION (🚨 FIXED)
+    # STEP 8: PROBLEMATIC BEHAVIOR DETECTION (🚨 FIXED)
     behavior_type = detect_problematic_behavior(message)
     if behavior_type:
         # Increment strikes for problematic behavior
@@ -1739,7 +1833,7 @@ def detect_priority_smart_with_safety(message):
             st.session_state.last_behavior_type = None
             st.session_state.behavior_timeout = False
     
-    # STEP 8: SAFETY CHECK (for concerning but not crisis content)
+    # STEP 9: SAFETY CHECK (for concerning but not crisis content)
     is_safe, safety_type, trigger = check_request_safety(message)
     if not is_safe:
         if safety_type == "CONCERNING_MULTIPLE_FLAGS":
@@ -1747,11 +1841,11 @@ def detect_priority_smart_with_safety(message):
         else:
             return 'safety', safety_type, trigger
     
-    # STEP 9: EMOTIONAL DISTRESS (but not crisis)
+    # STEP 10: EMOTIONAL DISTRESS (but not crisis)
     if detect_emotional_distress(message):
         return 'emotional', 'felicity', None
     
-    # STEP 10: ACADEMIC PRIORITIES
+    # STEP 11: ACADEMIC PRIORITIES
     # Multiple assignments/organization
     organization_indicators = [
         'multiple assignments', 'so much homework', 'everything due',
@@ -1945,6 +2039,36 @@ Please consider talking to:
 
 I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
+def emergency_intervention(message, safety_type, student_age, student_name=""):
+    """Enhanced emergency intervention with age-appropriate crisis response"""
+    name_part = f"{student_name}, " if student_name else ""
+    resources = get_crisis_resources()
+    
+    if student_age <= 11:  # Elementary
+        return f"""🚨 {name_part}I'm very worried about what you're saying. 
+
+Please find a grown-up RIGHT NOW:
+• Your mom, dad, or family
+• Your teacher
+• Call {resources['emergency']} if you're in danger
+
+You are loved and important. Please get help right away.
+
+Tell a grown-up what you said to me. They will help you."""
+    
+    else:  # Middle & High School
+        return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.
+
+Please get help IMMEDIATELY:
+• Call {resources['crisis_line']} right now
+• {resources['text_line']}
+• Call {resources['emergency']} if you're in immediate danger
+• Tell a trusted adult immediately
+
+You don't have to go through this alone. There are people who want to help you.
+
+Please reach out for help right now."""
+
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with ALL fixes applied"""
     
@@ -2014,6 +2138,24 @@ Please don't hesitate to talk to them today if possible. You don't have to carry
 Is there anything positive we can focus on right now while you're getting the support you need? 💙"""
         
         return response, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
+    
+    # 🚨 NEW: Handle confusion (add this before family referral handling)
+    if priority == 'confusion':
+        student_info = extract_student_info_from_history()
+        student_name = st.session_state.get('student_name', '') or student_info.get('name', '')
+        name_part = f"{student_name}, " if student_name else ""
+        
+        response = f"""😊 {name_part}Thanks for telling me you're feeling confused — that's totally okay! Let's figure it out together.
+
+What would help most right now?
+- A quick example
+- Step-by-step explanation  
+- A picture or diagram
+- Just the key idea in 2 sentences
+
+Tell me which part is tricky, or pick one of the options above! 😊"""
+        
+        return response, "😊 Lumii's Learning Support", "confusion", "🧠 With Memory"
     
     # Handle family referral topics (UNIFIED SEXUAL HEALTH & IDENTITY)
     if priority == 'family_referral':
@@ -2291,6 +2433,8 @@ with st.sidebar:
     
     **🌟 General Learning** - Support with all school subjects and questions
     
+    **🤔 Confusion Help** - When you're genuinely confused about any topic
+    
     *I remember our conversation, keep you safe, and stay focused on learning!*
     """)
     
@@ -2328,6 +2472,8 @@ st.info("""
 🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
 
 👨‍👩‍👧‍👦 **Family Guidance:** Important personal topics are best discussed with your parents or guardians first
+
+🤔 **Confusion Help:** If you're confused about something, just tell me! I'll help you understand
 
 💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
 
@@ -2379,6 +2525,9 @@ for i, message in enumerate(st.session_state.messages):
             elif priority == "polite_decline":
                 st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
+            elif priority == "confusion":
+                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
@@ -2497,6 +2646,9 @@ else:
                     elif response_priority == "polite_decline":
                         st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
                         st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
+                    elif response_priority == "confusion":
+                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
                     else:
                         st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
                         st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
@@ -2525,6 +2677,7 @@ st.markdown("""
     <p><strong>My Friend Lumii</strong> - Your safe, emotionally intelligent AI learning companion 🛡️💙</p>
     <p>🛡️ Safety first • 🧠 Remembers conversations • 🎯 Smart emotional support • 📚 Natural conversation flow • 🌟 Always protective</p>
     <p>🤝 Respectful learning • 👨‍👩‍👧‍👦 Family guidance • 🔒 Multi-layer safety • 📞 Crisis resources • ⚡ Error recovery • 💪 Always helpful, never harmful</p>
+    <p>🤔 <strong>NEW:</strong> Confusion help - If you're confused about something, just tell me! I'll help you understand without judgment.</p>
     <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe</em></p>
 </div>
 """, unsafe_allow_html=True)
