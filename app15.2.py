@@ -163,12 +163,12 @@ This conversation is ending for your safety. Please call one of the numbers abov
     return False, None
 
 def get_crisis_resources():
-    """Get locale-appropriate crisis resources - DEFAULTS TO SLOVENIA"""
+    """Get locale-appropriate crisis resources - DEFAULTS TO US FOR BETA"""
     try:
-        locale = st.secrets.get("LOCALE", "SI")  # Changed default to SI
-        return CRISIS_RESOURCES.get(locale, SLOVENIA_CRISIS_RESOURCES)
+        locale = st.secrets.get("LOCALE", "US")  
+        return CRISIS_RESOURCES.get(locale, US_CRISIS_RESOURCES)  
     except:
-        return SLOVENIA_CRISIS_RESOURCES
+        return US_CRISIS_RESOURCES  
 
 # =============================================================================
 # CONVERSATION FLOW FIXES (NEW)
