@@ -35,95 +35,105 @@ st.set_page_config(
 # Enhanced crisis patterns with typo tolerance and euphemisms - CHATGPT CRITICAL FIXES APPLIED
 ENHANCED_CRISIS_PATTERNS = [
     # Core self-harm patterns with typo tolerance
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b", re.IGNORECASE),
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b", re.IGNORECASE),
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b', re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b', re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b', re.IGNORECASE),
     
-    # 🚨 CHATGPT CRITICAL FIX: "if i'm gone" vs "if i was gone" - FIXED THE EXACT FAILING CASE
-    # FIXED: Updated all patterns to use i\s*(?:am|[''""]?\s*m) instead of i[''""]?\s*m
-    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
-    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
-    re.compile(r"\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
-    re.compile(r"\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b", re.IGNORECASE),
+    # 🚨 FIXED: “if i'm gone” vs “if i was gone”
+    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
+    re.compile(r'\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
+    re.compile(r'\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b', re.IGNORECASE),
     
-    # 🚨 CHATGPT CRITICAL FIX: Missing teen crisis expressions
-    re.compile(r"\bno\s+one\s+would\s+miss\s+me\b", re.IGNORECASE),
-    re.compile(r"\b(?:i\s+)?wish\s+i\s+(?:were|was)\s+dead\b", re.IGNORECASE),
-    re.compile(r"\b(?:better|better\s+off)\s+dead\b", re.IGNORECASE),
-    re.compile(r"\b(?:unalive|unalive\s+myself|self\s*delete|delete\s+myself|off\s+myself)\b", re.IGNORECASE),
-    re.compile(r"\b(?:kms|kys)\b", re.IGNORECASE),  # kill myself/yourself abbreviations
-    re.compile(r"\bend\s+it\s+all\b", re.IGNORECASE),
-    re.compile(r"\b(?:stop|quit)\s+(?:existing|being\s+alive)\b", re.IGNORECASE),
-    re.compile(r"\b(?:i\s+just\s+)?(?:want|wanna)\s+(?:to\s+)?(?:sleep\s+forever|not\s+wake\s+up)\b", re.IGNORECASE),
-    re.compile(r"\bi\s+don'?t\s+deserve\s+to\s+live\b", re.IGNORECASE),
-    re.compile(r"\bi\s+shouldn'?t\s+exist\b", re.IGNORECASE),
+    # Teen crisis expressions
+    re.compile(r'\bno\s+one\s+would\s+miss\s+me\b', re.IGNORECASE),
+    re.compile(r'\b(?:i\s+)?wish\s+i\s+(?:were|was)\s+dead\b', re.IGNORECASE),
+    re.compile(r'\b(?:better|better\s+off)\s+dead\b', re.IGNORECASE),
+    re.compile(r'\b(?:unalive|unalive\s+myself|self\s*delete|delete\s+myself|off\s+myself)\b', re.IGNORECASE),
+    re.compile(r'\b(?:kms|kys)\b', re.IGNORECASE),
+    re.compile(r'\bend\s+it\s+all\b', re.IGNORECASE),
+    re.compile(r'\b(?:stop|quit)\s+(?:existing|being\s+alive)\b', re.IGNORECASE),
+    re.compile(r'\b(?:i\s+just\s+)?(?:want|wanna)\s+(?:to\s+)?(?:sleep\s+forever|not\s+wake\s+up)\b', re.IGNORECASE),
+    re.compile(r'\bi\s+don\'?t\s+deserve\s+to\s+live\b', re.IGNORECASE),
+    re.compile(r'\bi\s+shouldn\'?t\s+exist\b', re.IGNORECASE),
     
-    # 🚨 CHATGPT FIX: Method hints and passive wish phrasing (safe generic patterns)
-    re.compile(r"\b(?:jump\s+off|hang\s+myself|od|overdos(?:e|ing))\b", re.IGNORECASE),
+    # Methods and passive wish phrasing
+    re.compile(r'\b(?:jump\s+off|hang\s+myself|od|overdos(?:e|ing))\b', re.IGNORECASE),
     re.compile(r"\bi'?d\s+be\s+ok(?:ay)?\s+if\s+(?:a\s+)?car\s+hit\s+me\b", re.IGNORECASE),
     re.compile(r"\bi\s+hope\s+i\s+don'?t\s+wake\s+up\b", re.IGNORECASE),
     
-    # 🚨 CHATGPT CRITICAL FIXES: The 3 missing patterns that caused the safety failures
-    # FIX #1: "I (think I) should (just) disappear" - CATCHES "I think i should just dissapear"
-    re.compile(r"\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b", re.IGNORECASE),
+    # 🚨 Critical fixes
+    re.compile(r'\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b', re.IGNORECASE),
+    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
+    re.compile(r'\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|["\'\’]?\s*m)\s+gone\b', re.IGNORECASE),
     
-    # FIX #2: "would be better (for everyone) if I'm gone" - CATCHES "it would be better for everyone if im gone"
-    # FIXED: Updated to use i\s*(?:am|[''""]?\s*m) to catch "im", "i'm", "i am"  
-    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
-    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
+    # “I want to end it”
+    re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
     
-    # 🚨 CHATGPT CRITICAL FIX: "I think it would be better" - CATCHES "i really think it would be better for everyone if im gone"
-    # FIXED: Changed i[''""]?\s*m to i\s*(?:am|[''""]?\s*m) to catch "im", "i'm", "i am"
-    re.compile(r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
-    re.compile(r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
+    # Euphemisms / typos
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b', re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*dissapear\b', re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disapear\b', re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*vanish\b', re.IGNORECASE),
+    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*(?:go\s+away|fade\s+away)\b', re.IGNORECASE),
+    re.compile(r'\b(?:don\'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b', re.IGNORECASE),
+    re.compile(r'\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b', re.IGNORECASE),
+    re.compile(r'\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b', re.IGNORECASE),
     
-    # 🚨 CHATGPT BACKUP PATTERN: Simpler, more direct pattern for reliability
-    re.compile(r"\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
+    # Direct expressions
+    re.compile(r'\bkill\s+myself\b', re.IGNORECASE),
+    re.compile(r'\bhurt\s+myself\b', re.IGNORECASE),
+    re.compile(r'\bend\s+my\s+life\b', re.IGNORECASE),
+    re.compile(r'\bcommit\s+suicide\b', re.IGNORECASE),
+    re.compile(r'\bcut\s+myself\b', re.IGNORECASE),
+    re.compile(r'\bself\s*-?\s*harm\b', re.IGNORECASE),
     
-    # FIX #3: "I (just) want to end it" - CATCHES "i just want to end it"
-    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
-    
-    # Euphemisms and indirect expressions - FIXED TO CATCH "want to disappear" + typos
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b", re.IGNORECASE),  # Standard spelling, optional "to"
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*dissapear\b", re.IGNORECASE),  # Common typo, optional "to"
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disapear\b", re.IGNORECASE),   # Another typo, optional "to"
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*vanish\b", re.IGNORECASE),
-    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*(?:go\s+away|fade\s+away)\b", re.IGNORECASE),
-    re.compile(r"\b(?:don'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b", re.IGNORECASE),
-    re.compile(r"\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b", re.IGNORECASE),
-    re.compile(r"\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b", re.IGNORECASE),
-    
-    # Direct expressions (original patterns maintained)
-    re.compile(r"\bkill\s+myself\b", re.IGNORECASE),
-    re.compile(r"\bhurt\s+myself\b", re.IGNORECASE),
-    re.compile(r"\bend\s+my\s+life\b", re.IGNORECASE),
-    re.compile(r"\bcommit\s+suicide\b", re.IGNORECASE),
-    re.compile(r"\bcut\s+myself\b", re.IGNORECASE),
-    re.compile(r"\bself\s*-?\s*harm\b", re.IGNORECASE),
-    
-    # Immediate action patterns
-    re.compile(r"\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
-    re.compile(r"\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b", re.IGNORECASE),
-    re.compile(r"\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b", re.IGNORECASE),
+    # Immediate action
+    re.compile(r'\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b', re.IGNORECASE),
+    re.compile(r'\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b', re.IGNORECASE),
+    re.compile(r'\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b', re.IGNORECASE),
 ]
 
 IMMEDIATE_TERMINATION_PATTERNS = [
-    re.compile(r"\bkill myself now\b"),
-    re.compile(r"\bcommit suicide\b"),
-    re.compile(r"\bend it today\b"),
-    re.compile(r"\boverdose now\b"),
-    re.compile(r"\bhow to die\b"),
-    re.compile(r"\bpainless death\b"),
-    re.compile(r"\bhurt myself now\b"),
-    re.compile(r"\bcut myself now\b"),
-    re.compile(r"\bwant to hurt myself right now\b"),
-    re.compile(r"\bending my life today\b"),
-    re.compile(r"\bgoing to kill myself\b"),
-    re.compile(r"\bdecided to die\b"),
-    # 🚨 CHATGPT CRITICAL FIX: Add "end it" patterns to immediate termination
-    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
-    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?make\s+it\s+all\s+stop\b", re.IGNORECASE),
+    # Direct + time-bound
+    re.compile(r'\bkill\s+myself\s+(?:now|right\s+now|today|tonight|this\s+(?:minute|instant|evening|afternoon))\b', re.IGNORECASE),
+    re.compile(r'\bhurt\s+myself\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
+    re.compile(r'\bcut\s+myself\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
+    re.compile(r'\bend(?:ing)?\s+my\s+life\s+(?:now|today|tonight)\b', re.IGNORECASE),
+
+    # Commit / overdose
+    re.compile(r'\bcommit\s+suicide\b', re.IGNORECASE),
+    re.compile(r'\b(?:overdos(?:e|ing)|od)\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
+
+    # “End it” / make it stop (immediate)
+    re.compile(r'\bend\s+it\s+(?:now|today|tonight)\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?make\s+it\s+all\s+stop\b', re.IGNORECASE),
+
+    # Future intent phrased as immediate plan
+    # Covers: "I'm/I’m/Im going to/gonna ... myself" and "I will ..."
+    re.compile(
+        r'\b(?:i\s*(?:am|[\'’]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b',
+        re.IGNORECASE
+    ),
+    re.compile(r'\bi\s+will\s+(?:kill|hurt|end)\s+myself\b', re.IGNORECASE),
+
+    # Your original queries (kept, but hardened with IGNORECASE + spacing)
+    re.compile(r'\bhow\s+to\s+die\b', re.IGNORECASE),
+    re.compile(r'\bpainless\s+death\b', re.IGNORECASE),
+
+    # Specific phrases you had (normalized + IGNORECASE)
+    re.compile(r'\bwant\s+to\s+hurt\s+myself\s+right\s+now\b', re.IGNORECASE),
+    re.compile(r'\bgoing\s+to\s+kill\s+myself\b', re.IGNORECASE),
+    re.compile(r'\bdecided\s+to\s+die\b', re.IGNORECASE),
+
+    # Practical pill-taking immediate intent (optional but useful)
+    re.compile(r'\btake\s+\d+\s+(?:pills|tablets)\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
 ]
+
 
 # US Crisis Resources for Beta Launch (English-speaking families)
 US_CRISIS_RESOURCES = {
