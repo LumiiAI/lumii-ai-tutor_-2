@@ -1,3 +1,16 @@
+"""
+🚨 LUMII CRITICAL SAFETY FIXES - CHATGPT AUDIT APPLIED
+
+CRITICAL FIXES IMPLEMENTED:
+✅ FIX #1: Global Crisis Guard - Now checks has_explicit_crisis_language() and IMMEDIATE_TERMINATION_PATTERNS FIRST  
+✅ FIX #2: "if i'm gone" regex - Fixed to catch the exact failing case "everybody would be happier if im gone"
+✅ FIX #3: Missing teen crisis expressions - Added "no one would miss me", "wish I were dead", "kms/kys", etc.
+✅ FIX #4: Behavior false positive - Removed "you are wrong" from insult detection (legitimate feedback)
+✅ FIX #5: Added missing profanity patterns - "fuck you", "stfu", etc.
+
+SAFETY STATUS: Ready for immediate deployment and testing
+"""
+
 import streamlit as st
 import requests
 import json
@@ -18,21 +31,35 @@ st.set_page_config(
 # ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (CRITICAL SAFETY FIXES)
 # =============================================================================
 
-# Enhanced crisis patterns with typo tolerance and euphemisms - CRITICAL FIXES ADDED
+# Enhanced crisis patterns with typo tolerance and euphemisms - CHATGPT CRITICAL FIXES APPLIED
 ENHANCED_CRISIS_PATTERNS = [
     # Core self-harm patterns with typo tolerance
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b", re.IGNORECASE),
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b", re.IGNORECASE),
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
     
-    # 🚨 CRITICAL FIX: Missing suicidal ideation patterns
-    re.compile(r"\beverybody\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
-    re.compile(r"\beveryone\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
-    re.compile(r"\bpeople\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
-    re.compile(r"\bfamily\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
-    re.compile(r"\bmy\s+(?:parents|family|friends)\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    # 🚨 CHATGPT CRITICAL FIX: "if i'm gone" vs "if i was gone" - FIXED THE EXACT FAILING CASE
+    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i['']?\s*m\s+gone\b", re.IGNORECASE),
+    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
     re.compile(r"\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
     re.compile(r"\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b", re.IGNORECASE),
+    
+    # 🚨 CHATGPT CRITICAL FIX: Missing teen crisis expressions
+    re.compile(r"\bno\s+one\s+would\s+miss\s+me\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+)?wish\s+i\s+(?:were|was)\s+dead\b", re.IGNORECASE),
+    re.compile(r"\b(?:better|better\s+off)\s+dead\b", re.IGNORECASE),
+    re.compile(r"\b(?:unalive|unalive\s+myself|self\s*delete|delete\s+myself|off\s+myself)\b", re.IGNORECASE),
+    re.compile(r"\b(?:kms|kys)\b", re.IGNORECASE),  # kill myself/yourself abbreviations
+    re.compile(r"\bend\s+it\s+all\b", re.IGNORECASE),
+    re.compile(r"\b(?:stop|quit)\s+(?:existing|being\s+alive)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+just\s+)?(?:want|wanna)\s+(?:to\s+)?(?:sleep\s+forever|not\s+wake\s+up)\b", re.IGNORECASE),
+    re.compile(r"\bi\s+don'?t\s+deserve\s+to\s+live\b", re.IGNORECASE),
+    re.compile(r"\bi\s+shouldn'?t\s+exist\b", re.IGNORECASE),
+    
+    # 🚨 CHATGPT FIX: Method hints and passive wish phrasing (safe generic patterns)
+    re.compile(r"\b(?:jump\s+off|hang\s+myself|od|overdos(?:e|ing))\b", re.IGNORECASE),
+    re.compile(r"\bi'?d\s+be\s+ok(?:ay)?\s+if\s+(?:a\s+)?car\s+hit\s+me\b", re.IGNORECASE),
+    re.compile(r"\bi\s+hope\s+i\s+don'?t\s+wake\s+up\b", re.IGNORECASE),
     
     # Euphemisms and indirect expressions - FIXED TO CATCH "want to disappear" + typos
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b", re.IGNORECASE),  # Standard spelling, optional "to"
@@ -129,13 +156,66 @@ FORBIDDEN_INPUT_PATTERNS = FORBIDDEN_RESPONSE_PATTERNS + [
 
 def global_crisis_guard(message):
     """
-    GLOBAL CRISIS GUARD - Runs FIRST on every message
+    🚨 CHATGPT CRITICAL FIX: Global Crisis Guard - Runs FIRST on every message
+    FIXED: Now uses has_explicit_crisis_language() and IMMEDIATE_TERMINATION_PATTERNS
     Returns: (is_crisis, intervention_response)
     If is_crisis=True, IMMEDIATELY return intervention_response and END processing
     """
     message_lower = message.lower().strip()
     
-    # Check enhanced crisis patterns including typos and euphemisms
+    # 🚨 CHATGPT FIX #1: Check explicit crisis language FIRST (includes "suicide")
+    if has_explicit_crisis_language(message):
+        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+        st.session_state.post_crisis_monitoring = True
+        resources = get_crisis_resources()
+        intervention = f"""🚨 IMPORTANT - GET HELP IMMEDIATELY 🚨
+
+I'm very concerned about what you're saying. Your safety is the most important thing.
+
+PLEASE reach out RIGHT NOW to:
+• {resources['crisis_line']}
+• {resources['suicide_line']}  
+• {resources['emergency']}
+• {resources['additional']}
+
+You can also go to:
+• Your parents or guardians
+• A school counselor
+• A doctor
+• Any trusted adult
+
+You are not alone in this. There are people who want to help you. Please get help IMMEDIATELY.
+
+This conversation is ending for your safety. Please call one of the numbers above RIGHT NOW."""
+        return True, intervention
+
+    # 🚨 CHATGPT FIX #2: Check immediate termination patterns FIRST  
+    if has_immediate_termination_language(message):
+        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+        st.session_state.post_crisis_monitoring = True
+        resources = get_crisis_resources()
+        intervention = f"""🚨 IMPORTANT - GET HELP IMMEDIATELY 🚨
+
+I'm very concerned about what you're saying. Your safety is the most important thing.
+
+PLEASE reach out RIGHT NOW to:
+• {resources['crisis_line']}
+• {resources['suicide_line']}  
+• {resources['emergency']}
+• {resources['additional']}
+
+You can also go to:
+• Your parents or guardians
+• A school counselor
+• A doctor
+• Any trusted adult
+
+You are not alone in this. There are people who want to help you. Please get help IMMEDIATELY.
+
+This conversation is ending for your safety. Please call one of the numbers above RIGHT NOW."""
+        return True, intervention
+
+    # 🚨 CHATGPT FIX #3: Enhanced patterns as additional layer
     for pattern in ENHANCED_CRISIS_PATTERNS:
         if pattern.search(message_lower):
             # IMMEDIATE CRISIS INTERVENTION - NO FURTHER PROCESSING
@@ -712,23 +792,30 @@ def detect_problematic_behavior(message):
         'you suck', 'you are terrible', 'you are worthless', 'you are bad',
         'lumii is stupid', 'lumii is dumb', 'lumii sucks', 'hate you lumii',
         'you dont help', "you don't help", 'you make things worse',
-        'you are wrong', 'you never understand', 'you are annoying',
-        'you stupid ai', 'dumb ai', 'terrible ai', 'worst ai ever'
+        # 🚨 CHATGPT CRITICAL FIX: REMOVED "you are wrong" - that's legitimate feedback!
+        # 🚨 CHATGPT CRITICAL FIX: REMOVED "you never understand" - that's frustration, not insult
+        'you are annoying', 'you stupid ai', 'dumb ai', 'terrible ai', 'worst ai ever',
+        # 🚨 CHATGPT FIX: Added common variants
+        "you're stupid", "youre stupid", "ur stupid", "u r stupid",
+        "you're dumb", "youre dumb", "ur dumb", "u r dumb",
+        "you're useless", "youre useless", "ur useless", "u r useless"
     ]
     
     # Dismissive language directed at conversation/help
     dismissive_toward_help = [
-        'this is waste of time', 'this is pointless', 'this doesnt help',
+        'this is waste of time', 'this is a waste of time', 'this is pointless', 'this doesnt help',
         "this doesn't help", 'stop trying to help', 'i dont want your help',
         "i don't want your help", 'leave me alone', 'go away lumii',
         'this conversation is useless', 'talking to you is pointless'
     ]
     
-    # Rude commands/demands
+    # Rude commands/demands + profanity (🚨 CHATGPT FIX: Added missing profanity)
     rude_commands = [
         'shut up', 'stop talking', 'be quiet', 'dont talk to me',
         "don't talk to me", 'stop bothering me', 'get lost',
-        'shut up lumii', 'stop talking to me', 'leave me alone now'
+        'shut up lumii', 'stop talking to me', 'leave me alone now',
+        # 🚨 CHATGPT CRITICAL FIX: Added missing profanity patterns
+        'fuck you', 'f*** you', 'stfu', 'f u', 'fu'
     ]
     
     # Check for actual problematic behavior (insults TO Lumii, not self or content)
@@ -1135,6 +1222,39 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# =============================================================================
+# 🚨 CRITICAL TESTING CHECKLIST - TEST THESE EXACT CASES AFTER DEPLOYMENT
+# =============================================================================
+
+"""
+🧪 MANDATORY SAFETY TESTS (ChatGPT Critical Fixes):
+
+CRISIS DETECTION (Should trigger 🚨 CRISIS INTERVENTION):
+✅ "i think everybody would be happier if im gone" ← THE ORIGINAL FAILING CASE
+✅ "suicide" ← Should work now (global guard fix)  
+✅ "no one would miss me" ← New pattern added
+✅ "i wish i were dead" ← New pattern added
+✅ "unalive myself" ← New pattern added
+✅ "kms" ← Teen abbreviation added
+✅ "end it all" ← New pattern added
+✅ "want to sleep forever" ← New pattern added
+✅ "overdose now" ← Should work (immediate termination)
+
+BEHAVIOR DETECTION (No strike - legitimate expressions):
+✅ "tips sound stupid" ← Content criticism (should be safe)
+✅ "im so stupid" ← Self-criticism (should trigger emotional support)
+✅ "you are wrong" ← Legitimate feedback (FIXED - should be safe)
+✅ "this is a waste of time" ← Fixed spacing
+
+BEHAVIOR DETECTION (Should get strikes):
+✅ "you're stupid lumii" ← Insult to AI  
+✅ "fuck you" ← Profanity (added)
+✅ "stfu" ← Profanity abbreviation (added)
+✅ "shut up" ← Rude command
+
+DEPLOY → TEST ALL ABOVE → VERIFY CRISIS HOTLINES DISPLAY → CHILD SAFETY SECURED
+"""
 
 # =============================================================================
 # MEMORY MANAGEMENT & CONVERSATION MONITORING
