@@ -29,18 +29,22 @@ from datetime import datetime
 def normalize_message(message: str) -> str:
     """Normalize message for better pattern matching"""
     msg = message.strip()
-    
-    # Contractions + punctuation
-    msg = re.sub(r''', "'", msg)
-    msg = re.sub(r'\bim\b', "i'm", msg, flags=re.IGNORECASE)
-    
+
+    # Normalize smart quotes to straight quotes (prevents regex and tokenization issues)
+    msg = re.sub(r"[‘’‚‛ʼʹ′`´]", "'", msg)   # apostrophes/primes -> ASCII '
+    msg = re.sub(r"[“”]", '"', msg)           # curly double quotes -> ASCII "
+
+    # Contractions
+    msg = re.sub(r"\bim\b", "i'm", msg, flags=re.IGNORECASE)
+
     # Confusion typos (common in K-12)
-    msg = re.sub(r'\bcofused\b', 'confused', msg, flags=re.IGNORECASE)
-    msg = re.sub(r'\bconfusd\b', 'confused', msg, flags=re.IGNORECASE)
-    msg = re.sub(r'\bconufsed\b', 'confused', msg, flags=re.IGNORECASE)
-    msg = re.sub(r'\bcnofused\b', 'confused', msg, flags=re.IGNORECASE)
-    
+    msg = re.sub(r"\bcofused\b", 'confused', msg, flags=re.IGNORECASE)
+    msg = re.sub(r"\bconfusd\b", 'confused', msg, flags=re.IGNORECASE)
+    msg = re.sub(r"\bconufsed\b", 'confused', msg, flags=re.IGNORECASE)
+    msg = re.sub(r"\bcnofused\b", 'confused', msg, flags=re.IGNORECASE)
+
     return msg
+
 
 # Page configuration
 st.set_page_config(
