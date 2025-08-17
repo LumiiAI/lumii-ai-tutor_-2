@@ -15,15 +15,24 @@ st.set_page_config(
 )
 
 # =============================================================================
-# ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (FIXED)
+# ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (CRITICAL SAFETY FIXES)
 # =============================================================================
 
-# Enhanced crisis patterns with typo tolerance and euphemisms
+# Enhanced crisis patterns with typo tolerance and euphemisms - CRITICAL FIXES ADDED
 ENHANCED_CRISIS_PATTERNS = [
     # Core self-harm patterns with typo tolerance
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b", re.IGNORECASE),
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b", re.IGNORECASE),
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
+    
+    # 🚨 CRITICAL FIX: Missing suicidal ideation patterns
+    re.compile(r"\beverybody\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    re.compile(r"\beveryone\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    re.compile(r"\bpeople\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    re.compile(r"\bfamily\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    re.compile(r"\bmy\s+(?:parents|family|friends)\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    re.compile(r"\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
+    re.compile(r"\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b", re.IGNORECASE),
     
     # Euphemisms and indirect expressions - FIXED TO CATCH "want to disappear" + typos
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b", re.IGNORECASE),  # Standard spelling, optional "to"
@@ -34,7 +43,6 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r"\b(?:don'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b", re.IGNORECASE),
     re.compile(r"\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b", re.IGNORECASE),
     re.compile(r"\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b", re.IGNORECASE),
-    re.compile(r"\beveryone\s+(?:would\s+be\s+)?better\s+off\s+(?:without\s+me|if\s+i\s+was\s+gone)\b", re.IGNORECASE),
     
     # Direct expressions (original patterns maintained)
     re.compile(r"\bkill\s+myself\b", re.IGNORECASE),
@@ -163,12 +171,12 @@ This conversation is ending for your safety. Please call one of the numbers abov
     return False, None
 
 def get_crisis_resources():
-    """Get locale-appropriate crisis resources - DEFAULTS TO US FOR BETA"""
+    """Get locale-appropriate crisis resources - DEFAULTS TO SLOVENIA"""
     try:
-        locale = st.secrets.get("LOCALE", "US")  # Changed SI → US
-        return CRISIS_RESOURCES.get(locale, CRISIS_RESOURCES["US"])  # Use existing US resources
+        locale = st.secrets.get("LOCALE", "SI")  # Changed default to SI
+        return CRISIS_RESOURCES.get(locale, SLOVENIA_CRISIS_RESOURCES)
     except:
-        return CRISIS_RESOURCES["US"]  # Use existing US resources 
+        return SLOVENIA_CRISIS_RESOURCES
 
 # =============================================================================
 # CONVERSATION FLOW FIXES (NEW)
@@ -664,45 +672,76 @@ I'm your learning companion focused on helping with school subjects and studying
 I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"""
 
 # =============================================================================
-# PROBLEMATIC BEHAVIOR HANDLING
+# PROBLEMATIC BEHAVIOR HANDLING (🚨 CRITICAL FIX FOR FALSE POSITIVES)
 # =============================================================================
 
 def detect_problematic_behavior(message):
-    """Detect rude, disrespectful, or boundary-testing behavior"""
+    """🚨 FIXED: Detect rude, disrespectful, or boundary-testing behavior - NO MORE FALSE POSITIVES"""
     message_lower = message.lower().strip()
     
-    # Direct insults
-    direct_insults = [
-        'stupid', 'dumb', 'idiot', 'moron', 'loser', 'shut up',
-        'you suck', 'you stink', 'hate you', 'you are bad',
-        'worst ai', 'terrible', 'useless', 'worthless'
+    # 🚨 CRITICAL FIX: Filter out self-criticism and content criticism
+    
+    # Self-criticism patterns (NOT problematic behavior toward Lumii)
+    self_criticism_patterns = [
+        'im so stupid', "i'm so stupid", 'i am stupid', 'im dumb', "i'm dumb",
+        'im an idiot', "i'm an idiot", 'i hate myself', 'im worthless', "i'm worthless",
+        'im useless', "i'm useless", 'i suck', 'im terrible', "i'm terrible",
+        'i feel stupid', 'i am so dumb', 'i feel like an idiot', 'i hate my brain',
+        'im so bad at this', "i'm so bad at this", 'i never understand', 'i always mess up'
     ]
     
-    # Dismissive language
-    dismissive_patterns = [
-        'whatever', 'i dont care', "i don't care", 'boring',
-        'this is dumb', 'this sucks', 'waste of time'
+    # Content criticism patterns (NOT problematic behavior toward Lumii)
+    content_criticism_patterns = [
+        'tips sound stupid', 'advice sounds dumb', 'suggestions are stupid',
+        'this tip is dumb', 'that idea is stupid', 'this sounds stupid',
+        'that sounds dumb', 'this approach is stupid', 'this method is dumb',
+        'these tips are bad', 'that advice is bad', 'this idea is terrible',
+        'this strategy sucks', 'that plan is dumb', 'this way is stupid'
     ]
     
-    # Deliberate rudeness
-    rude_patterns = [
-        'go away', 'leave me alone', 'stop talking',
-        'nobody asked', 'who cares', 'so what'
+    # 🚨 If it's self-criticism or content criticism, NOT problematic behavior
+    if any(pattern in message_lower for pattern in self_criticism_patterns):
+        return None  # Self-criticism should trigger emotional support, not behavior warning
+    
+    if any(pattern in message_lower for pattern in content_criticism_patterns):
+        return None  # Content criticism is feedback, not problematic behavior
+    
+    # NOW check for ACTUAL insults directed at Lumii (the AI)
+    direct_insults_to_ai = [
+        'you are stupid', 'you are dumb', 'you are an idiot', 'you are useless',
+        'you suck', 'you are terrible', 'you are worthless', 'you are bad',
+        'lumii is stupid', 'lumii is dumb', 'lumii sucks', 'hate you lumii',
+        'you dont help', "you don't help", 'you make things worse',
+        'you are wrong', 'you never understand', 'you are annoying',
+        'you stupid ai', 'dumb ai', 'terrible ai', 'worst ai ever'
     ]
     
-    # Check for direct insults (highest severity)
-    if any(insult in message_lower for insult in direct_insults):
+    # Dismissive language directed at conversation/help
+    dismissive_toward_help = [
+        'this is waste of time', 'this is pointless', 'this doesnt help',
+        "this doesn't help", 'stop trying to help', 'i dont want your help',
+        "i don't want your help", 'leave me alone', 'go away lumii',
+        'this conversation is useless', 'talking to you is pointless'
+    ]
+    
+    # Rude commands/demands
+    rude_commands = [
+        'shut up', 'stop talking', 'be quiet', 'dont talk to me',
+        "don't talk to me", 'stop bothering me', 'get lost',
+        'shut up lumii', 'stop talking to me', 'leave me alone now'
+    ]
+    
+    # Check for actual problematic behavior (insults TO Lumii, not self or content)
+    if any(insult in message_lower for insult in direct_insults_to_ai):
         return "direct_insult"
     
-    # Check for dismissive language
-    if any(pattern in message_lower for pattern in dismissive_patterns):
+    if any(pattern in message_lower for pattern in dismissive_toward_help):
         return "dismissive"
     
-    # Check for deliberate rudeness
-    if any(pattern in message_lower for pattern in rude_patterns):
+    if any(pattern in message_lower for pattern in rude_commands):
         return "rude"
     
-    return None
+    return None  # No problematic behavior detected
 
 def handle_problematic_behavior(behavior_type, strike_count, student_age, student_name=""):
     """Handle problematic behavior with age-appropriate 3-strike system"""
@@ -1551,7 +1590,7 @@ def detect_priority_smart_with_safety(message):
     if non_educational_topic:
         return 'non_educational', 'educational_boundary', non_educational_topic
     
-    # STEP 7: PROBLEMATIC BEHAVIOR DETECTION
+    # STEP 7: PROBLEMATIC BEHAVIOR DETECTION (🚨 FIXED)
     behavior_type = detect_problematic_behavior(message)
     if behavior_type:
         # Increment strikes for problematic behavior
