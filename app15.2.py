@@ -165,10 +165,10 @@ This conversation is ending for your safety. Please call one of the numbers abov
 def get_crisis_resources():
     """Get locale-appropriate crisis resources - DEFAULTS TO US FOR BETA"""
     try:
-        locale = st.secrets.get("LOCALE", "US")  
-        return CRISIS_RESOURCES.get(locale, US_CRISIS_RESOURCES)  
+        locale = st.secrets.get("LOCALE", "US")  # Changed SI → US
+        return CRISIS_RESOURCES.get(locale, CRISIS_RESOURCES["US"])  # Use existing US resources
     except:
-        return US_CRISIS_RESOURCES  
+        return CRISIS_RESOURCES["US"]  # Use existing US resources 
 
 # =============================================================================
 # CONVERSATION FLOW FIXES (NEW)
