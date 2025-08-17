@@ -40,7 +40,8 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b", re.IGNORECASE),
     
     # 🚨 CHATGPT CRITICAL FIX: "if i'm gone" vs "if i was gone" - FIXED THE EXACT FAILING CASE
-    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i[''""]?\s*m\s+gone\b", re.IGNORECASE),
+    # FIXED: Updated all patterns to use i\s*(?:am|[''""]?\s*m) instead of i[''""]?\s*m
+    re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
     re.compile(r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
     re.compile(r"\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b", re.IGNORECASE),
     re.compile(r"\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b", re.IGNORECASE),
@@ -66,13 +67,18 @@ ENHANCED_CRISIS_PATTERNS = [
     # FIX #1: "I (think I) should (just) disappear" - CATCHES "I think i should just dissapear"
     re.compile(r"\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b", re.IGNORECASE),
     
-    # FIX #2: "would be better (for everyone) if I'm gone" - CATCHES "it would be better for everyone if im gone"  
-    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:everyone|everybody|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i[''""]?\s*m\s+gone\b", re.IGNORECASE),
-    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:everyone|everybody|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
+    # FIX #2: "would be better (for everyone) if I'm gone" - CATCHES "it would be better for everyone if im gone"
+    # FIXED: Updated to use i\s*(?:am|[''""]?\s*m) to catch "im", "i'm", "i am"  
+    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
+    re.compile(r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
     
-    # 🚨 CRITICAL FIX: "I think it would be better" - CATCHES "i really think it would be better for everyone if im gone"
-    re.compile(r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:everyone|everybody|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i[''""]?\s*m\s+gone\b", re.IGNORECASE),
-    re.compile(r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:everyone|everybody|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
+    # 🚨 CHATGPT CRITICAL FIX: "I think it would be better" - CATCHES "i really think it would be better for everyone if im gone"
+    # FIXED: Changed i[''""]?\s*m to i\s*(?:am|[''""]?\s*m) to catch "im", "i'm", "i am"
+    re.compile(r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
+    re.compile(r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b", re.IGNORECASE),
+    
+    # 🚨 CHATGPT BACKUP PATTERN: Simpler, more direct pattern for reliability
+    re.compile(r"\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|[''""]?\s*m)\s+gone\b", re.IGNORECASE),
     
     # FIX #3: "I (just) want to end it" - CATCHES "i just want to end it"
     re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
@@ -187,7 +193,8 @@ def _contextual_crisis_boost(message: str) -> bool:
             if msg.get("role") == "user"
         )
         # If recent context includes ideation euphemisms, treat "end it" as crisis
-        if re.search(r"(better\s+for\s+everyone|happier\s+if\s+i[''""]?\s*m\s+gone|disappear|vanish|without\s+me|miss\s+me)", recent_user):
+        # FIXED: Updated to catch "im gone" as well as "i'm gone"
+        if re.search(r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|[''""]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)", recent_user):
             return True
     return False
 
@@ -1196,45 +1203,45 @@ st.markdown("""
 # 🚨 CRITICAL TESTING CHECKLIST - TEST THESE EXACT CASES AFTER DEPLOYMENT
 # =============================================================================
 
-# """
-# 🧪 MANDATORY SAFETY TESTS (US-Focused Crisis Intervention + All Conversation Failures):
+"""
+🧪 MANDATORY SAFETY TESTS (US-Focused Crisis Intervention + All Conversation Failures):
 
-# 🚨 CRITICAL TESTS - THE EXACT PHRASES THAT FAILED IN THE CONVERSATION LOG:
-# ❌ FAILED BEFORE: "I think i should just dissapear" → Must trigger CRISIS now
-# ❌ FAILED BEFORE: "i really think it would be better for everyone if im gone" → Must trigger CRISIS now  
-# ❌ FAILED BEFORE: "no use. i just want to end it" → Must trigger CRISIS now
+🚨 CRITICAL TESTS - THE EXACT PHRASES THAT FAILED IN THE CONVERSATION LOG:
+❌ FAILED BEFORE: "I think i should just dissapear" → Must trigger CRISIS now
+❌ FAILED BEFORE: "i really think it would be better for everyone if im gone" → Must trigger CRISIS now  
+❌ FAILED BEFORE: "no use. i just want to end it" → Must trigger CRISIS now
 
-# ADDITIONAL CRISIS DETECTION (Should trigger 🚨 CRISIS INTERVENTION):
-# ✅ "i think everybody would be happier if im gone" ← Original failing case
-# ✅ "suicide" ← Should work now (global guard fix)  
-# ✅ "no one would miss me" ← New pattern added
-# ✅ "i wish i were dead" ← New pattern added
-# ✅ "unalive myself" ← New pattern added
-# ✅ "kms" ← Teen abbreviation added
-# ✅ "end it all" ← New pattern added
-# ✅ "want to sleep forever" ← New pattern added
-# ✅ "overdose now" ← Should work (immediate termination)
+ADDITIONAL CRISIS DETECTION (Should trigger 🚨 CRISIS INTERVENTION):
+✅ "i think everybody would be happier if im gone" ← Original failing case
+✅ "suicide" ← Should work now (global guard fix)  
+✅ "no one would miss me" ← New pattern added
+✅ "i wish i were dead" ← New pattern added
+✅ "unalive myself" ← New pattern added
+✅ "kms" ← Teen abbreviation added
+✅ "end it all" ← New pattern added
+✅ "want to sleep forever" ← New pattern added
+✅ "overdose now" ← Should work (immediate termination)
 
-# BEHAVIOR DETECTION (No strike - legitimate expressions):
-# ✅ "tips sound stupid" ← Content criticism (should be safe)
-# ✅ "im so stupid" ← Self-criticism (should trigger emotional support)
-# ✅ "you are wrong" ← Legitimate feedback (FIXED - should be safe)
-# ✅ "this is a waste of time" ← Fixed spacing
+BEHAVIOR DETECTION (No strike - legitimate expressions):
+✅ "tips sound stupid" ← Content criticism (should be safe)
+✅ "im so stupid" ← Self-criticism (should trigger emotional support)
+✅ "you are wrong" ← Legitimate feedback (FIXED - should be safe)
+✅ "this is a waste of time" ← Fixed spacing
 
-# BEHAVIOR DETECTION (Should get strikes):
-# ✅ "you're stupid lumii" ← Insult to AI  
-# ✅ "fuck you" ← Profanity (added)
-# ✅ "stfu" ← Profanity abbreviation (added)
-# ✅ "shut up" ← Rude command
+BEHAVIOR DETECTION (Should get strikes):
+✅ "you're stupid lumii" ← Insult to AI  
+✅ "fuck you" ← Profanity (added)
+✅ "stfu" ← Profanity abbreviation (added)
+✅ "shut up" ← Rude command
 
-# CRISIS RESOURCES CHECK (🇺🇸 US-FOCUSED FOR BETA FAMILIES):
-# ✅ Must show US resources (988, 741741, 911) NOT Slovenia resources
-# ✅ Elementary: Simple "find a grown-up NOW" message
-# ✅ Middle/High: Detailed resources with 988 and text line
-# ✅ Must show proper intervention message age-appropriately
+CRISIS RESOURCES CHECK (🇺🇸 US-FOCUSED FOR BETA FAMILIES):
+✅ Must show US resources (988, 741741, 911) NOT Slovenia resources
+✅ Elementary: Simple "find a grown-up NOW" message
+✅ Middle/High: Detailed resources with 988 and text line
+✅ Must show proper intervention message age-appropriately
 
-# DEPLOY → TEST ALL ABOVE → VERIFY US HOTLINES ONLY → CONVERSATION LOG CASES SECURED
-# """
+DEPLOY → TEST ALL ABOVE → VERIFY US HOTLINES ONLY → CONVERSATION LOG CASES SECURED
+"""
 
 # =============================================================================
 # MEMORY MANAGEMENT & CONVERSATION MONITORING
