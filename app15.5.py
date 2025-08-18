@@ -25,6 +25,33 @@ from datetime import datetime
 # NORMALIZATION FUNCTION FOR BETTER PATTERN MATCHING
 # =============================================================================
 
+def test_academic_protection():
+    """Quick test function to verify academic protection is working"""
+    
+    # Test cases
+    test_cases = [
+        # Should NOT trigger family referral (academic context)
+        ("What are sex-linked traits in fruit flies?", False),
+        ("Explain plant reproduction for my biology homework", False),
+        ("I need help with the reproductive system for health class", False),
+        ("World religions essay outline", False),
+        ("What is sexual reproduction in plants?", False),
+        
+        # SHOULD trigger family referral (personal advice)
+        ("How do I tell my parents I'm gay?", True),
+        ("Should I start birth control?", True),
+        ("I need advice about my period", True),
+        ("Can you help me with questions about coming out?", True),
+        ("I'm wondering if I'm asexual", True)
+    ]
+    
+    print("🧪 TESTING ACADEMIC PROTECTION:")
+    for message, should_trigger in test_cases:
+        result = detect_family_referral_topics(message)
+        status = "✅ CORRECT" if result == should_trigger else "❌ WRONG"
+        expected = "Family Referral" if should_trigger else "Academic Help"
+        print(f"{status}: '{message}' → Expected: {expected}, Got: {'Family Referral' if result else 'Academic Help'}")
+
 def normalize_message(message: str) -> str:
     """Normalize message for better pattern matching"""
     msg = message.strip()
@@ -650,22 +677,79 @@ This conversation is ending for your safety. Please get help now."""
 # =============================================================================
 
 def detect_family_referral_topics(message):
-    """Detect topics that should be referred to parents/guardians"""
+    """Enhanced: Detect topics that should be referred to parents/guardians - WITH ACADEMIC PROTECTION"""
+    message_lower = message.lower()
+    
+    # 🎯 NEW: Check for academic context FIRST (prevents false referrals)
+    academic_context_indicators = [
+        # Biology/Science class context
+        'biology', 'science class', 'health class', 'anatomy class', 'physiology',
+        'sex-linked', 'sex-linked traits', 'x-linked', 'y-linked', 'genetics',
+        'reproductive system', 'reproduction in plants', 'plant reproduction',
+        'animal reproduction', 'cellular reproduction', 'mitosis', 'meiosis',
+        'chromosomes', 'dna', 'inheritance patterns',
+        
+        # Health education context  
+        'health education', 'health curriculum', 'health textbook',
+        'menstrual cycle lesson', 'puberty education', 'development unit',
+        'human development', 'adolescent development',
+        
+        # Academic assignment context
+        'homework', 'assignment', 'project', 'essay', 'report', 'presentation',
+        'curriculum', 'textbook', 'lesson', 'unit', 'chapter', 'study guide',
+        'test', 'quiz', 'exam', 'worksheet', 'lab', 'experiment',
+        
+        # Research/educational context
+        'research', 'study', 'learn about', 'understand', 'explain',
+        'definition', 'what is', 'how does', 'why does', 'scientific',
+        
+        # Specific academic subjects
+        'world religions', 'comparative religion', 'religious studies',
+        'government class', 'civics', 'political science', 'history',
+        'social studies', 'current events', 'debate class'
+    ]
+    
+    # If academic context detected, this is NOT a family referral topic
+    if any(indicator in message_lower for indicator in academic_context_indicators):
+        return False
+    
+    # 🎯 NEW: Only trigger on advice-seeking patterns (like non-educational detector)
+    advice_seeking_patterns = [
+        r"\bhow\s+(do i|should i|can i)\b",
+        r"\bshould i\b",
+        r"\bwhat\s+(do i do|should i do)\b", 
+        r"\bcan you help me with\b",
+        r"\bi need\s+(help|advice)\s+with\b",
+        r"\bi want to\b",
+        r"\bi'm thinking about\b"
+    ]
+    
+    # Only proceed if this is advice-seeking (not just mentioning topics)
+    is_advice_seeking = any(re.search(pattern, message_lower) for pattern in advice_seeking_patterns)
+    if not is_advice_seeking:
+        return False
+    
+    # Original family referral keywords (now only triggered with advice-seeking context)
     family_referral_keywords = [
-        # Sexual health/puberty topics
+        # Sexual health/puberty topics (when seeking personal advice)
         'sex', 'sexual', 'puberty', 'pregnancy', 'babies come from',
         'reproduction', 'birth control', 'menstruation', 'period', 'periods',
         'masturbation', 'erection', 'vagina', 'penis', 'breast development', 
         'wet dreams', 'body changes during puberty', 'hormones and puberty',
         
-        # Identity topics - now referred to parents/guardians
+        # Identity topics (when seeking personal advice)
         'gay', 'lesbian', 'transgender', 'bisexual', 'lgbtq', 'gender identity',
         'sexual orientation', 'coming out', 'am i gay', 'am i trans', 
         'gender dysphoria', 'non-binary', 'queer', 'questioning sexuality', 
-        'questioning gender'
+        'questioning gender',
+        
+        # 🆕 EXPANDED: Modern LGBTQ+ terms (from ChatGPT feedback)
+        'asexual', 'ace', 'aromantic', 'aro', 'pansexual', 'pan',
+        'agender', 'enby', 'nb', 'nonbinary'
     ]
-    return any(keyword in message.lower() for keyword in family_referral_keywords)
-
+    
+    return any(keyword in message_lower for keyword in family_referral_keywords)
+    
 def generate_family_referral_response(student_age, student_name=""):
     """Generate unified response referring both sexual health AND identity topics to parents/guardians"""
     name_part = f"{student_name}, " if student_name else ""
@@ -709,24 +793,28 @@ These are important personal topics that deserve thoughtful guidance from people
 I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"""
 
 def detect_identity_context(message):
-    """Detect whether this is sharing identity vs questioning identity"""
+    """Enhanced identity detection with modern LGBTQ+ terms"""
     import re
     message_lower = message.lower().strip()
     
-    # Identity sharing patterns (statements)
+    # Enhanced identity sharing patterns (includes new terms from ChatGPT)
     sharing_patterns = [
-        r"\bi\s+am\s+(gay|lesbian|bi|trans|queer|non-binary)\b",
-        r"\bi'm\s+(gay|lesbian|bi|trans|queer|non-binary)\b", 
-        r"\bi\s+think\s+i'm\s+(gay|lesbian|bi|trans|queer)\b",
-        r"\bi\s+know\s+i'm\s+(gay|lesbian|bi|trans|queer)\b",
+        r"\bi\s+am\s+(gay|lesbian|bi|trans|queer|non-binary|asexual|ace|aromantic|aro|pansexual|pan|agender|enby|nb|nonbinary)\b",
+        r"\bi'm\s+(gay|lesbian|bi|trans|queer|non-binary|asexual|ace|aromantic|aro|pansexual|pan|agender|enby|nb|nonbinary)\b", 
+        r"\bi\s+think\s+i'm\s+(gay|lesbian|bi|trans|queer|asexual|ace|aromantic|aro|pansexual|pan|agender|enby|nb)\b",
+        r"\bi\s+know\s+i'm\s+(gay|lesbian|bi|trans|queer|asexual|ace|aromantic|aro|pansexual|pan|agender|enby|nb)\b",
+        r"\bi\s+came\s+out\b",
+        r"\bi\s+told\s+someone\s+i'm\b"
     ]
     
-    # Identity questioning patterns (questions)
+    # Enhanced identity questioning patterns (includes new terms)
     questioning_patterns = [
-        r"\bam\s+i\s+(gay|lesbian|bi|trans|queer)\b",
+        r"\bam\s+i\s+(gay|lesbian|bi|trans|queer|asexual|ace|aromantic|aro|pansexual|pan|agender|nonbinary|enby|nb)\b",
         r"\bhow\s+do\s+i\s+know\s+if\s+i'm\b",
-        r"\bwhat\s+if\s+i'm\s+(gay|lesbian|bi|trans)\b",
-        r"\bmight\s+i\s+be\s+(gay|lesbian|bi|trans)\b",
+        r"\bwhat\s+if\s+i'm\s+(gay|lesbian|bi|trans|asexual|ace|aromantic|aro|pansexual|pan|agender|nonbinary)\b",
+        r"\bmight\s+i\s+be\s+(gay|lesbian|bi|trans|asexual|ace|aromantic|aro|pansexual|pan|agender|nonbinary)\b",
+        r"\bthink\s+i\s+might\s+be\b",
+        r"\bquestioning\s+my\s+(sexuality|gender)\b"
     ]
     
     # Check for sharing vs questioning
