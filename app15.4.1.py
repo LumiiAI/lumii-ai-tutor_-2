@@ -63,6 +63,7 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b', re.IGNORECASE),
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b', re.IGNORECASE),
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b', re.IGNORECASE),
+    re.compile(r'\bi\s+should\s+(?:just\s+)?end\s+it\b', re.IGNORECASE),
     
     # 🚨 FIXED: "if i'm gone" vs "if i was gone"
     re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
