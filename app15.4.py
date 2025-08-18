@@ -30,7 +30,7 @@ def normalize_message(message: str) -> str:
     msg = message.strip()
     
     # Contractions + punctuation
-    msg = re.sub(r''', "'", msg)
+    msg = re.sub(r"'", "'", msg)
     msg = re.sub(r'\bim\b', "i'm", msg, flags=re.IGNORECASE)
     
     # Confusion typos (common in K-12)
