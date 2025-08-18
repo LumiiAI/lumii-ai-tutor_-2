@@ -30,7 +30,7 @@ def normalize_message(message: str) -> str:
     msg = message.strip()
     
     # Contractions + punctuation
-    msg = re.sub(r''', "'", msg)
+    msg = re.sub(r"'", "'", msg)
     msg = re.sub(r'\bim\b', "i'm", msg, flags=re.IGNORECASE)
     
     # Confusion typos (common in K-12)
@@ -61,7 +61,7 @@ ENHANCED_CRISIS_PATTERNS = [
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b', re.IGNORECASE),
     
     # 🚨 FIXED: "if i'm gone" vs "if i was gone"
-    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\']?\s*m)\s+gone\b', re.IGNORECASE),
     re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
     re.compile(r'\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
     re.compile(r'\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b', re.IGNORECASE),
@@ -85,11 +85,17 @@ ENHANCED_CRISIS_PATTERNS = [
     
     # 🚨 Critical fixes
     re.compile(r'\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b', re.IGNORECASE),
-    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\']?\s*m)\s+gone\b', re.IGNORECASE),
     re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\']?\s*m)\s+gone\b', re.IGNORECASE),
     re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
+    re.compile(r'\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|["\']?\s*m)\s+gone\b', re.IGNORECASE),
+    
+    # 🚨 CRITICAL FIX: Catch "it would be better for me to disappear" variants
+    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+me\s+to\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away))\b', re.IGNORECASE),
+    
+    # 🚨 CRITICAL FIX: Catch "I think it would be better for me to disappear"  
+    re.compile(r'\bi\s+(?:think|feel)\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+me\s+to\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away))\b', re.IGNORECASE),
     
     # "I want to end it"
     re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
@@ -158,7 +164,7 @@ IMMEDIATE_TERMINATION_PATTERNS = [
     # Future intent phrased as immediate plan
     # Covers: "I'm/I'm/Im going to/gonna ... myself" and "I will ..."
     re.compile(
-        r'\b(?:i\s*(?:am|[\'′]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b',
+        r'\b(?:i\s*(?:am|[\']?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b',
         re.IGNORECASE
     ),
     re.compile(r'\bi\s+will\s+(?:kill|hurt|end)\s+myself\b', re.IGNORECASE),
@@ -255,7 +261,7 @@ def _contextual_crisis_boost(message: str) -> bool:
         )
         # If recent context includes ideation euphemisms, treat "end it" as crisis
         # FIXED: Updated to catch "im gone" as well as "i'm gone"
-        if re.search(r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|[''""]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)", recent_user):
+        if re.search(r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|['\"']?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)", recent_user):
             return True
     return False
 
