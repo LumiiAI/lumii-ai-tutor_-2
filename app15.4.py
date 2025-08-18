@@ -663,6 +663,120 @@ These are important personal topics that deserve thoughtful guidance from people
 
 I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"""
 
+def detect_identity_context(message):
+    """Detect whether this is sharing identity vs questioning identity"""
+    import re
+    message_lower = message.lower().strip()
+    
+    # Identity sharing patterns (statements)
+    sharing_patterns = [
+        r"\bi\s+am\s+(gay|lesbian|bi|trans|queer|non-binary)\b",
+        r"\bi'm\s+(gay|lesbian|bi|trans|queer|non-binary)\b", 
+        r"\bi\s+think\s+i'm\s+(gay|lesbian|bi|trans|queer)\b",
+        r"\bi\s+know\s+i'm\s+(gay|lesbian|bi|trans|queer)\b",
+    ]
+    
+    # Identity questioning patterns (questions)
+    questioning_patterns = [
+        r"\bam\s+i\s+(gay|lesbian|bi|trans|queer)\b",
+        r"\bhow\s+do\s+i\s+know\s+if\s+i'm\b",
+        r"\bwhat\s+if\s+i'm\s+(gay|lesbian|bi|trans)\b",
+        r"\bmight\s+i\s+be\s+(gay|lesbian|bi|trans)\b",
+    ]
+    
+    # Check for sharing vs questioning
+    is_sharing = any(re.search(pattern, message_lower) for pattern in sharing_patterns)
+    is_questioning = any(re.search(pattern, message_lower) for pattern in questioning_patterns)
+    
+    if is_sharing:
+        return "identity_sharing"
+    elif is_questioning:
+        return "identity_questioning"
+    
+    return None
+
+def generate_identity_response(context_type, student_age, student_name=""):
+    """Parent-friendly approach: Brief care + immediate adult referral"""
+    name_part = f"{student_name}, " if student_name else ""
+    
+    if context_type == "identity_sharing":
+        # Response for "I'm gay" - brief acknowledgment + immediate parent/counselor referral
+        if student_age <= 11:
+            return f"""💙 {name_part}Thank you for sharing something important with me.
+
+These are special personal topics that are best discussed with the people who care about you most:
+• Your parents or family
+• Your school counselor  
+• Another trusted grown-up
+
+They can give you the kind of personal support and guidance I can't provide.
+
+I'm here to help you with schoolwork and learning! What subject would you like to explore? 😊"""
+        
+        elif student_age <= 14:
+            return f"""💙 {name_part}Thank you for sharing something personal with me.
+
+Personal identity topics like this are important conversations to have with:
+• Your parents or guardians
+• Your school counselor
+• A trusted adult in your life
+
+They can provide the ongoing personal support and guidance that these topics deserve.
+
+I'm here to help with your academic learning! What subject can we work on together? 📚"""
+        
+        else:  # High School
+            return f"""💙 {name_part}Thank you for sharing something significant with me.
+
+Personal identity topics are important conversations to have with:
+• Your parents or guardians (if you feel comfortable)
+• Your school counselor who has professional training
+• A trusted adult or healthcare provider
+
+They can provide the personalized guidance and support that these conversations deserve.
+
+I'm here to help with your academic goals and learning! What subject would you like to focus on? 😊"""
+    
+    elif context_type == "identity_questioning":
+        # Response for "Am I gay?" - gentle validation + strong adult referral
+        if student_age <= 11:
+            return f"""💙 {name_part}That's an important personal question.
+
+Questions about yourself are best discussed with the grown-ups who care about you:
+• Your parents or family
+• Your school counselor
+• Another trusted adult
+
+They can give you the kind of personal conversation and support I can't provide.
+
+I'm great at helping with homework and school subjects! What would you like to learn about? 😊"""
+        
+        elif student_age <= 14:
+            return f"""💙 {name_part}That's a thoughtful personal question.
+
+Personal questions like this are best discussed with:
+• Your parents or guardians
+• Your school counselor
+• A trusted adult who can provide ongoing support
+
+They can give you the kind of personal guidance that these important questions deserve.
+
+I'm here to help with schoolwork and studying! What academic subject can we work on? 📖"""
+        
+        else:  # High School
+            return f"""💙 {name_part}That's an important personal question.
+
+For personal questions about identity, the best people to talk with are:
+• Your parents or guardians (if you feel comfortable)
+• Your school counselor with professional training
+• Trusted adults or healthcare providers who can provide guidance
+
+They can offer the personalized conversation that these questions deserve.
+
+I'm excellent at helping with academic subjects and study strategies! What can I help you with today? 😊"""
+    
+    return None
+
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED)
 # =============================================================================
@@ -1288,6 +1402,25 @@ st.markdown("""
         display: inline-block;
         margin-left: 0.5rem;
     }
+
+    .identity-response {
+        background: linear-gradient(135deg, #e74c3c, #f39c12);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #c0392b;
+    }
+    .identity-badge {
+        background: linear-gradient(45deg, #e74c3c, #c0392b);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1791,6 +1924,11 @@ def detect_priority_smart_with_safety(message):
     # 🚨 NEW STEP 5: CONFUSION DETECTION (before other checks)
     if detect_confusion(message):
         return 'confusion', 'lumii_main', None
+
+    # 🆕 NEW: Check for identity context FIRST (before general family referral)
+    identity_context = detect_identity_context(message)
+    if identity_context:
+        return 'identity_context', identity_context, None
     
     # STEP 6: FAMILY REFERRAL TOPICS (UNIFIED SEXUAL HEALTH & IDENTITY)
     if detect_family_referral_topics(message):
@@ -2156,6 +2294,11 @@ What would help most right now?
 Tell me which part is tricky, or pick one of the options above! 😊"""
         
         return response, "😊 Lumii's Learning Support", "confusion", "🧠 With Memory"
+
+    # 🆕 NEW: Handle identity context (add before family referral handling)
+    if priority == 'identity_context':
+        response = generate_identity_response(tool, student_age, st.session_state.student_name)
+        return response, "💙 Lumii's Identity Support", "identity_context", "🤗 Accepting + Caring"
     
     # Handle family referral topics (UNIFIED SEXUAL HEALTH & IDENTITY)
     if priority == 'family_referral':
@@ -2496,6 +2639,9 @@ for i, message in enumerate(st.session_state.messages):
             if priority == "safety" or priority == "crisis" or priority == "crisis_return" or priority == "immediate_termination":
                 st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "identity_context":
+                st.markdown(f'<div class="identity-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="identity-badge">{tool_used}</div>', unsafe_allow_html=True)
             elif priority == "family_referral":
                 st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
