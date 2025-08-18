@@ -687,7 +687,8 @@ def detect_family_referral_topics(message):
         'sex-linked', 'sex-linked traits', 'x-linked', 'y-linked', 'genetics',
         'reproductive system', 'reproduction in plants', 'plant reproduction',
         'animal reproduction', 'cellular reproduction', 'mitosis', 'meiosis',
-        'chromosomes', 'dna', 'inheritance patterns',
+        'chromosomes', 'dna', 'inheritance patterns', 'health textbook',
+        'textbook assignment', 'menstrual cycle lesson',
         
         # Health education context  
         'health education', 'health curriculum', 'health textbook',
@@ -721,7 +722,8 @@ def detect_family_referral_topics(message):
         r"\bcan you help me with\b",
         r"\bi need\s+(help|advice)\s+with\b",
         r"\bi want to\b",
-        r"\bi'm thinking about\b"
+        r"\bi'm thinking about\b",
+        r"\bwhat is\b"
     ]
     
     # Only proceed if this is advice-seeking (not just mentioning topics)
