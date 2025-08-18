@@ -56,6 +56,10 @@ st.set_page_config(
 # Enhanced crisis patterns with typo tolerance and euphemisms - CHATGPT CRITICAL FIXES APPLIED
 ENHANCED_CRISIS_PATTERNS = [
     # Core self-harm patterns with typo tolerance
+    re.compile(r'\bi\s+(?:think\s+)?(?:maybe\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|dissapeare|vanish|go\s+away|fade\s+away)\b', re.IGNORECASE),
+    re.compile(r'\bi\s+(?:want\s+to|wanna|wish\s+i\s+could)\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish)\b', re.IGNORECASE),
+    re.compile(r'\b(?:better\s+if\s+)?i\s+(?:just\s+)?(?:disappeared|dissapeared|vanished|went\s+away)\b', re.IGNORECASE),
+    re.compile(r'\bi\s+should\s+(?:just\s+)?(?:not\s+exist|stop\s+existing|be\s+gone)\b', re.IGNORECASE),
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b', re.IGNORECASE),
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b', re.IGNORECASE),
     re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b', re.IGNORECASE),
@@ -261,13 +265,10 @@ def _contextual_crisis_boost(message: str) -> bool:
 
 def global_crisis_guard(message):
     """
-    🚨 CHATGPT CRITICAL FIX: Global Crisis Guard - Runs FIRST on every message
-    FIXED: Now uses has_explicit_crisis_language() and IMMEDIATE_TERMINATION_PATTERNS
-    🇺🇸 US-focused age-adaptive crisis intervention for beta families
+    🚨 ENHANCED: Global Crisis Guard - MUST catch "disappear" language
     Returns: (is_crisis, intervention_response)
-    If is_crisis=True, IMMEDIATELY return intervention_response and END processing
     """
-    # 🚨 NEW: Normalize message first
+    # Normalize message first
     normalized_message = normalize_message(message)
     message_lower = normalized_message.lower().strip()
     
@@ -275,38 +276,64 @@ def global_crisis_guard(message):
     student_age = detect_age_from_message_and_history(message)
     student_name = st.session_state.get('student_name', '')
     
-    # 🚨 CHATGPT FIX #1: Check explicit crisis language FIRST (includes "suicide")
+    # 🚨 CRITICAL: Check for "disappear" language FIRST
+    disappear_patterns = [
+        r'\bi\s+(?:think\s+)?(?:maybe\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|dissapeare|vanish|go\s+away|fade\s+away)\b',
+        r'\bi\s+(?:want\s+to|wanna|wish\s+i\s+could)\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish)\b',
+        r'\b(?:better\s+if\s+)?i\s+(?:just\s+)?(?:disappeared|dissapeared|vanished|went\s+away)\b',
+        r'\bi\s+should\s+(?:just\s+)?(?:not\s+exist|stop\s+existing|be\s+gone)\b'
+    ]
+    
+    for pattern in disappear_patterns:
+        if re.search(pattern, message_lower):
+            st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+            st.session_state.post_crisis_monitoring = True
+            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
+            return True, intervention
+    
+    # 🚨 CRITICAL: Enhanced "no use" detection with context awareness
+    if re.search(r'\bno\s+use\b', message_lower):
+        # Check recent conversation for crisis context
+        recent_user_messages = []
+        for msg in st.session_state.messages[-10:]:  # Check last 10 messages
+            if msg.get('role') == 'user':
+                recent_user_messages.append(msg.get('content', '').lower())
+        
+        recent_context = " ".join(recent_user_messages)
+        crisis_context_indicators = [
+            "disappear", "dissapear", "vanish", "end it", "better off", "no point", 
+            "give up", "hopeless", "worthless", "burden", "better without me"
+        ]
+        
+        if any(indicator in recent_context for indicator in crisis_context_indicators):
+            st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+            st.session_state.post_crisis_monitoring = True
+            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
+            return True, intervention
+    
+    # Continue with existing crisis checks...
     if has_explicit_crisis_language(message):
         st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
         st.session_state.post_crisis_monitoring = True
         intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
         return True, intervention
 
-    # 🚨 CHATGPT FIX #2: Check immediate termination patterns FIRST  
     if has_immediate_termination_language(message):
         st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
         st.session_state.post_crisis_monitoring = True
         intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
         return True, intervention
 
-    # 🚨 CHATGPT FIX #3: Enhanced patterns as additional layer
+    # Enhanced patterns as additional layer
     for pattern in ENHANCED_CRISIS_PATTERNS:
         if pattern.search(message_lower):
-            # IMMEDIATE CRISIS INTERVENTION - NO FURTHER PROCESSING
             st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
             st.session_state.post_crisis_monitoring = True
             intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
             return True, intervention
     
-    # 🚨 CHATGPT CRITICAL FIX: Context-aware boost for ambiguous phrases
-    if _contextual_crisis_boost(message):
-        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-        st.session_state.post_crisis_monitoring = True
-        intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
-        return True, intervention
-    
     return False, None
-
+    
 def get_crisis_resources():
     """Get locale-appropriate crisis resources - DEFAULTS TO US FOR BETA FAMILIES"""
     try:
@@ -320,17 +347,35 @@ def get_crisis_resources():
 # =============================================================================
 
 def is_polite_decline(message):
-    """Detect polite declines that shouldn't end conversation"""
+    """Detect polite declines that shouldn't end conversation - ENHANCED SAFETY"""
     message_lower = message.lower().strip()
     
+    # 🚨 CRITICAL: Never treat crisis-context "no" as polite decline
+    if message_lower in ["no", "no thanks", "not now", "maybe later"]:
+        # Check recent conversation for crisis context
+        recent_user_messages = []
+        for msg in st.session_state.messages[-5:]:
+            if msg.get('role') == 'user':
+                recent_user_messages.append(msg.get('content', '').lower())
+        
+        recent_context = " ".join(recent_user_messages)
+        crisis_indicators = [
+            "disappear", "dissapear", "vanish", "end it", "better off", "no point",
+            "give up", "hopeless", "worthless", "burden", "hurt myself", "kill myself"
+        ]
+        
+        # If crisis context detected, this is NOT a polite decline
+        if any(indicator in recent_context for indicator in crisis_indicators):
+            return False
+    
+    # Original polite decline detection
     polite_declines = [
         "no thanks", "not now", "maybe later", "not right now",
         "no thank you", "i'm good", "i'm ok", "not today",
-        "maybe tomorrow", "later", "nah", "no"
+        "maybe tomorrow", "later", "nah"
     ]
     
-    # Only consider it a polite decline if it's EXACTLY one of these phrases
-    # or starts with one followed by minimal words
+    # Only consider polite decline if EXACTLY matching safe phrases
     for decline in polite_declines:
         if message_lower == decline:
             return True
