@@ -716,14 +716,14 @@ def detect_family_referral_topics(message):
     
     # 🎯 NEW: Only trigger on advice-seeking patterns (like non-educational detector)
     advice_seeking_patterns = [
-        r"\bhow\s+(do i|should i|can i)\b",
-        r"\bshould i\b",
-        r"\bwhat\s+(do i do|should i do)\b", 
-        r"\bcan you help me with\b",
-        r"\bi need\s+(help|advice)\s+with\b",
-        r"\bi want to\b",
-        r"\bi'm thinking about\b",
-        r"\bwhat is\b"
+    r"\bhow\s+(?:do i|should i|can i)\b",
+    r"\bshould i\b", 
+    r"\bwhat\s+(?:do i do|should i do)\b",
+    r"\bcan you help me(?:\s+(?:with|about|on))?\b",
+    r"\bi need\s+(?:help|advice)(?:\s+(?:with|about|on))?\b",
+    r"\bi need advice\b",
+    r"\bi'?m\s+(?:thinking|wondering)\s+about\b",
+    r"\bi want to\b"
     ]
     
     # Only proceed if this is advice-seeking (not just mentioning topics)
