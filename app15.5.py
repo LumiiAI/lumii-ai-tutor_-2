@@ -2962,6 +2962,3 @@ st.markdown("""
     <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe</em></p>
 </div>
 """, unsafe_allow_html=True)
-
-# Test the function when app starts
-test_academic_protection()
