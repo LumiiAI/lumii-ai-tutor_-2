@@ -494,25 +494,38 @@ def has_immediate_termination_language(message):
 
 def global_crisis_override_check(message):
     """ALWAYS check for crisis first - overrides ALL other states including timeout"""
-    message_lower = message.lower()
-    
+    ml = normalize_message(message).lower().strip()
+
+    # ✅ Academic-context bypass unless truly explicit (FIXES THE BUG!)
+    academic_terms = [
+        "homework","math","science","biology","chemistry","physics","test","class",
+        "school","assignment","quiz","project","studying","exam","grade","teacher"
+    ]
+    explicit_only = (
+        "kill myself","hurt myself","end my life","commit suicide","suicide",
+        "cut myself","i want to die","i want to kill myself","i will kill myself",
+        "i want to end my life"
+    )
+    if any(w in ml for w in academic_terms) and not any(p in ml for p in explicit_only):
+        return False, None, None  # respect academic bypass globally
+
     # Skip if accepting an offer (but ensure acceptance is safe)
     if is_accepting_offer(message):
         return False, None, None
-    
+
     # Check for explicit crisis language
     if has_explicit_crisis_language(message):
         return True, "BLOCKED_HARMFUL", "explicit_crisis"
-    
+
     # Check for immediate termination needs
     if has_immediate_termination_language(message):
         return True, "IMMEDIATE_TERMINATION", "critical_immediate"
-    
+
     # Crisis-level patterns
-    if ('goodbye letter' in message_lower or 'farewell letter' in message_lower) and \
-       ('final' in message_lower or 'last' in message_lower or 'forever' in message_lower):
+    if ('goodbye letter' in ml or 'farewell letter' in ml) and \
+       ('final' in ml or 'last' in ml or 'forever' in ml):
         return True, "CRISIS_GOODBYE_LETTERS", "goodbye_letter"
-    
+
     return False, None, None
 
 def check_request_safety(message):
