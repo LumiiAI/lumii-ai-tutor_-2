@@ -264,87 +264,53 @@ def _contextual_crisis_boost(message: str) -> bool:
     return False
 
 def global_crisis_guard(message):
-    """
-    🚨 ENHANCED: Global Crisis Guard - MUST catch "disappear" language
-    Returns: (is_crisis, intervention_response)
-    """
-    # Normalize message first
-    normalized_message = normalize_message(message)
-    message_lower = normalized_message.lower().strip()
+    """ChatGPT's improved crisis guard with proper control flow"""
+    msg = normalize_message(message)
+    ml = msg.lower().strip()
     
-    # 🚨 NEW: Academic context check FIRST (before any crisis patterns)
+    # 1) Context flags
     academic_indicators = [
-        'homework', 'math', 'science', 'biology', 'chemistry', 'physics', 
-        'test', 'class', 'school', 'assignment', 'quiz', 'project', 
-        'studying', 'exam', 'grade', 'teacher', 'textbook'
+        "homework","math","science","biology","chemistry","physics","test","class",
+        "school","assignment","quiz","project","studying","exam","grade","teacher"
     ]
-    has_academic_context = any(word in message_lower for word in academic_indicators)
+    has_academic_context = any(w in ml for w in academic_indicators)
     
-    if has_academic_context:
-        # Only trigger on EXPLICIT self-harm language in academic contexts
-        explicit_only = ['kill myself', 'hurt myself', 'end my life', 'suicide', 'cut myself']
-        if not any(phrase in message_lower for phrase in explicit_only):
-            return False, None  # Don't trigger crisis for academic frustration
+    explicit_crisis_phrases = [
+        "kill myself","hurt myself","end my life","suicide","cut myself","i want to die",
+        "i want to kill myself","i will kill myself","i want to end my life"
+    ]
+    has_explicit_crisis = any(p in ml for p in explicit_crisis_phrases)
     
-    # Detect student age for age-appropriate response (EXISTING CODE)
-    student_age = detect_age_from_message_and_history(message)
-    student_name = st.session_state.get('student_name', '')
+    # 2) Guard clause: academic bypass unless explicit
+    if has_academic_context and not has_explicit_crisis:
+        return False, None  # Hard exit - nothing below should run
     
-    # 🚨 CRITICAL: Check for "disappear" language FIRST
+    # 3) Generic crisis patterns with context-aware exclusions
     disappear_patterns = [
-        r'\bi\s+(?:think\s+)?(?:maybe\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|dissapeare|vanish|go\s+away|fade\s+away)\b',
-        r'\bi\s+(?:want\s+to|wanna|wish\s+i\s+could)\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish)\b',
-        r'\b(?:better\s+if\s+)?i\s+(?:just\s+)?(?:disappeared|dissapeared|vanished|went\s+away)\b',
-        r'\bi\s+should\s+(?:just\s+)?(?:not\s+exist|stop\s+existing|be\s+gone)\b'
+        # Avoid "disappear from class/school" etc using negative lookahead
+        r"\bdisappear\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
+        r"\bvanish\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
+        r"\b(?:i\s+don['']t\s+want\s+to\s+exist|i\s+want\s+to\s+disappear)\b",
+        r"\b(?:end\s+it\s+all|end\s+everything)\b"
     ]
     
-    for pattern in disappear_patterns:
-        if re.search(pattern, message_lower):
+    for pat in disappear_patterns:
+        if re.search(pat, ml, flags=re.IGNORECASE):
+            student_age = detect_age_from_message_and_history(message)
+            student_name = st.session_state.get('student_name', '')
+            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
             st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
             st.session_state.post_crisis_monitoring = True
-            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
             return True, intervention
     
-    # 🚨 CRITICAL: Enhanced "no use" detection with context awareness
-    if re.search(r'\bno\s+use\b', message_lower):
-        # Check recent conversation for crisis context
-        recent_user_messages = []
-        for msg in st.session_state.messages[-10:]:  # Check last 10 messages
-            if msg.get('role') == 'user':
-                recent_user_messages.append(msg.get('content', '').lower())
-        
-        recent_context = " ".join(recent_user_messages)
-        crisis_context_indicators = [
-            "disappear", "dissapear", "vanish", "end it", "better off", "no point", 
-            "give up", "hopeless", "worthless", "burden", "better without me"
-        ]
-        
-        if any(indicator in recent_context for indicator in crisis_context_indicators):
-            st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-            st.session_state.post_crisis_monitoring = True
-            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
-            return True, intervention
-    
-    # Continue with existing crisis checks...
-    if has_explicit_crisis_language(message):
+    # 4) Explicit phrases always win
+    if has_explicit_crisis:
+        student_age = detect_age_from_message_and_history(message)
+        student_name = st.session_state.get('student_name', '')
+        intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
         st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
         st.session_state.post_crisis_monitoring = True
-        intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
         return True, intervention
-
-    if has_immediate_termination_language(message):
-        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-        st.session_state.post_crisis_monitoring = True
-        intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
-        return True, intervention
-
-    # Enhanced patterns as additional layer
-    for pattern in ENHANCED_CRISIS_PATTERNS:
-        if pattern.search(message_lower):
-            st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-            st.session_state.post_crisis_monitoring = True
-            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
-            return True, intervention
     
     return False, None
     
