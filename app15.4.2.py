@@ -713,16 +713,14 @@ def generate_family_referral_response(student_age, student_name=""):
         "• Science (biology, chemistry, physics)\n"
         "• Reading & writing (essays, summaries)\n"
         "• Study skills and exam prep\n\n"
-        "Tell me what homework or class topic you want to work on next. 💪📚"
+       "Tell me what homework or class topic you want to work on next. 💪📚\n\n"
+       "I'm your learning buddy who helps with school subjects. For big questions like this, the best people to talk to are:\n"
+       "• Your mom, dad, or family\n"
+       "• Your teacher or school counselor\n"
+       "• Another trusted grown-up\n\n"
+       "These are important topics that your family can help you understand in the way that's right for your family."
     )
-
-I'm your learning buddy who helps with school subjects. For big questions like this, the best people to talk to are:
-• Your mom, dad, or family
-• Your teacher or school counselor
-• Another trusted grown-up
-
-These are important topics that your family can help you understand in the way that's right for your family.
-
+    
 I'm great at helping with homework and making school fun! What would you like to learn about? 😊"""
         
     elif student_age <= 14:  # Middle School
