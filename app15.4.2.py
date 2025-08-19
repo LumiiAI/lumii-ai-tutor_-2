@@ -729,33 +729,38 @@ This conversation is ending for your safety. Please get help now."""
 # =============================================================================
 
 def detect_family_referral_topics(message):
-    """Conservative (beta) detector: refer ALL sensitive topics to parents/guardians.
-
-    In beta, we intentionally over-refer any sexual-health, puberty, reproduction,
-    or identity-related content to a trusted adult. This avoids relying on age
-    detection or self-reported age.
     """
-    m = message.lower()
+    Conservative (beta) detector for sensitive topics.
+    HARD RULE: never trigger family referral if any crisis language is present.
+    Also uses word boundaries so 'sex' doesn't match inside 'existing'.
+    """
+    m = normalize_message(message).lower()
 
-    # Sensitive topics list (intentionally broad for beta)
-    sensitive_phrases = [
+    # 🔒 Crisis shield: if crisis language is present, DO NOT refer to family
+    if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS):
+        return False
+
+    # Use word-boundary regex for 'sex' and precise tokens for the rest
+    sensitive_regexes = [
         # Sexual health / reproduction / puberty
-        "sex", "sex-linked", "sexual", "reproduction", "reproductive",
-        "pregnancy", "birth control", "contraception", "menstruation",
-        "period", "periods", "puberty", "masturbation", "erection",
-        "vagina", "penis", "breast development", "wet dreams",
-        "body changes during puberty", "hormones and puberty", "sti", "std",
-        "condom", "plan b", "morning-after", "fertilization", "ovulation",
-        "semen", "sperm", "ejaculation", "intercourse",
+        r"\bsex\b", r"\bsex\-linked\b", r"\bsexual\b", r"\breproduction\b", r"\breproductive\b",
+        r"\bpregnancy\b", r"\bbirth\s+control\b", r"\bcontraception\b", r"\bmenstruation\b",
+        r"\bperiods?\b", r"\bpuberty\b", r"\bmasturbation\b", r"\berection\b",
+        r"\bvagina\b", r"\bpenis\b", r"\bbreast\s+development\b", r"\bwet\s+dreams\b",
+        r"\bbody\s+changes\s+during\s+puberty\b", r"\bhormones?\s+and\s+puberty\b",
+        r"\bsti\b", r"\bstd\b", r"\bcondom\b", r"\bplan\s*b\b", r"\bmorning\-after\b",
+        r"\bfertilization\b", r"\bovulation\b", r"\bsemen\b", r"\bsperm\b",
+        r"\bejacu(?:late|lation)\b", r"\bintercourse\b",
+
         # Identity / orientation / gender
-        "gay", "lesbian", "transgender", "bisexual", "lgbtq", "gender identity",
-        "sexual orientation", "coming out", "am i gay", "am i trans",
-        "gender dysphoria", "non-binary", "queer", "questioning sexuality",
-        "questioning gender"
+        r"\bgay\b", r"\blesbian\b", r"\bbisexual\b", r"\btransgender\b", r"\blgbtq\b",
+        r"\bgender\s+identity\b", r"\bsexual\s+orientation\b", r"\bcoming\s+out\b",
+        r"\bam\s+i\s+gay\b", r"\bam\s+i\s+trans\b", r"\bgender\s+dysphoria\b",
+        r"\bnon\-binary\b", r"\bqueer\b", r"\bquestioning\s+sexuality\b", r"\bquestioning\s+gender\b",
     ]
 
-    # Substring match is deliberate here to err on the side of caution during beta
-    return any(phrase in m for phrase in sensitive_phrases)
+    return any(re.search(rx, m) for rx in sensitive_regexes)
+
 
 def generate_family_referral_response(student_age, student_name=""):
     """Conservative (beta) family referral message.
@@ -2035,10 +2040,18 @@ def detect_emotional_distress(message):
     return distress_score >= 2
 
 def detect_priority_smart_with_safety(message):
-    """Crisis-first priority router. Returns (priority, tool, trigger)."""
-    message_lower = message.lower().strip()
+    """
+    Crisis-first router. Returns (priority, tool, trigger).
+    Ensures 'I should just stop existing' and similar phrases cannot be
+    swallowed by family referral or any other branch.
+    """
+    message_lower = normalize_message(message).lower().strip()
 
-    # 1) CRISIS OVERRIDE — ALWAYS FIRST
+    # 0) 🔥 HARD crisis pre-check (string + patterns) — absolutely first
+    if has_explicit_crisis_language(message) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+        return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
+
+    # 1) CRISIS OVERRIDE (kept for consistency with your architecture)
     is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
     if is_crisis:
         return 'crisis', crisis_type, crisis_trigger
@@ -2049,10 +2062,9 @@ def detect_priority_smart_with_safety(message):
             'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
             'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
         ]
-        is_positive_response = any(p in message_lower for p in positive_responses)
         if has_explicit_crisis_language(message):
             return 'crisis_return', 'FINAL_TERMINATION', 'post_crisis_violation'
-        if is_positive_response:
+        if any(p in message_lower for p in positive_responses):
             return 'post_crisis_support', 'supportive_continuation', None
 
     # 3) BEHAVIOR TIMEOUT (but crisis still wins)
@@ -2061,24 +2073,24 @@ def detect_priority_smart_with_safety(message):
             return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
         return 'behavior_timeout', 'behavior_final', 'timeout_active'
 
-    # 4) ACCEPTANCE OF PRIOR OFFER (safe)
+    # 4) ACCEPTANCE OF PRIOR OFFER
     if is_accepting_offer(message):
         return 'general', 'lumii_main', None
 
-    # 5) CONFUSION (legit confusion shouldn’t get strikes)
+    # 5) CONFUSION (before anything punitive)
     if detect_confusion(message):
         return 'confusion', 'lumii_main', None
 
-    # 6) FAMILY REFERRAL — MOVED AFTER CRISIS CHECKS
-    if detect_family_referral_topics(message):
-        return 'family_referral', 'parent_guidance', None
-
-    # 7) IDENTITY CONTEXT (sharing/questioning)
+    # 6) IDENTITY CONTEXT (sharing/questioning)
     identity_context = detect_identity_context(message)
     if identity_context:
         return 'identity_context', identity_context, None
 
-    # 8) NON-EDUCATIONAL TOPICS (health/legal/life-decisions)
+    # 7) FAMILY REFERRAL — runs AFTER all crisis/identity/confusion checks
+    if detect_family_referral_topics(message):
+        return 'family_referral', 'parent_guidance', None
+
+    # 8) NON-EDUCATIONAL TOPICS
     non_edu = detect_non_educational_topics(message)
     if non_edu:
         return 'non_educational', 'educational_boundary', non_edu
@@ -2098,7 +2110,7 @@ def detect_priority_smart_with_safety(message):
             return 'behavior_final', 'behavior_timeout', behavior_type
         return 'behavior', 'behavior_warning', behavior_type
 
-    # Optional reset: clear strikes after several good user turns
+    # Optional: reset strikes after several good user turns
     if st.session_state.get('behavior_strikes', 0) > 0:
         good_count = 0
         for msg in reversed(st.session_state.get('messages', [])[-5:]):
@@ -2124,14 +2136,13 @@ def detect_priority_smart_with_safety(message):
         return 'emotional', 'felicity', None
 
     # 12) ACADEMIC ROUTING
-    organization_indicators = [
+    org_indicators = [
         'multiple assignments', 'so much homework', 'everything due',
         'need to organize', 'overwhelmed with work', 'too many projects'
     ]
-    if any(ind in message_lower for ind in organization_indicators):
+    if any(ind in message_lower for ind in org_indicators):
         return 'organization', 'cali', None
 
-    # Math routing: pattern or topic/intent cues
     if (re.search(r'\d+\s*[\+\-\*/]\s*\d+', message_lower) or
         any(k in message_lower for k in [
             'solve', 'calculate', 'math problem', 'math homework', 'equation', 'equations',
@@ -2144,11 +2155,7 @@ def detect_priority_smart_with_safety(message):
         ])):
         return 'math', 'mira', None
 
-    # Interests / general support
-    if any(p in message_lower for p in ['i like', 'i love', 'i enjoy', 'is fun', 'is cool', 'is interesting', 'is awesome']):
-        return 'general', 'lumii_main', None
-
-    # Default: general learning help
+    # 13) Default: general learning help
     return 'general', 'lumii_main', None
 
 def detect_age_from_message_and_history(message):
