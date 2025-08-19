@@ -650,28 +650,57 @@ This conversation is ending for your safety. Please get help now."""
 # =============================================================================
 
 def detect_family_referral_topics(message):
-    """Detect topics that should be referred to parents/guardians"""
-    family_referral_keywords = [
-        # Sexual health/puberty topics
-        'sex', 'sexual', 'puberty', 'pregnancy', 'babies come from',
-        'reproduction', 'birth control', 'menstruation', 'period', 'periods',
-        'masturbation', 'erection', 'vagina', 'penis', 'breast development', 
-        'wet dreams', 'body changes during puberty', 'hormones and puberty',
-        
-        # Identity topics - now referred to parents/guardians
-        'gay', 'lesbian', 'transgender', 'bisexual', 'lgbtq', 'gender identity',
-        'sexual orientation', 'coming out', 'am i gay', 'am i trans', 
-        'gender dysphoria', 'non-binary', 'queer', 'questioning sexuality', 
-        'questioning gender'
+    """Conservative (beta) detector: refer ALL sensitive topics to parents/guardians.
+
+    In beta, we intentionally over-refer any sexual-health, puberty, reproduction,
+    or identity-related content to a trusted adult. This avoids relying on age
+    detection or self-reported age.
+    """
+    m = message.lower()
+
+    # Sensitive topics list (intentionally broad for beta)
+    sensitive_phrases = [
+        # Sexual health / reproduction / puberty
+        "sex", "sex-linked", "sexual", "reproduction", "reproductive",
+        "pregnancy", "birth control", "contraception", "menstruation",
+        "period", "periods", "puberty", "masturbation", "erection",
+        "vagina", "penis", "breast development", "wet dreams",
+        "body changes during puberty", "hormones and puberty", "sti", "std",
+        "condom", "plan b", "morning-after", "fertilization", "ovulation",
+        "semen", "sperm", "ejaculation", "intercourse",
+        # Identity / orientation / gender
+        "gay", "lesbian", "transgender", "bisexual", "lgbtq", "gender identity",
+        "sexual orientation", "coming out", "am i gay", "am i trans",
+        "gender dysphoria", "non-binary", "queer", "questioning sexuality",
+        "questioning gender"
     ]
-    return any(keyword in message.lower() for keyword in family_referral_keywords)
+
+    # Substring match is deliberate here to err on the side of caution during beta
+    return any(phrase in m for phrase in sensitive_phrases)
 
 def generate_family_referral_response(student_age, student_name=""):
-    """Generate unified response referring both sexual health AND identity topics to parents/guardians"""
-    name_part = f"{student_name}, " if student_name else ""
+    """Conservative (beta) family referral message.
     
-    if student_age <= 11:  # Elementary
-        return f"""🌟 {name_part}That's a really important question! 
+    Beta policy: Lumii does not discuss personal/sensitive topics. We direct
+    students to families or trusted adults for age-appropriate guidance.
+    Age is not used in messaging during beta.
+    """
+    name_part = f"{student_name}, " if student_name else ""
+    return (
+        f"🛡️ {name_part}for safety during our **beta**, Lumii can't discuss this personal topic.\n\n"
+        "Because kids online can misreport age, we're being extra conservative to keep everyone safe. "
+        "The best people to help with personal or sensitive questions are: \n"
+        "• Your parent or guardian\n"
+        "• Your school counselor\n"
+        "• A trusted family member or another trusted adult\n\n"
+        "They can give the right, age-appropriate guidance for you.\n\n"
+        "I'm still great at **schoolwork**! If you'd like, we can switch to topics I *can* help with, like:\n"
+        "• Math (algebra, geometry, word problems)\n"
+        "• Science (biology, chemistry, physics)\n"
+        "• Reading & writing (essays, summaries)\n"
+        "• Study skills and exam prep\n\n"
+        "Tell me what homework or class topic you want to work on next. 💪📚"
+    )
 
 I'm your learning buddy who helps with school subjects. For big questions like this, the best people to talk to are:
 • Your mom, dad, or family
