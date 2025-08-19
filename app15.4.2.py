@@ -479,9 +479,24 @@ def _contains_crisis_resource(text: str) -> bool:
 # =============================================================================
 
 def has_explicit_crisis_language(message):
-    """Centralized crisis detection using enhanced patterns"""
-    message_lower = message.lower()
-    return any(pattern.search(message_lower) for pattern in ENHANCED_CRISIS_PATTERNS) or "suicide" in message_lower
+    """Centralized crisis detection using enhanced patterns (academic-aware)."""
+    ml = normalize_message(message).lower().strip()
+
+    # Academic-aware narrowing: only treat truly explicit phrases as crisis
+    academic_terms = [
+        "homework","math","science","biology","chemistry","physics","test","class",
+        "school","assignment","quiz","project","studying","exam","grade","teacher"
+    ]
+    explicit_only = (
+        "kill myself","hurt myself","end my life","commit suicide","suicide",
+        "cut myself","i want to die","i want to kill myself","i will kill myself",
+        "i want to end my life"
+    )
+    if any(w in ml for w in academic_terms):
+        return any(p in ml for p in explicit_only)
+
+    # Non-academic: keep your full enhanced patterns
+    return any(pattern.search(ml) for pattern in ENHANCED_CRISIS_PATTERNS) or "suicide" in ml
 
 def has_immediate_termination_language(message):
     """Check for immediate termination triggers"""
