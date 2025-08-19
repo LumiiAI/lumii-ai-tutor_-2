@@ -272,7 +272,21 @@ def global_crisis_guard(message):
     normalized_message = normalize_message(message)
     message_lower = normalized_message.lower().strip()
     
-    # Detect student age for age-appropriate response
+    # 🚨 NEW: Academic context check FIRST (before any crisis patterns)
+    academic_indicators = [
+        'homework', 'math', 'science', 'biology', 'chemistry', 'physics', 
+        'test', 'class', 'school', 'assignment', 'quiz', 'project', 
+        'studying', 'exam', 'grade', 'teacher', 'textbook'
+    ]
+    has_academic_context = any(word in message_lower for word in academic_indicators)
+    
+    if has_academic_context:
+        # Only trigger on EXPLICIT self-harm language in academic contexts
+        explicit_only = ['kill myself', 'hurt myself', 'end my life', 'suicide', 'cut myself']
+        if not any(phrase in message_lower for phrase in explicit_only):
+            return False, None  # Don't trigger crisis for academic frustration
+    
+    # Detect student age for age-appropriate response (EXISTING CODE)
     student_age = detect_age_from_message_and_history(message)
     student_name = st.session_state.get('student_name', '')
     
