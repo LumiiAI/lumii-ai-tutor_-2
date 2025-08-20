@@ -2992,7 +2992,7 @@ else:
                     )
         
                     # 🚨 Crisis, relapse, or immediate termination → show once, record placeholder, lock input, and stop
-                   if response_priority in ("crisis", "crisis_return", "immediate_termination"):
+                    if response_priority in ("crisis", "crisis_return", "immediate_termination"):
                        st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                        st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
 
