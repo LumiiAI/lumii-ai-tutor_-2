@@ -2046,17 +2046,34 @@ def detect_emotional_distress(message):
     # Need significant distress indicators
     return distress_score >= 2
 
+    import re
+
+ACADEMIC_DISAPPEAR_RX = re.compile(
+    r"\b(?:disappear|vanish)\s+(?:from|in)\s+"
+    r"(?:class|classroom|school|lesson|maths?|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym|language\s+arts)\b"
+)
+
 def detect_priority_smart_with_safety(message):
     """
     Crisis-first router. Returns (priority, tool, trigger).
-    Ensures 'I should just stop existing' and similar phrases cannot be
-    swallowed by family referral or any other branch.
+    Ensures explicit crisis always wins; allows an academic 'disappear from class' bypass
+    for implicit phrasing only.
     """
     message_lower = normalize_message(message).lower().strip()
 
-    # 0) HARD crisis pre-check — absolutely first
-    if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+    # 0) 🔥 EXPLICIT crisis check — absolutely first (do NOT include broad patterns here)
+    if has_explicit_crisis_language(message_lower):
         return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
+
+    # 0a) 🎓 Academic "disappear/vanish ... from/in ... class/school" bypass (implicit only)
+    #     If it's clearly about skipping/avoiding class, don't treat as crisis.
+    if ACADEMIC_DISAPPEAR_RX.search(message_lower):
+        return 'general', 'lumii_main', None
+
+    # 0b) Implicit crisis patterns (euphemisms like "disappear", "be gone", "not exist")
+    #     These run AFTER the academic bypass so class-context lines are not flagged.
+    if any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+        return 'crisis', 'BLOCKED_HARMFUL', 'implicit_crisis'
 
     # 1) CRISIS OVERRIDE (kept for consistency with your architecture)
     is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
@@ -2069,14 +2086,14 @@ def detect_priority_smart_with_safety(message):
             'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
             'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
         ]
-        if has_explicit_crisis_language(message):
+        if has_explicit_crisis_language(message_lower):
             return 'crisis_return', 'FINAL_TERMINATION', 'post_crisis_violation'
         if any(p in message_lower for p in positive_responses):
             return 'post_crisis_support', 'supportive_continuation', None
 
     # 3) BEHAVIOR TIMEOUT (but crisis still wins)
     if st.session_state.get('behavior_timeout', False):
-        if has_explicit_crisis_language(message):
+        if has_explicit_crisis_language(message_lower):
             return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
         return 'behavior_timeout', 'behavior_final', 'timeout_active'
 
@@ -2164,6 +2181,7 @@ def detect_priority_smart_with_safety(message):
 
     # 13) Default: general learning help
     return 'general', 'lumii_main', None
+
 
 def detect_age_from_message_and_history(message):
     """Enhanced age detection using both current message and conversation history - CONSERVATIVE DEFAULT"""
