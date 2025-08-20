@@ -2205,53 +2205,51 @@ def detect_priority_smart_with_safety(message):
 
 
 def detect_age_from_message_and_history(message):
-    """Enhanced age detection using both current message and conversation history - CONSERVATIVE DEFAULT"""
-    
-    # First, check conversation history
-    student_info = extract_student_info_from_history()
-    if student_info['age']:
-        return student_info['age']
-    
-    # Then check current message
-    message_lower = message.lower()
-    
-    # Direct age mentions
-    age_patterns = [r"i'?m (\d+)", r"i am (\d+)", r"(\d+) years old", r"grade (\d+)"]
-    for pattern in age_patterns:
-        match = re.search(pattern, message_lower)
-        if match:
-            age = int(match.group(1))
-            if age <= 18:
-                return age
-    
-    # Language complexity indicators
-    elementary_indicators = [
-        'mom', 'dad', 'mommy', 'daddy', 'teacher said', 'my teacher', 
-        'recess', 'lunch', 'story time'
-    ]
-    
-    middle_indicators = [
-        'homework', 'quiz', 'test tomorrow', 'project', 'presentation'
-    ]
-    
-    high_indicators = [
-        'college', 'university', 'SAT', 'ACT', 'AP', 'GPA', 'transcript'
-    ]
-    
-    # Count indicators
-    elementary_count = sum(1 for indicator in elementary_indicators if indicator in message_lower)
-    middle_count = sum(1 for indicator in middle_indicators if indicator in message_lower)
-    high_count = sum(1 for indicator in high_indicators if indicator in message_lower)
-    
-    # Decision logic - require multiple indicators + CONSERVATIVE default
-    if high_count >= 2:
-        return 16  # High school
-    elif middle_count >= 3:  # INCREASED threshold
-        return 12  # Middle school
-    elif elementary_count >= 2:  # Easier to detect elementary
-        return 8   # Elementary  
-    else:
-        return 8   # CONSERVATIVE: Default to elementary (was 12)
+    """
+    Enhanced age/grade detection — GRADE FIRST to avoid 'I'm 8th grade' → age 8 mistakes.
+    Returns an age (int). Also stores best-known grade/age in st.session_state.
+    """
+    # 0) existing info from history (prefer explicit age; else grade→age)
+    info = extract_student_info_from_history() or {}
+    known_age = info.get('age')
+    known_grade = info.get('grade')
+    if known_grade and not known_age:
+        known_age = grade_to_age(known_grade)
+    if known_age:
+        st.session_state['student_age'] = known_age
+        if known_grade:
+            st.session_state['student_grade'] = known_grade
+        return known_age
+
+    text = normalize_message(message).lower().strip()
+
+    # 1) GRADE FIRST
+    mg = GRADE_RX.search(text)
+    if mg:
+        grade_str = next((g for g in mg.groups() if g), None)
+        if grade_str:
+            grade = max(1, min(12, int(grade_str)))
+            st.session_state['student_grade'] = grade
+            age = grade_to_age(grade)
+            st.session_state['student_age'] = age
+            return age
+
+    # 2) AGE (guarded so it won't match '8th grade')
+    ma = AGE_RX.search(text)
+    if ma:
+        age = int(ma.group(1))
+        if 6 <= age <= 18:
+            st.session_state['student_age'] = age
+            # derive grade (don’t overwrite later explicit grade)
+            st.session_state.setdefault('student_grade', age_to_grade(age))
+            return age
+
+    # 3) Fallback conservative default (tone-safe)
+    default_age = 12
+    st.session_state['student_age'] = default_age
+    st.session_state.setdefault('student_grade', age_to_grade(default_age))
+    return default_age
+
 
 # =============================================================================
 # MEMORY-SAFE AI RESPONSE GENERATION WITH ALL FIXES APPLIED
