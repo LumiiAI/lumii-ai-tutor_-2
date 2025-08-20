@@ -42,6 +42,10 @@ def age_to_grade(age_num: int) -> int:
     # inverse mapping ≈ age − 5, clamped 1–12
     return max(1, min(12, int(age_num) - 5))
 
+# Make sure this exists once at startup
+if 'locked_after_crisis' not in st.session_state:
+    st.session_state['locked_after_crisis'] = False
+
 # =============================================================================
 # NORMALIZATION FUNCTION FOR BETTER PATTERN MATCHING
 # =============================================================================
@@ -2102,15 +2106,17 @@ def detect_priority_smart_with_safety(message):
         return 'crisis', crisis_type, crisis_trigger
 
     # 2) POST-CRISIS MONITORING
-    if st.session_state.get('post_crisis_monitoring', False):
-        positive_responses = [
-            'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
-            'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
-        ]
-        if has_explicit_crisis_language(message_lower):
-            return 'crisis_return', 'FINAL_TERMINATION', 'post_crisis_violation'
-        if any(p in message_lower for p in positive_responses):
-            return 'post_crisis_support', 'supportive_continuation', None
+if st.session_state.get('post_crisis_monitoring', False):
+    positive_responses = [
+        'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
+        'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
+    ]
+    # If explicit/implicit crisis appears again while in monitoring → relapse crisis
+    if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+        return 'crisis_return', 'CRISIS', 'post_crisis_violation'
+    # If the student acknowledges positively → supportive continuation
+    if any(p in message_lower for p in positive_responses):
+        return 'post_crisis_support', 'supportive_continuation', None
 
     # 3) BEHAVIOR TIMEOUT (but crisis still wins)
     if st.session_state.get('behavior_timeout', False):
@@ -2385,6 +2391,16 @@ Please reach out for help right now."""
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with ALL fixes applied"""
+
+    # 🚨 Unified crisis handling (initial + relapse) — always first
+    if priority in ('crisis', 'crisis_return'):
+        age  = detect_age_from_message_and_history(message)
+        name = st.session_state.get('student_name', '')
+        crisis_msg = generate_age_adaptive_crisis_intervention(age, name)
+        st.session_state.post_crisis_monitoring = True
+        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
+        # Return unified badge + crisis priority; no memory tag
+        return crisis_msg, "🚨 Lumii's Crisis Response", "crisis", None
     
     # FIXED: Acceptance short-circuit with safe tail checking
     if is_accepting_offer(message):
@@ -2859,8 +2875,19 @@ for i, message in enumerate(st.session_state.messages):
 # Chat input with enhanced safety processing
 prompt_placeholder = "What would you like to learn about today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! How can I help you today?"
 
-# Check if conversation is paused due to behavior timeout
-if st.session_state.behavior_timeout:
+# --- Input gating: crisis lock first, then behavior timeout ---
+
+# 1) Crisis lock (conversation paused for safety)
+if st.session_state.get("locked_after_crisis", False):
+    st.error("🚨 Conversation is paused for safety. Please tell a trusted adult what you wrote.")
+    # Disabled input so it’s obvious the chat is paused
+    st.chat_input(
+        placeholder="Conversation paused for safety.",
+        disabled=True
+    )
+
+# 2) Behavior timeout (disrespectful language)
+elif getattr(st.session_state, "behavior_timeout", False):
     st.error("🛑 Conversation is paused due to disrespectful language. Please take a break and return when ready to communicate kindly.")
     if st.button("🤝 I'm Ready to Be Respectful", type="primary"):
         st.session_state.behavior_timeout = False
@@ -2868,12 +2895,15 @@ if st.session_state.behavior_timeout:
         st.session_state.last_behavior_type = None
         st.success("✅ Welcome back! Let's learn together respectfully.")
         st.rerun()
+
+# 3) Normal input
 else:
     if prompt := st.chat_input(prompt_placeholder):
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
+
         
         # STEP 1: GLOBAL CRISIS GUARD FIRST (HIGHEST PRIORITY)
         is_crisis, crisis_intervention = global_crisis_guard(prompt)
@@ -2914,83 +2944,105 @@ else:
             st.rerun()
         
         # STEP 3: Continue with existing priority detection for non-crisis messages
-        else:
-            # Existing priority detection code continues here...
-            priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
-            student_age = detect_age_from_message_and_history(prompt)
-            is_distressed = detect_emotional_distress(prompt)
-            
-            # Generate response using enhanced memory-safe system
-            with st.chat_message("assistant"):
-                with st.spinner("🧠 Thinking safely with full memory..."):
-                    time.sleep(1)
-                    response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
-                        prompt, priority, tool, student_age, is_distressed, None, safety_trigger
-                    )
-                    
-                    # Check for duplicates and add variation if needed
-                    if is_duplicate_response(response):
-                        response = add_variation_to_response(response)
-                    
-                    # Add natural follow-up if appropriate
-                    follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
-                    if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
-                        response += follow_up
-                    
-                    # Display with appropriate styling
-                    if response_priority == "safety" or response_priority == "crisis" or response_priority == "crisis_return" or response_priority == "immediate_termination":
-                        st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority == "family_referral":
-                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority == "educational_boundary":
-                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority in ["behavior", "behavior_final", "behavior_timeout"]:
-                        st.markdown(f'<div class="behavior-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority == "post_crisis_support":
-                        st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
-                    elif response_priority == "concerning":
-                        st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                    elif response_priority == "emotional":
-                        st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                    elif response_priority == "math":
-                        st.markdown(f'<div class="math-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                    elif response_priority == "organization":
-                        st.markdown(f'<div class="organization-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                    elif response_priority == "polite_decline":
-                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
-                    elif response_priority == "confusion":
-                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-            
-            # Add assistant response to chat with enhanced metadata
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": response,
-                "priority": response_priority,
-                "tool_used": tool_used,
-                "was_distressed": is_distressed,
-                "student_age_detected": student_age,
-                "safety_triggered": False
-            })
-            
-            # Update interaction count
-            st.session_state.interaction_count += 1
-            
-            # Rerun to update sidebar stats and memory display
-            st.rerun()
+else:
+    # Existing priority detection code continues here...
+    priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
+    student_age = detect_age_from_message_and_history(prompt)
+    is_distressed = detect_emotional_distress(prompt)
+
+    # Generate response using enhanced memory-safe system
+    with st.chat_message("assistant"):
+        with st.spinner("🧠 Thinking safely with full memory..."):
+            time.sleep(1)
+            response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
+                prompt, priority, tool, student_age, is_distressed, None, safety_trigger
+            )
+
+            # 🚨 Crisis & relapse → show once, record placeholder, lock input, and stop
+            if response_priority in ("crisis", "crisis_return"):
+                st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
+                # Unify badge for both initial crisis and relapse
+                st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
+
+                # Record minimal placeholder instead of raw crisis text
+                st.session_state.messages.append({
+                    "role": "system",
+                    "content": "[crisis intervention issued]",
+                    "priority": "crisis",
+                    "tool_used": "CRISIS",
+                    "was_distressed": True,
+                    "student_age_detected": student_age,
+                    "safety_triggered": True
+                })
+
+                # Lock input for safety and stop the turn
+                st.session_state["locked_after_crisis"] = True
+                st.stop()
+
+            # --- Non-crisis path continues normally ---
+            # Check for duplicates and add variation if needed
+            if is_duplicate_response(response):
+                response = add_variation_to_response(response)
+
+            # Add natural follow-up if appropriate
+            follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
+            if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
+                response += follow_up
+
+            # Display with appropriate styling
+            if response_priority in ("safety", "immediate_termination"):
+                st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif response_priority == "family_referral":
+                st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif response_priority == "educational_boundary":
+                st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif response_priority in ["behavior", "behavior_final", "behavior_timeout"]:
+                st.markdown(f'<div class="behavior-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif response_priority == "post_crisis_support":
+                st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
+            elif response_priority == "concerning":
+                st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+            elif response_priority == "emotional":
+                st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+            elif response_priority == "math":
+                st.markdown(f'<div class="math-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+            elif response_priority == "organization":
+                st.markdown(f'<div class="organization-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+            elif response_priority == "polite_decline":
+                st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
+            elif response_priority == "confusion":
+                st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+
+    # Add assistant response to chat with enhanced metadata (non-crisis only)
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": response,
+        "priority": response_priority,
+        "tool_used": tool_used,
+        "was_distressed": is_distressed,
+        "student_age_detected": student_age,
+        "safety_triggered": False
+    })
+
+    # Update interaction count
+    st.session_state.interaction_count += 1
+
+    # Rerun to update sidebar stats and memory display
+    st.rerun()
 
 # Footer with enhanced safety and memory info
 st.markdown("---")
