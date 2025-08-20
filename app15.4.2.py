@@ -744,20 +744,24 @@ def detect_family_referral_topics(message):
     """
     Conservative (beta) detector for sensitive topics.
     HARD RULE: never trigger family referral if any crisis language is present.
-    Also uses word boundaries so 'sex' doesn't match inside 'existing'.
+    Uses word boundaries so 'sex' doesn't match inside 'existing'.
+    Includes menstrual-cycle variants to catch academic phrasing.
     """
     m = normalize_message(message).lower()
 
-    # 🔒 Crisis shield: if crisis language is present, DO NOT refer to family
+    # 🔒 Crisis shield
     if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS):
         return False
 
-    # Use word-boundary regex for 'sex' and precise tokens for the rest
+    # Sexual health / puberty / identity (precise tokens with word boundaries)
     sensitive_regexes = [
         # Sexual health / reproduction / puberty
         r"\bsex\b", r"\bsex\-linked\b", r"\bsexual\b", r"\breproduction\b", r"\breproductive\b",
-        r"\bpregnancy\b", r"\bbirth\s+control\b", r"\bcontraception\b", r"\bmenstruation\b",
-        r"\bperiods?\b", r"\bpuberty\b", r"\bmasturbation\b", r"\berection\b",
+        r"\bpregnancy\b", r"\bbirth\s+control\b", r"\bcontraception\b",
+        r"\bmenstruation\b", r"\bperiods?\b", 
+        r"\bmenstrual\s+cycle\b", r"\bmenstrual\b", r"\b(?:menstrual|period)\s+cycle\b",
+        r"\bpms\b", r"\bperiod\s+cramps?\b", r"\bdysmenorrhea\b",
+        r"\bpuberty\b", r"\bmasturbation\b", r"\berection\b",
         r"\bvagina\b", r"\bpenis\b", r"\bbreast\s+development\b", r"\bwet\s+dreams\b",
         r"\bbody\s+changes\s+during\s+puberty\b", r"\bhormones?\s+and\s+puberty\b",
         r"\bsti\b", r"\bstd\b", r"\bcondom\b", r"\bplan\s*b\b", r"\bmorning\-after\b",
@@ -772,6 +776,7 @@ def detect_family_referral_topics(message):
     ]
 
     return any(re.search(rx, m) for rx in sensitive_regexes)
+
 
 
 def generate_family_referral_response(student_age, student_name=""):
