@@ -21,6 +21,27 @@ import re
 import uuid
 from datetime import datetime
 
+# === Grade/Age detection (ADD THESE LINES) ===============================
+# e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
+GRADE_RX = re.compile(
+    r"\b(?:grade\s*(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)\s*grade)\b",
+    re.IGNORECASE,
+)
+
+# e.g., "I'm 13", "I am 13" — but NOT "I'm 8th grade"
+AGE_RX = re.compile(
+    r"\b(?:i[' ]?m|i am)\s+(\d{1,2})(?!\s*(?:st|nd|rd|th)\s*grade)\b",
+    re.IGNORECASE,
+)
+
+def grade_to_age(grade_num: int) -> int:
+    # typical US mapping ≈ grade + 5, clamped 6–18
+    return max(6, min(18, int(grade_num) + 5))
+
+def age_to_grade(age_num: int) -> int:
+    # inverse mapping ≈ age − 5, clamped 1–12
+    return max(1, min(12, int(age_num) - 5))
+
 # =============================================================================
 # NORMALIZATION FUNCTION FOR BETTER PATTERN MATCHING
 # =============================================================================
