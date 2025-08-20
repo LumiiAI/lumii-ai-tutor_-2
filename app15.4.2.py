@@ -2124,7 +2124,7 @@ def detect_priority_smart_with_safety(message):
     # 0a) 🎓 Academic "disappear/vanish ... from/in ... class/school" bypass (implicit only)
     #     Route to supportive emotional help (not generic).
     if ACADEMIC_DISAPPEAR_RX.search(message_lower):
-    return 'emotional', 'lumii_main', 'academic_disappear'
+        return 'emotional', 'lumii_main', 'academic_disappear'
 
     # 0b) Implicit crisis patterns (euphemisms like "disappear", "be gone", "not exist")
     #     These run AFTER the academic bypass so class-context lines are not flagged.
