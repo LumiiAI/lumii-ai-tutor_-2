@@ -42,6 +42,14 @@ def age_to_grade(age_num: int) -> int:
     # inverse mapping ≈ age − 5, clamped 1–12
     return max(1, min(12, int(age_num) - 5))
 
+# Helper for nice ordinals (1st, 2nd, 3rd, 4th...)
+def _make_ordinal(n: int) -> str:
+    if 11 <= (n % 100) <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
 # Make sure this exists once at startup
 if 'locked_after_crisis' not in st.session_state:
     st.session_state['locked_after_crisis'] = False
@@ -1991,38 +1999,61 @@ Let's focus on something positive we can work on together. How can I help you wi
 # =============================================================================
 
 def extract_student_info_from_history():
-    """Extract student information from conversation history"""
+    """Extract student information from conversation history (grade-first)."""
     student_info = {
         'name': st.session_state.get('student_name', ''),
         'age': None,
+        'grade': st.session_state.get('student_grade', None),
         'subjects_discussed': [],
         'emotional_history': [],
         'recent_topics': []
     }
-    
-    # Analyze conversation history for additional context
-    for msg in st.session_state.messages[-10:]:  # Look at recent messages
-        if msg['role'] == 'user':
-            content_lower = msg['content'].lower()
-            
-            # Extract age mentions
-            age_patterns = [r"i'?m (\d+)", r"i am (\d+)", r"(\d+) years old", r"grade (\d+)"]
-            for pattern in age_patterns:
-                match = re.search(pattern, content_lower)
-                if match:
-                    mentioned_age = int(match.group(1))
-                    if mentioned_age <= 18:  # Reasonable age range
-                        student_info['age'] = mentioned_age
-                        break
-            
-            # Track subjects
-            subjects = ['math', 'science', 'english', 'history', 'art', 'music']
-            for subject in subjects:
-                if subject in content_lower and subject not in student_info['subjects_discussed']:
-                    student_info['subjects_discussed'].append(subject)
-    
-    return student_info
 
+    # Look at recent user messages only
+    for msg in st.session_state.messages[-10:]:
+        if msg.get('role') != 'user':
+            continue
+        text = normalize_message(msg.get('content', '')).lower().strip()
+
+        # --- GRADE FIRST ---
+        if student_info.get('grade') is None:
+            mg = GRADE_RX.search(text)
+            if mg:
+                gstr = next((g for g in mg.groups() if g), None)
+                if gstr:
+                    gval = int(gstr)
+                    if 1 <= gval <= 12:
+                        student_info['grade'] = gval
+                        if student_info.get('age') is None:
+                            student_info['age'] = grade_to_age(gval)
+
+        # --- AGE explicit "years old" ---
+        if student_info.get('age') is None:
+            my = re.search(r"\b(\d{1,2})\s*years?\s*old\b", text)
+            if my:
+                aval = int(my.group(1))
+                if 6 <= aval <= 18:
+                    student_info['age'] = aval
+                    if student_info.get('grade') is None:
+                        student_info['grade'] = age_to_grade(aval)
+
+        # --- AGE short "I'm/I am N" (guarded by AGE_RX) ---
+        if student_info.get('age') is None:
+            ma = AGE_RX.search(text)
+            if ma:
+                aval = int(ma.group(1))
+                if 6 <= aval <= 18:
+                    student_info['age'] = aval
+                    if student_info.get('grade') is None:
+                        student_info['grade'] = age_to_grade(aval)
+
+        # Subjects
+        for subject in ['math', 'science', 'english', 'history', 'art', 'music']:
+            if subject in text and subject not in student_info['subjects_discussed']:
+                student_info['subjects_discussed'].append(subject)
+
+    return student_info
+    
 def detect_emotional_distress(message):
     """Detect if the student is showing clear emotional distress (NOT just mentioning feelings)"""
     message_lower = message.lower()
@@ -2209,6 +2240,8 @@ if st.session_state.get('post_crisis_monitoring', False):
     # 13) Default: general learning help
     return 'general', 'lumii_main', None
 
+
+# detect_age_from_message_and_history(...)
 
 def detect_age_from_message_and_history(message):
     """
@@ -2978,6 +3011,15 @@ else:
                 # Lock input for safety and stop the turn
                 st.session_state["locked_after_crisis"] = True
                 st.stop()
+
+            # --- Greeting injection: first safe reply uses detected GRADE (fallback to age→grade) ---
+            if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
+               detected_grade = st.session_state.get('student_grade')
+               if detected_grade is not None:
+                   grade_for_greeting = int(detected_grade)
+               else:
+                   grade_for_greeting = age_to_grade(int(st.session_state.get('student_age', student_age or 12)))
+               response = f"{_make_ordinal(grade_for_greeting)} grade, wow! " + response
 
             # --- Non-crisis path continues normally ---
             # Check for duplicates and add variation if needed
