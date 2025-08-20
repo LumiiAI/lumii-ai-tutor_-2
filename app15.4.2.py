@@ -2056,7 +2056,7 @@ def detect_priority_smart_with_safety(message):
 
     # 0) HARD crisis pre-check — absolutely first
     if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
-    return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
+        return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
 
     # 1) CRISIS OVERRIDE (kept for consistency with your architecture)
     is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
