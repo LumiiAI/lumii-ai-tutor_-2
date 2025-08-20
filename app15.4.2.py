@@ -2122,9 +2122,9 @@ def detect_priority_smart_with_safety(message):
         return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
 
     # 0a) 🎓 Academic "disappear/vanish ... from/in ... class/school" bypass (implicit only)
-    #     If it's clearly about skipping/avoiding class, don't treat as crisis.
+    #     Route to supportive emotional help (not generic).
     if ACADEMIC_DISAPPEAR_RX.search(message_lower):
-        return 'general', 'lumii_main', None
+    return 'emotional', 'lumii_main', 'academic_disappear'
 
     # 0b) Implicit crisis patterns (euphemisms like "disappear", "be gone", "not exist")
     #     These run AFTER the academic bypass so class-context lines are not flagged.
@@ -2991,26 +2991,26 @@ else:
                         prompt, priority, tool, student_age, is_distressed, None, safety_trigger
                     )
         
-                    # 🚨 Crisis & relapse → show once, record placeholder, lock input, and stop
-                    if response_priority in ("crisis", "crisis_return"):
-                        st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
-                        # Unify badge for both initial crisis and relapse
-                        st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
-        
-                        # Record minimal placeholder instead of raw crisis text
-                        st.session_state.messages.append({
-                            "role": "system",
-                            "content": "[crisis intervention issued]",
-                            "priority": "crisis",
-                            "tool_used": "CRISIS",
-                            "was_distressed": True,
-                            "student_age_detected": student_age,
-                            "safety_triggered": True
+                    # 🚨 Crisis, relapse, or immediate termination → show once, record placeholder, lock input, and stop
+                   if response_priority in ("crisis", "crisis_return", "immediate_termination"):
+                       st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
+                       st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
+
+                       st.session_state.messages.append({
+                           "role": "system",
+                           "content": "[crisis intervention issued]",
+                           "priority": "crisis" if response_priority != "immediate_termination" else "immediate_termination",
+                           "tool_used": "CRISIS",
+                           "was_distressed": True,
+                           "student_age_detected": student_age,
+                           "safety_triggered": True
                         })
-        
-                        # Lock input for safety and stop the turn
-                        st.session_state["locked_after_crisis"] = True
-                        st.stop()
+
+                       # Enable post-crisis monitoring and lock input
+                       st.session_state["post_crisis_monitoring"] = True
+                       st.session_state["locked_after_crisis"] = True
+                       st.stop()
+
         
                     # --- Greeting injection: first safe reply uses detected GRADE (fallback to age→grade) ---
                     if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
@@ -3037,7 +3037,7 @@ else:
                         response += follow_up
         
                     # Display with appropriate styling
-                    if response_priority in ("safety", "immediate_termination"):
+                    if response_priority == "safety":
                         st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
                         st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
                     elif response_priority == "family_referral":
