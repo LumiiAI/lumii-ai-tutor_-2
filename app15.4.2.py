@@ -2137,17 +2137,17 @@ def detect_priority_smart_with_safety(message):
         return 'crisis', crisis_type, crisis_trigger
 
     # 2) POST-CRISIS MONITORING
-if st.session_state.get('post_crisis_monitoring', False):
-    positive_responses = [
-        'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
-        'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
-    ]
-    # If explicit/implicit crisis appears again while in monitoring → relapse crisis
-    if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
-        return 'crisis_return', 'CRISIS', 'post_crisis_violation'
-    # If the student acknowledges positively → supportive continuation
-    if any(p in message_lower for p in positive_responses):
-        return 'post_crisis_support', 'supportive_continuation', None
+    if st.session_state.get('post_crisis_monitoring', False):
+        positive_responses = [
+            'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
+            'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
+        ]
+        # If explicit/implicit crisis appears again while in monitoring → relapse crisis
+        if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+            return 'crisis_return', 'CRISIS', 'post_crisis_violation'
+        # If the student acknowledges positively → supportive continuation
+        if any(p in message_lower for p in positive_responses):
+            return 'post_crisis_support', 'supportive_continuation', None
 
     # 3) BEHAVIOR TIMEOUT (but crisis still wins)
     if st.session_state.get('behavior_timeout', False):
