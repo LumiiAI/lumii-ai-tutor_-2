@@ -235,6 +235,18 @@ FORBIDDEN_INPUT_PATTERNS = FORBIDDEN_RESPONSE_PATTERNS + [
     re.compile(r"\bact like\b.*\b(evil|harmful|bad)\b"),
 ]
 
+def _normalize_crisis_resources():
+    """Give every locale both 'crisis_line' and 'suicide_line' to avoid KeyErrors."""
+    for _, rs in CRISIS_RESOURCES.items():
+        crisis = rs.get('crisis_line') or rs.get('suicide_line') or ""
+        rs['crisis_line'] = crisis
+        rs['suicide_line'] = rs.get('suicide_line', crisis)
+        rs['text_line'] = rs.get('text_line', "")
+        rs['emergency'] = rs.get('emergency', "")
+        rs['additional'] = rs.get('additional', "")
+
+_normalize_crisis_resources()
+
 # =============================================================================
 # CONFUSION DETECTION FOR LEGITIMATE STUDENT CONFUSION
 # =============================================================================
@@ -770,11 +782,12 @@ def generate_family_referral_response(student_age, student_name=""):
     Age is not used in messaging during beta.
     """
     name_part = f"{student_name}, " if student_name else ""
+
     if student_age <= 11:
         return (
             f"🛡️ {name_part}for safety during our **beta**, Lumii can't discuss this personal topic.\n\n"
             "Because kids online can misreport age, we're being extra conservative to keep everyone safe. "
-            "The best people to help with personal or sensitive questions are: \n"
+            "The best people to help with personal or sensitive questions are:\n"
             "• Your parent or guardian\n"
             "• Your school counselor\n"
             "• A trusted family member or another trusted adult\n\n"
@@ -785,35 +798,25 @@ def generate_family_referral_response(student_age, student_name=""):
             "• Reading & writing (essays, summaries)\n"
             "• Study skills and exam prep\n\n"
             "Tell me what homework or class topic you want to work on next. 💪📚\n\n"
-            "I'm your learning buddy who helps with school subjects. For big questions like this, the best people to talk to are:\n"
+            "I'm your learning buddy who helps with school subjects. "
+            "For big questions like this, the best people to talk to are:\n"
             "• Your mom, dad, or family\n"
             "• Your teacher or school counselor\n"
             "• Another trusted grown-up\n\n"
             "These are important topics that your family can help you understand in the way that's right for your family.\n"
             "I'm great at helping with homework and making school fun! What would you like to learn about? 😊"
         )
-    elif student_age <= 14:  # Middle School
+    else:
         return (
-            f"🌟 {name_part}That's an important question! \n\n"
-            "I'm your learning companion focused on school subjects and studying. For questions about personal topics like this, the best people to talk to are:\n"
+            f"🛡️ {name_part}during our **beta**, I can't discuss this personal topic.\n\n"
+            "To keep everyone safe, the best people to help with personal or sensitive questions are:\n"
             "• Your parents or guardians\n"
             "• Your school counselor\n"
-            "• A trusted family member\n"
-            "• Another trusted adult\n\n"
-            "These are important personal topics that your family and trusted adults can help you understand with care and in the way that's right for your family.\n\n"
-            "I'm here to help make your schoolwork easier and support your learning! What subject can we work on? 📖"
+            "• Another trusted adult in your life\n\n"
+            "They can give guidance that fits your family's values and your needs.\n\n"
+            "I'm here to help with schoolwork and studying — what subject should we work on next? 📚"
         )
-    else:  # High School
-        return (
-            f"🌟 {name_part}That's an important personal question! \n\n"
-            "I'm your learning companion focused on helping with school subjects and academic support. For personal questions like this, I'd recommend discussing with:\n"
-            "• Your parents or guardians\n"
-            "• Your school counselor\n"
-            "• A trusted family member or adult\n"
-            "• Your healthcare provider if appropriate\n\n"
-            "These are important personal topics that deserve thoughtful guidance from people who know you and care about you in your real life.\n\n"
-            "I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"
-        )
+
 def detect_identity_context(message):
     """Detect whether this is sharing identity vs questioning identity"""
     import re
