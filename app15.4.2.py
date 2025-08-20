@@ -749,7 +749,7 @@ def detect_family_referral_topics(message):
     """
     m = normalize_message(message).lower()
 
-    # 🔒 Crisis shield
+    # 🔒 Crisis shield (never override crisis)
     if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS):
         return False
 
@@ -758,7 +758,7 @@ def detect_family_referral_topics(message):
         # Sexual health / reproduction / puberty
         r"\bsex\b", r"\bsex\-linked\b", r"\bsexual\b", r"\breproduction\b", r"\breproductive\b",
         r"\bpregnancy\b", r"\bbirth\s+control\b", r"\bcontraception\b",
-        r"\bmenstruation\b", r"\bperiods?\b", 
+        r"\bmenstruation\b", r"\bperiods?\b",
         r"\bmenstrual\s+cycle\b", r"\bmenstrual\b", r"\b(?:menstrual|period)\s+cycle\b",
         r"\bpms\b", r"\bperiod\s+cramps?\b", r"\bdysmenorrhea\b",
         r"\bpuberty\b", r"\bmasturbation\b", r"\berection\b",
@@ -775,9 +775,8 @@ def detect_family_referral_topics(message):
         r"\bnon\-binary\b", r"\bqueer\b", r"\bquestioning\s+sexuality\b", r"\bquestioning\s+gender\b",
     ]
 
-    return any(re.search(rx, m) for rx in sensitive_regexes)
-
-
+    # Use the already-imported re module
+    return any(re.search(rx, m, re.IGNORECASE) for rx in sensitive_regexes)
 
 def generate_family_referral_response(student_age, student_name=""):
     """Conservative (beta) family referral message.
@@ -2055,9 +2054,9 @@ def detect_priority_smart_with_safety(message):
     """
     message_lower = normalize_message(message).lower().strip()
 
-    # 0) 🔥 HARD crisis pre-check (string + patterns) — absolutely first
-    if has_explicit_crisis_language(message) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
-        return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
+    # 0) HARD crisis pre-check — absolutely first
+    if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+    return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
 
     # 1) CRISIS OVERRIDE (kept for consistency with your architecture)
     is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
