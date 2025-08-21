@@ -1665,16 +1665,25 @@ initialize_session_state()
 
 
 # =============================================================================
-# PRIVACY DISCLAIMER POPUP - LAUNCH REQUIREMENT
+# PRIVACY DISCLAIMER POPUP - LAUNCH REQUIREMENT (polished, no behavior change)
 # =============================================================================
+from typing import Final
+import streamlit as st
 
-# Show disclaimer popup before allowing app access
-if not st.session_state.agreed_to_terms:
+def _show_privacy_disclaimer() -> None:
+    """Render the startup privacy/safety disclaimer and gate access until accepted.
+
+    Behavior preserved:
+      - Shows headings and the same disclaimer copy.
+      - Blocks the app until user clicks the same button.
+      - On click: sets session flag and reruns; otherwise stops execution.
+    """
     st.markdown("# 🌟 Welcome to My Friend Lumii!")
     st.markdown("## 🚀 Beta Testing Phase - Enhanced Safety Version")
-    
-    # Main disclaimer content with ENHANCED SAFETY
-    st.info("""
+
+    # Main disclaimer content with ENHANCED SAFETY (copy unchanged)
+    st.info(
+        """
     🛡️ **Enhanced Safety Features:** Multiple layers of protection to keep you safe
     
     👨‍👩‍👧‍👦 **Ask Your Parents First:** If you're under 16, make sure your parents say it's okay to chat with Lumii
@@ -1688,25 +1697,34 @@ if not st.session_state.agreed_to_terms:
     📞 **If You Need Real Help:** If you're having difficult thoughts, I'll always encourage you to talk to a trusted adult
     
     🧪 **We're Testing Together:** You're helping me get better at being your safe learning friend!
-    """)
-    
-    st.markdown("**Ready to start learning together safely? Click below if you understand and your parents are okay with it! 😊**")
-    
-    # Working button logic
-    agree_clicked = st.button("🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button")
-    
+    """
+    )
+
+    st.markdown(
+        "**Ready to start learning together safely? Click below if you understand and your parents are okay with it! 😊**"
+    )
+
+    # Working button logic (unchanged)
+    agree_clicked = st.button(
+        "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
+    )
     if agree_clicked:
         st.session_state.agreed_to_terms = True
         st.rerun()
-    
-    st.stop()
+
+    st.stop()  # Do not continue rendering until accepted
+
+
+# Show disclaimer popup before allowing app access (logic unchanged)
+if not st.session_state.agreed_to_terms:
+    _show_privacy_disclaimer()
 
 # =============================================================================
 # MAIN APP CONTINUES HERE (AFTER DISCLAIMER AGREEMENT)
 # =============================================================================
 
-# Custom CSS for beautiful styling
-st.markdown("""
+# Custom CSS for beautiful styling (copy unchanged; extracted into a constant)
+_APP_CSS: Final[str] = """
 <style>
     .main-header {
         font-size: 2.5rem;
@@ -1876,12 +1894,13 @@ st.markdown("""
         margin: 0.2rem;
     }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(_APP_CSS, unsafe_allow_html=True)
 
 # =============================================================================
 # 🚨 CRITICAL TESTING CHECKLIST - TEST THESE EXACT CASES AFTER DEPLOYMENT
+# (kept as a no-op string so nothing renders for users; copy unchanged)
 # =============================================================================
-
 """
 🧪 MANDATORY SAFETY TESTS (US-Focused Crisis Intervention + All Conversation Failures):
 
