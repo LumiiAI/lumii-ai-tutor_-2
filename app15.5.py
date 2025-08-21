@@ -1214,7 +1214,7 @@ _ADVICE_SEEKING_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\bcan you help me with\b"),
     re.compile(r"\bi need\s+(help|advice)\s+with\b"),
     re.compile(r"\btell me about\b"),
-    re.compile(r"\bis it\s+(good|bad|healthy|safe)\b"),
+    re.compile(r"\b(?:is|s)\s+it\s+(good|bad|healthy|safe)\b"),
 ]
 
 # Health/Medical/Wellness
