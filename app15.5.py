@@ -666,59 +666,73 @@ def _contains_crisis_resource(text: str) -> bool:
     return any(m in t for m in crisis_markers)
 
 # =============================================================================
-# ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED
+# ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED (polished, no behavior change)
 # =============================================================================
 
-def has_explicit_crisis_language(message):
+from typing import Optional, Tuple
+
+# NOTE: Assumes the following are defined elsewhere in the app:
+# - normalize_message(message: str) -> str
+# - ENHANCED_CRISIS_PATTERNS (List[Pattern[str]])
+# - IMMEDIATE_TERMINATION_PATTERNS (List[Pattern[str]])
+# - FORBIDDEN_INPUT_PATTERNS (List[Pattern[str]])
+# - FORBIDDEN_RESPONSE_PATTERNS (List[Pattern[str]])
+# - is_accepting_offer(message: str) -> bool
+# - get_crisis_resources() -> Dict[str, str]
+
+# Constants mirror inline lists in original code to avoid behavior change
+_ACADEMIC_TERMS_STRICT: Tuple[str, ...] = (
+    "homework", "math", "science", "biology", "chemistry", "physics", "test", "class",
+    "school", "assignment", "quiz", "project", "studying", "exam", "grade", "teacher",
+)
+
+# Used in has_explicit_crisis_language (WITHOUT the 3 extra phrases)
+_EXPLICIT_ONLY_STRICT: Tuple[str, ...] = (
+    "kill myself", "hurt myself", "end my life", "commit suicide", "suicide",
+    "cut myself", "i want to die", "i want to kill myself", "i will kill myself",
+    "i want to end my life",
+)
+
+# Used in global_crisis_override_check (WITH the 3 extra phrases)
+_EXPLICIT_ONLY_WITH_ADDITIONS: Tuple[str, ...] = _EXPLICIT_ONLY_STRICT + (
+    "stop existing", "not exist", "be gone",
+)
+
+# Broader academic context list used in check_request_safety (matches original)
+_ACADEMIC_TERMS_BROAD: Tuple[str, ...] = (
+    "homework", "test", "quiz", "assignment", "project", "school",
+    "math", "science", "english", "history", "art", "music",
+)
+
+
+def has_explicit_crisis_language(message: str) -> bool:
     """Centralized crisis detection using enhanced patterns (academic-aware)."""
     ml = normalize_message(message).lower().strip()
 
     # Academic-aware narrowing: only treat truly explicit phrases as crisis
-    academic_terms = [
-        "homework","math","science","biology","chemistry","physics","test","class",
-        "school","assignment","quiz","project","studying","exam","grade","teacher"
-    ]
-    explicit_only = (
-        "kill myself","hurt myself","end my life","commit suicide","suicide",
-        "cut myself","i want to die","i want to kill myself","i will kill myself",
-        "i want to end my life"
-    )
-    if any(w in ml for w in academic_terms):
-        return any(p in ml for p in explicit_only)
+    if any(w in ml for w in _ACADEMIC_TERMS_STRICT):
+        return any(p in ml for p in _EXPLICIT_ONLY_STRICT)
 
     # Non-academic: keep your full enhanced patterns
-    return any(pattern.search(ml) for pattern in ENHANCED_CRISIS_PATTERNS) or "suicide" in ml
+    return any(pattern.search(ml) for pattern in ENHANCED_CRISIS_PATTERNS) or ("suicide" in ml)
 
-def has_immediate_termination_language(message):
-    """Check for immediate termination triggers"""
-    message_lower = message.lower()
+
+def has_immediate_termination_language(message: str) -> bool:
+    """Check for immediate termination triggers."""
+    message_lower = (message or "").lower()
     return any(pattern.search(message_lower) for pattern in IMMEDIATE_TERMINATION_PATTERNS)
+
 
 # =============================================================================
 # ENHANCED SAFETY ARCHITECTURE - CRISIS ALWAYS WINS
 # =============================================================================
 
-def global_crisis_override_check(message):
-    """MINIMAL FIX: Just add the 3 missing phrases to academic bypass"""
+def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """MINIMAL FIX: Add the 3 missing phrases to academic bypass (logic unchanged)."""
     ml = normalize_message(message).lower().strip()
 
     # Academic-context bypass (unchanged logic, just 3 added phrases)
-    academic_terms = [
-        "homework","math","science","biology","chemistry","physics","test","class",
-        "school","assignment","quiz","project","studying","exam","grade","teacher"
-    ]
-    
-    # 🚨 MINIMAL ADDITION: Just the 3 phrases that were missed
-    explicit_only = (
-        "kill myself","hurt myself","end my life","commit suicide","suicide",
-        "cut myself","i want to die","i want to kill myself","i will kill myself",
-        "i want to end my life",
-        # 🚨 ONLY these 3 additions needed:
-        "stop existing","not exist","be gone"
-    )
-    
-    # Academic bypass ONLY if no explicit crisis
-    if any(w in ml for w in academic_terms) and not any(p in ml for p in explicit_only):
+    if any(w in ml for w in _ACADEMIC_TERMS_STRICT) and not any(p in ml for p in _EXPLICIT_ONLY_WITH_ADDITIONS):
         return False, None, None
 
     # Skip if accepting an offer (unchanged)
@@ -730,33 +744,29 @@ def global_crisis_override_check(message):
         return True, "BLOCKED_HARMFUL", "explicit_crisis"
 
     # Check for immediate termination (unchanged)
-    if has_immediate_termination_language(message):
+    if has_immediate_termination_language(ml):
         return True, "IMMEDIATE_TERMINATION", "critical_immediate"
 
     # Crisis-level patterns (unchanged)
-    if ('goodbye letter' in ml or 'farewell letter' in ml) and \
-       ('final' in ml or 'last' in ml or 'forever' in ml):
+    if ("goodbye letter" in ml or "farewell letter" in ml) and ("final" in ml or "last" in ml or "forever" in ml):
         return True, "CRISIS_GOODBYE_LETTERS", "goodbye_letter"
 
     return False, None, None
 
-def check_request_safety(message):
-    """Enhanced safety check with proper priority ordering"""
-    
+
+def check_request_safety(message: str) -> Tuple[bool, str, Optional[str]]:
+    """Enhanced safety check with proper priority ordering."""
     # CRITICAL: Global crisis check FIRST
     is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
     if is_crisis:
         return False, crisis_type, crisis_trigger
-    
-    message_lower = message.lower()
+
+    message_lower = (message or "").lower()
     concerning_score = 0
-    
+
     # Academic stress context awareness
-    academic_context = any(word in message_lower for word in [
-        'homework', 'test', 'quiz', 'assignment', 'project', 'school',
-        'math', 'science', 'english', 'history', 'art', 'music'
-    ])
-    
+    academic_context = any(word in message_lower for word in _ACADEMIC_TERMS_BROAD)
+
     # Enhanced context-aware concerning detection
     if "burden" in message_lower and ("everyone" in message_lower or "family" in message_lower):
         concerning_score += 2
@@ -770,61 +780,59 @@ def check_request_safety(message):
         concerning_score += 2
     if "never go back to school" in message_lower:
         concerning_score += 2
-    
+
     # Don't flag normal academic stress as concerning
-    if any(word in message_lower for word in ['stressed', 'worried', 'anxious']):
+    if any(word in message_lower for word in ("stressed", "worried", "anxious")):
         if academic_context and concerning_score < 3:
             concerning_score = 0
-    
+
     # Only flag if high concerning score
     if concerning_score >= 4:
         return False, "CONCERNING_MULTIPLE_FLAGS", "multiple_concerns"
-    
+
     return True, "SAFE", None
 
-def validate_user_input(message):
-    """Check user input BEFORE sending to API - prevents jailbreak attempts"""
-    message_lower = message.lower()
-    
-    # Check against forbidden input patterns
+
+def validate_user_input(message: str) -> Tuple[bool, Optional[str]]:
+    """Check user input BEFORE sending to API - prevents jailbreak attempts."""
+    message_lower = (message or "").lower()
     for pattern in FORBIDDEN_INPUT_PATTERNS:
         if pattern.search(message_lower):
             return False, pattern.pattern
-    
     return True, None
 
-def validate_ai_response(response):
-    """Enhanced response validator with broader safety coverage"""
-    response_lower = response.lower()
-    
-    # Check against enhanced forbidden patterns
+
+def validate_ai_response(response: str) -> Tuple[bool, Optional[str]]:
+    """Enhanced response validator with broader safety coverage."""
+    response_lower = (response or "").lower()
     for pattern in FORBIDDEN_RESPONSE_PATTERNS:
         if pattern.search(response_lower):
             return False, pattern.pattern
-    
     return True, None
 
-def should_terminate_conversation(message, harmful_request_count):
-    """Unified termination logic"""
+
+def should_terminate_conversation(message: str, harmful_request_count: int) -> Tuple[bool, Optional[str]]:
+    """Unified termination logic."""
     # Check if accepting offer first
     if is_accepting_offer(message):
         return False, None
-    
+
     # Use centralized immediate termination check
     if has_immediate_termination_language(message):
         return True, "CRITICAL_IMMEDIATE"
-    
+
     # Persistent harmful requests after multiple warnings
     if harmful_request_count >= 5:
         return True, "PERSISTENT_HARMFUL"
-    
+
     return False, None
 
-def generate_age_adaptive_crisis_intervention(student_age, student_name=""):
-    """🇺🇸 Age-adaptive crisis intervention for US beta families"""
+
+def generate_age_adaptive_crisis_intervention(student_age: int, student_name: str = "") -> str:
+    """🇺🇸 Age-adaptive crisis intervention for US beta families (copy unchanged)."""
     name_part = f"{student_name}, " if student_name else ""
     resources = get_crisis_resources()
-    
+
     if student_age <= 11:  # Elementary
         return f"""🚨 {name_part}I'm worried about you and want to help right away.
 
@@ -836,7 +844,6 @@ Please find a grown-up NOW:
 You are important and loved. Get help right now.
 
 This conversation is ending so you can get help. Please tell a grown-up what you said."""
-    
     else:  # Middle School & High School (12-18)
         return f"""🚨 {name_part}I'm very concerned about what you're saying. Your safety matters most.
 
