@@ -2617,154 +2617,200 @@ def detect_age_from_message_and_history(message: str) -> int:
 # MEMORY-SAFE AI RESPONSE GENERATION WITH ALL FIXES APPLIED
 # =============================================================================
 
-def generate_memory_safe_fallback(tool, student_age, is_distressed, message):
-    """Generate safe fallback responses when API fails but maintain context awareness"""
-    
-    # Get student info for personalization
+from typing import Optional, Tuple
+
+def generate_memory_safe_fallback(
+    tool: str, student_age: int, is_distressed: bool, message: str
+) -> Tuple[str, str, str]:
+    """
+    Produce a safe, context-aware fallback response when the API call fails.
+    Preserves existing copy and routing. Returns (response, tool_used, priority).
+    """
+    # Personalization
     student_info = extract_student_info_from_history()
-    student_name = st.session_state.get('student_name', '') or student_info.get('name', '')
+    student_name = st.session_state.get("student_name", "") or student_info.get("name", "")
     name_part = f"{student_name}, " if student_name else ""
-    
-    # Check if this is accepting an offer
+
+    # If user accepted a prior offer, deliver what was offered
     if is_accepting_offer(message):
-        # Provide the help that was offered
-        last_offer = get_last_offer_context()
-        if "friend" in last_offer["content"].lower():
-            response = f"""💙 {name_part}Great! Here are some tips for making new friends at your new school:
-
-1. **Join a club or activity** - Find something you enjoy like art, sports, or chess club
-2. **Be yourself** - The best friendships happen when you're genuine
-3. **Start small** - Even just saying 'hi' to someone new each day helps
-4. **Ask questions** - People love talking about their interests
-5. **Be patient** - Good friendships take time to develop
-
-Remember, lots of kids feel nervous about making friends. You're not alone! 
-Would you like more specific advice for any of these?"""
+        last_offer = get_last_offer_context() or {"offered_help": False, "content": ""}
+        offered_text = (last_offer.get("content") or "").lower()
+        if "friend" in offered_text:
+            response = (
+                f"💙 {name_part}Great! Here are some tips for making new friends at your new school:\n\n"
+                "1. **Join a club or activity** - Find something you enjoy like art, sports, or chess club\n"
+                "2. **Be yourself** - The best friendships happen when you're genuine\n"
+                "3. **Start small** - Even just saying 'hi' to someone new each day helps\n"
+                "4. **Ask questions** - People love talking about their interests\n"
+                "5. **Be patient** - Good friendships take time to develop\n\n"
+                "Remember, lots of kids feel nervous about making friends. You're not alone! \n"
+                "Would you like more specific advice for any of these?"
+            )
         else:
             response = f"🌟 {name_part}Of course! Let me help you with that. What specific part would you like to work on?"
         return response, "🌟 Lumii's Help (Safe Mode)", "general"
-    
-    if tool == 'safety':
-        return emergency_intervention(message, "GENERAL", student_age, student_name), "🛡️ Lumii's Safety Response", "safety"
-    elif tool == 'felicity' or is_distressed:
+
+    # Normal safe fallbacks by tool
+    if tool == "safety":
+        return (
+            emergency_intervention(message, "GENERAL", student_age, student_name),
+            "🛡️ Lumii's Safety Response",
+            "safety",
+        )
+
+    if tool == "felicity" or is_distressed:
         if student_age <= 11:
-            response = f"💙 {name_part}I can see you're having a tough time right now. It's okay to feel this way! I'm here to help you feel better. Can you tell me more about what's bothering you?"
+            response = (
+                f"💙 {name_part}I can see you're having a tough time right now. It's okay to feel this way! "
+                "I'm here to help you feel better. Can you tell me more about what's bothering you?"
+            )
         else:
-            response = f"💙 {name_part}I understand you're going through something difficult. Your feelings are completely valid, and I'm here to support you. Would you like to talk about what's making you feel this way?"
+            response = (
+                f"💙 {name_part}I understand you're going through something difficult. Your feelings are completely valid, "
+                "and I'm here to support you. Would you like to talk about what's making you feel this way?"
+            )
         return response, "💙 Lumii's Emotional Support (Safe Mode)", "emotional"
-    
-    elif tool == 'cali':
-        response = f"📚 {name_part}I can help you organize your schoolwork! Let's break down what you're dealing with into manageable pieces. What assignments are you working on?"
+
+    if tool == "cali":
+        response = (
+            f"📚 {name_part}I can help you organize your schoolwork! Let's break down what you're dealing with into "
+            "manageable pieces. What assignments are you working on?"
+        )
         return response, "📚 Lumii's Organization Help (Safe Mode)", "organization"
-    
-    elif tool == 'mira':
-        response = f"🧮 {name_part}I'd love to help you with this math problem! Let's work through it step by step together. Can you show me what you're working on?"
+
+    if tool == "mira":
+        response = (
+            f"🧮 {name_part}I'd love to help you with this math problem! Let's work through it step by step together. "
+            "Can you show me what you're working on?"
+        )
         return response, "🧮 Lumii's Math Expertise (Safe Mode)", "math"
-    
-    else:  # general
-        response = f"🌟 {name_part}I'm here to help you learn and grow! What would you like to explore together today?"
-        return response, "🌟 Lumii's Learning Support (Safe Mode)", "general"
 
-def generate_enhanced_emotional_support(message, pattern_type, student_age, student_name=""):
-    """Enhanced emotional support for concerning but not crisis language"""
-    
+    # General fallback
+    response = f"🌟 {name_part}I'm here to help you learn and grow! What would you like to explore together today?"
+    return response, "🌟 Lumii's Learning Support (Safe Mode)", "general"
+
+
+def generate_enhanced_emotional_support(
+    message: str, pattern_type: str, student_age: int, student_name: str = ""
+) -> str:
+    """Return enhanced emotional support text for non-crisis but concerning language."""
     name_part = f"{student_name}, " if student_name else ""
-    
+
     if pattern_type == "CONCERNING_MULTIPLE_FLAGS":
-        if student_age <= 11:  # Elementary
-            return f"""💙 {name_part}I can tell you're feeling really sad and heavy right now. Those are big, hard feelings.
+        if student_age <= 11:
+            return (
+                f"💙 {name_part}I can tell you're feeling really sad and heavy right now. Those are big, hard feelings.\n\n"
+                "I want you to know something important: you are NOT a burden. You're a wonderful person, and the people "
+                "who love you want to help you because that's what people do when they care about each other.\n\n"
+                "Sometimes when we're really upset, our brain tells us things that aren't true. It might say "
+                "\"nobody wants me around\" but that's not real - that's just the sad feelings talking.\n\n"
+                "I think it would really help to talk to a grown-up who cares about you - like your mom, dad, a teacher, "
+                "or the school counselor. They want to help you feel better.\n\n"
+                "What's been making you feel so heavy inside? I'm here to listen. 💙"
+            )
+        if student_age <= 14:
+            return (
+                f"💙 {name_part}I can hear how much pain you're in right now, and I'm really concerned about you. "
+                "Those thoughts about being a burden sound incredibly heavy and painful.\n\n"
+                "I want you to know something: you are NOT a burden. When people care about you, helping you isn't a burden - "
+                "it's what they want to do. Your feelings might be telling you otherwise right now, but that's because you're "
+                "struggling, not because it's true.\n\n"
+                "These overwhelming feelings can make everything seem hopeless, but they ARE temporary, even though they feel "
+                "permanent right now.\n\n"
+                "I really think you need to talk to someone who can give you the support you deserve - maybe your school counselor, "
+                "your mom, or another trusted adult. You shouldn't have to carry these heavy feelings alone.\n\n"
+                "Can you tell me what's been happening that's made you feel this way? I'm here to listen and support you. 💙"
+            )
+        # High school
+        return (
+            f"💙 {name_part}I can hear the deep pain in what you're saying, and I'm genuinely concerned about you. "
+            "Those thoughts about being a burden are a sign that you're struggling with some really heavy emotional weight.\n\n"
+            "I need you to understand something important: you are NOT a burden. When you're dealing with difficult emotions, "
+            "reaching out for help isn't being a burden - it's being human. The people who care about you want to support you "
+            "through tough times.\n\n"
+            "These feelings of worthlessness and despair can feel overwhelming and permanent, but they are symptoms of emotional "
+            "distress, not facts about who you are or your value.\n\n"
+            "I strongly encourage you to reach out to someone who can provide the kind of support you need right now - whether "
+            "that's a school counselor, therapist, trusted family member, or another adult you trust. You don't have to navigate "
+            "these feelings alone.\n\n"
+            "What's been happening in your life that's brought you to this point? I'm here to listen without judgment. 💙"
+        )
 
-I want you to know something important: you are NOT a burden. You're a wonderful person, and the people who love you want to help you because that's what people do when they care about each other.
+    # Other concerning patterns
+    return (
+        f"💙 {name_part}I'm concerned about what you're saying. It sounds like you're going through something really difficult right now.\n\n"
+        "These feelings you're having are valid, but I want you to know that you don't have to face them alone. There are people "
+        "who care about you and want to help.\n\n"
+        "Please consider talking to:\n"
+        "• A trusted adult like a parent, teacher, or counselor\n"
+        "• Your school's guidance counselor\n\n"
+        "I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"
+    )
 
-Sometimes when we're really upset, our brain tells us things that aren't true. It might say "nobody wants me around" but that's not real - that's just the sad feelings talking.
 
-I think it would really help to talk to a grown-up who cares about you - like your mom, dad, a teacher, or the school counselor. They want to help you feel better.
-
-What's been making you feel so heavy inside? I'm here to listen. 💙"""
-            
-        elif student_age <= 14:  # Middle School  
-            return f"""💙 {name_part}I can hear how much pain you're in right now, and I'm really concerned about you. Those thoughts about being a burden sound incredibly heavy and painful.
-
-I want you to know something: you are NOT a burden. When people care about you, helping you isn't a burden - it's what they want to do. Your feelings might be telling you otherwise right now, but that's because you're struggling, not because it's true.
-
-These overwhelming feelings can make everything seem hopeless, but they ARE temporary, even though they feel permanent right now.
-
-I really think you need to talk to someone who can give you the support you deserve - maybe your school counselor, your mom, or another trusted adult. You shouldn't have to carry these heavy feelings alone.
-
-Can you tell me what's been happening that's made you feel this way? I'm here to listen and support you. 💙"""
-            
-        else:  # High School
-            return f"""💙 {name_part}I can hear the deep pain in what you're saying, and I'm genuinely concerned about you. Those thoughts about being a burden are a sign that you're struggling with some really heavy emotional weight.
-
-I need you to understand something important: you are NOT a burden. When you're dealing with difficult emotions, reaching out for help isn't being a burden - it's being human. The people who care about you want to support you through tough times.
-
-These feelings of worthlessness and despair can feel overwhelming and permanent, but they are symptoms of emotional distress, not facts about who you are or your value.
-
-I strongly encourage you to reach out to someone who can provide the kind of support you need right now - whether that's a school counselor, therapist, trusted family member, or another adult you trust. You don't have to navigate these feelings alone.
-
-What's been happening in your life that's brought you to this point? I'm here to listen without judgment. 💙"""
-    
-    else:  # Other concerning patterns
-        return f"""💙 {name_part}I'm concerned about what you're saying. It sounds like you're going through something really difficult right now.
-
-These feelings you're having are valid, but I want you to know that you don't have to face them alone. There are people who care about you and want to help.
-
-Please consider talking to:
-• A trusted adult like a parent, teacher, or counselor
-• Your school's guidance counselor
-
-I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
-
-def emergency_intervention(message, safety_type, student_age, student_name=""):
-    """Enhanced emergency intervention with age-appropriate crisis response"""
+def emergency_intervention(
+    message: str, safety_type: str, student_age: int, student_name: str = ""
+) -> str:
+    """Age-appropriate crisis intervention text using locale-appropriate resources."""
     name_part = f"{student_name}, " if student_name else ""
     resources = get_crisis_resources()
-    
-    if student_age <= 11:  # Elementary
-        return f"""🚨 {name_part}I'm very worried about what you're saying. 
 
-Please find a grown-up RIGHT NOW:
-• Your mom, dad, or family
-• Your teacher
-• Call {resources['emergency']} if you're in danger
+    if student_age <= 11:
+        return (
+            f"🚨 {name_part}I'm very worried about what you're saying. \n\n"
+            f"Please find a grown-up RIGHT NOW:\n"
+            f"• Your mom, dad, or family\n"
+            f"• Your teacher\n"
+            f"• Call {resources['emergency']} if you're in danger\n\n"
+            "You are loved and important. Please get help right away.\n\n"
+            "Tell a grown-up what you said to me. They will help you."
+        )
 
-You are loved and important. Please get help right away.
+    return (
+        f"🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.\n\n"
+        f"Please get help IMMEDIATELY:\n"
+        f"• Call {resources['crisis_line']} right now\n"
+        f"• {resources['text_line']}\n"
+        f"• Call {resources['emergency']} if you're in immediate danger\n"
+        f"• Tell a trusted adult immediately\n\n"
+        "You don't have to go through this alone. There are people who want to help you.\n\n"
+        "Please reach out for help right now."
+    )
 
-Tell a grown-up what you said to me. They will help you."""
-    
-    else:  # Middle & High School
-        return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.
 
-Please get help IMMEDIATELY:
-• Call {resources['crisis_line']} right now
-• {resources['text_line']}
-• Call {resources['emergency']} if you're in immediate danger
-• Tell a trusted adult immediately
+def generate_response_with_memory_safety(
+    message: str,
+    priority: str,
+    tool: str,
+    student_age: int = 10,
+    is_distressed: bool = False,
+    safety_type: Optional[str] = None,
+    trigger: Optional[str] = None,
+) -> Tuple[str, str, str, Optional[str]]:
+    """
+    Main response generator. Preserves routing and copy while adding:
+    - Type hints and docstrings
+    - Defensive guards (None-safe dict access, consistent returns)
+    Returns: (response_text, tool_used_badge, response_priority, memory_indicator_html_or_None)
+    """
 
-You don't have to go through this alone. There are people who want to help you.
-
-Please reach out for help right now."""
-
-def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
-    """Generate AI responses with ALL fixes applied"""
-
-    # 🚨 Unified crisis handling (initial + relapse) — always first
-    if priority in ('crisis', 'crisis_return'):
-        age  = detect_age_from_message_and_history(message)
-        name = st.session_state.get('student_name', '')
+    # 🚨 Crisis handling — always first
+    if priority in ("crisis", "crisis_return"):
+        age = detect_age_from_message_and_history(message)
+        name = st.session_state.get("student_name", "")
         crisis_msg = generate_age_adaptive_crisis_intervention(age, name)
         st.session_state.post_crisis_monitoring = True
-        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-        # Return unified badge + crisis priority; no memory tag
+        st.session_state.safety_interventions = st.session_state.get("safety_interventions", 0) + 1
         return crisis_msg, "🚨 Lumii's Crisis Response", "crisis", None
-    
-    # FIXED: Acceptance short-circuit with safe tail checking
-    if is_accepting_offer(message):
-        last_offer = get_last_offer_context()
-        student_info = extract_student_info_from_history()
-        final_age = student_info.get('age') or student_age
 
-        if last_offer["offered_help"] and last_offer["content"] and "friend" in last_offer["content"].lower():
+    # Offer acceptance short-circuit (friendship / general help)
+    if is_accepting_offer(message):
+        last_offer = get_last_offer_context() or {"offered_help": False, "content": ""}
+        offered_text = (last_offer.get("content") or "").lower()
+        student_info = extract_student_info_from_history()
+        final_age = student_info.get("age") or student_age
+
+        if "friend" in offered_text:
             response = (
                 "💙 Great! Here are some tips for making new friends at your new school:\n\n"
                 "1) **Join an activity you enjoy** (art, sports, chess, choir)\n"
@@ -2775,635 +2821,235 @@ def generate_response_with_memory_safety(message, priority, tool, student_age=10
                 "Want help planning what to try this week? We can make a mini friendship plan together. 😊"
             )
             return response, "🌟 Lumii's Learning Support", "general", "🧠 With Memory"
-        else:
-            response = "🌟 Awesome — tell me which part you'd like to start with and we'll do it together!"
-            return response, "🌟 Lumii's Learning Support", "general", "🧠 With Memory"
-    
-    # Handle immediate termination FIRST
-    if priority == 'immediate_termination':
+
+        response = "🌟 Awesome — tell me which part you'd like to start with and we'll do it together!"
+        return response, "🌟 Lumii's Learning Support", "general", "🧠 With Memory"
+
+    # Immediate termination
+    if priority == "immediate_termination":
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
         st.session_state.post_crisis_monitoring = True
         resources = get_crisis_resources()
-        response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
-        
-This conversation needs to stop for your safety. Please talk to:
-• A parent or trusted adult RIGHT NOW
-• {resources['crisis_line']}
-• {resources['suicide_line']}
-
-You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
-        
+        response = (
+            "💙 I care about you so much, and I'm very concerned about what you're saying.\n\n"
+            "This conversation needs to stop for your safety. Please talk to:\n"
+            "• A parent or trusted adult RIGHT NOW\n"
+            f"• {resources['crisis_line']}\n"
+            f"• {resources['suicide_line']}\n\n"
+            "You matter, and there are people who want to help you. Please reach out to them immediately. 💙"
+        )
         return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
-    
-    # Handle crisis return after termination
-    if priority == 'crisis_return':
+
+    # Crisis return after termination
+    if priority == "crisis_return":
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
         resources = get_crisis_resources()
-        response = f"""💙 I'm very concerned that you're still having these thoughts after we talked about safety.
-
-This conversation must end now. Please:
-• Call a trusted adult RIGHT NOW - don't wait
-• {resources['crisis_line']}
-• {resources['suicide_line']}
-• Go to your nearest emergency room if you're in immediate danger
-
-Your safety is the most important thing. Please get help immediately. 💙"""
-        
+        response = (
+            "💙 I'm very concerned that you're still having these thoughts after we talked about safety.\n\n"
+            "This conversation must end now. Please:\n"
+            "• Call a trusted adult RIGHT NOW - don't wait\n"
+            f"• {resources['crisis_line']}\n"
+            f"• {resources['suicide_line']}\n"
+            "• Go to your nearest emergency room if you're in immediate danger\n\n"
+            "Your safety is the most important thing. Please get help immediately. 💙"
+        )
         return response, "🛡️ FINAL TERMINATION - Please Get Help Now", "crisis", "🚨 Final Warning"
-    
-    # Handle supportive continuation after crisis
-    if priority == 'post_crisis_support':
-        response = f"""💙 I'm really glad you're listening and willing to reach out for help. That takes so much courage.
 
-You're taking the right steps by acknowledging that there are people who care about you. Those trusted adults - your parents, teachers, school counselors - they want to help you through this difficult time.
-
-Please don't hesitate to talk to them today if possible. You don't have to carry these heavy feelings alone.
-
-Is there anything positive we can focus on right now while you're getting the support you need? 💙"""
-        
+    # Supportive continuation after crisis
+    if priority == "post_crisis_support":
+        response = (
+            "💙 I'm really glad you're listening and willing to reach out for help. That takes so much courage.\n\n"
+            "You're taking the right steps by acknowledging that there are people who care about you. Those trusted adults - your parents, "
+            "teachers, school counselors - they want to help you through this difficult time.\n\n"
+            "Please don't hesitate to talk to them today if possible. You don't have to carry these heavy feelings alone.\n\n"
+            "Is there anything positive we can focus on right now while you're getting the support you need? 💙"
+        )
         return response, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
-    
-    # 🚨 NEW: Handle confusion (add this before family referral handling)
-    if priority == 'confusion':
+
+    # Confusion lane
+    if priority == "confusion":
         student_info = extract_student_info_from_history()
-        student_name = st.session_state.get('student_name', '') or student_info.get('name', '')
+        student_name = st.session_state.get("student_name", "") or student_info.get("name", "")
         name_part = f"{student_name}, " if student_name else ""
-        
-        response = f"""😊 {name_part}Thanks for telling me you're feeling confused — that's totally okay! Let's figure it out together.
-
-What would help most right now?
-- A quick example
-- Step-by-step explanation  
-- A picture or diagram
-- Just the key idea in 2 sentences
-
-Tell me which part is tricky, or pick one of the options above! 😊"""
-        
+        response = (
+            f"😊 {name_part}Thanks for telling me you're feeling confused — that's totally okay! Let's figure it out together.\n\n"
+            "What would help most right now?\n"
+            "- A quick example\n"
+            "- Step-by-step explanation  \n"
+            "- A picture or diagram\n"
+            "- Just the key idea in 2 sentences\n\n"
+            "Tell me which part is tricky, or pick one of the options above! 😊"
+        )
         return response, "😊 Lumii's Learning Support", "confusion", "🧠 With Memory"
 
-    # 🆕 NEW: Handle identity context (add before family referral handling)
-    if priority == 'identity_context':
+    # Identity context
+    if priority == "identity_context":
         response = generate_identity_response(tool, student_age, st.session_state.student_name)
         return response, "💙 Lumii's Identity Support", "identity_context", "🤗 Accepting + Caring"
-    
-    # Handle family referral topics (UNIFIED SEXUAL HEALTH & IDENTITY)
-    if priority == 'family_referral':
+
+    # Family referral
+    if priority == "family_referral":
         response = generate_family_referral_response(student_age, st.session_state.student_name)
         return response, "👨‍👩‍👧‍👦 Lumii's Family Referral", "family_referral", "📖 Parent Guidance"
-    
-    # Handle non-educational topics  
-    if priority == 'non_educational':
+
+    # Non-educational topics
+    if priority == "non_educational":
         response = generate_educational_boundary_response(trigger, student_age, st.session_state.student_name)
         return response, "🎓 Lumii's Learning Focus", "educational_boundary", "📚 Educational Scope"
-    
-    # Handle problematic behavior
-    if priority == 'behavior':
-        response = handle_problematic_behavior(trigger, st.session_state.behavior_strikes, student_age, st.session_state.student_name)
-        return response, f"⚠️ Lumii's Behavior Guidance (Strike {st.session_state.behavior_strikes})", "behavior", "🤝 Learning Respect"
-    
-    elif priority == 'behavior_final':
+
+    # Problematic behavior
+    if priority == "behavior":
+        response = handle_problematic_behavior(
+            trigger, st.session_state.behavior_strikes, student_age, st.session_state.student_name
+        )
+        return (
+            response,
+            f"⚠️ Lumii's Behavior Guidance (Strike {st.session_state.behavior_strikes})",
+            "behavior",
+            "🤝 Learning Respect",
+        )
+
+    if priority == "behavior_final":
         response = handle_problematic_behavior(trigger, 3, student_age, st.session_state.student_name)
         return response, "🛑 Lumii's Final Warning - Session Ended", "behavior_final", "🕐 Timeout Active"
-    
-    elif priority == 'behavior_timeout':
-        response = f"""🛑 I've already asked you to take a break because of disrespectful language. 
 
-This conversation is paused until you're ready to communicate kindly. 
-
-Please come back when you're ready to be respectful and learn together positively. I'll be here! 💙"""
+    if priority == "behavior_timeout":
+        response = (
+            "🛑 I've already asked you to take a break because of disrespectful language. \n\n"
+            "This conversation is paused until you're ready to communicate kindly. \n\n"
+            "Please come back when you're ready to be respectful and learn together positively. I'll be here! 💙"
+        )
         return response, "🛑 Conversation Paused - Please Take a Break", "behavior_timeout", "🕐 Timeout Active"
-    
-    # Handle safety interventions
-    if priority == 'crisis':
+
+    # Safety / Concerning
+    if priority == "crisis":  # (kept for architecture parity; earlier crisis branch already returned)
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
         st.session_state.post_crisis_monitoring = True
-        response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
+        response = emergency_intervention(message, safety_type or "", student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Crisis Response", "crisis", "🚨 Crisis Level"
-    
-    elif priority == 'concerning':
+
+    if priority == "concerning":
         st.session_state.safety_interventions += 1
-        response = generate_enhanced_emotional_support(message, safety_type, student_age, st.session_state.student_name)
+        response = generate_enhanced_emotional_support(message, safety_type or "", student_age, st.session_state.student_name)
         return response, "💙 Lumii's Enhanced Support", "concerning", "⚠️ Concerning Language"
-    
-    elif priority == 'safety':
+
+    if priority == "safety":
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
+        response = emergency_intervention(message, safety_type or "", student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
-    
-    # Reset harmful request count for safe messages
-    if priority not in ['crisis', 'crisis_return', 'safety', 'concerning', 'immediate_termination']:
+
+    # Reset counters for safe paths
+    if priority not in ("crisis", "crisis_return", "safety", "concerning", "immediate_termination"):
         st.session_state.harmful_request_count = 0
-        
-        # Reset post-crisis monitoring after sustained safety
-        if st.session_state.get('post_crisis_monitoring', False):
-            safe_exchanges = sum(1 for msg in st.session_state.messages[-10:] 
-                               if msg.get('role') == 'assistant' and 
-                               msg.get('priority') not in ['crisis', 'crisis_return', 'safety', 'concerning'])
+        if st.session_state.get("post_crisis_monitoring", False):
+            safe_exchanges = sum(
+                1
+                for msg in st.session_state.messages[-10:]
+                if msg.get("role") == "assistant"
+                and msg.get("priority") not in ("crisis", "crisis_return", "safety", "concerning")
+            )
             if safe_exchanges >= 5:
                 st.session_state.post_crisis_monitoring = False
-    
-    # Get student info
+
+    # Student info + memory indicators
     student_info = extract_student_info_from_history()
-    student_name = st.session_state.get('student_name', '') or student_info.get('name', '')
-    final_age = student_info.get('age') or student_age
-    
-    # Check conversation status
+    student_name = st.session_state.get("student_name", "") or student_info.get("name", "")
+    final_age = student_info.get("age") or student_age
+
     status, status_msg = check_conversation_length()
     memory_indicator = "🧠 With Memory"
-    
     if status == "warning":
         memory_indicator = '<span class="memory-warning">⚠️ Long Chat</span>'
     elif status == "critical":
         memory_indicator = '<span class="memory-warning">🚨 Memory Limit</span>'
-    
-    # Try AI response first
+
+    # Try LLM first; fall back if needed
     try:
-        if tool == 'felicity':
+        if tool == "felicity":
             st.session_state.emotional_support_count += 1
             ai_response, error, needs_fallback = get_groq_response_with_memory_safety(
                 message, "Felicity", final_age, student_name, is_distressed=True, temperature=0.8
             )
             if ai_response and not needs_fallback:
                 return ai_response, "💙 Lumii's Emotional Support", "emotional", memory_indicator
-            elif needs_fallback:
-                response, tool_used, priority = generate_memory_safe_fallback('felicity', final_age, is_distressed, message)
-                return response, tool_used, priority, memory_indicator
-        
-        elif tool == 'cali':
+            response, tool_used, new_priority = generate_memory_safe_fallback("felicity", final_age, is_distressed, message)
+            return response, tool_used, new_priority, memory_indicator
+
+        if tool == "cali":
             st.session_state.organization_help_count += 1
             ai_response, error, needs_fallback = get_groq_response_with_memory_safety(
                 message, "Cali", final_age, student_name, is_distressed, temperature=0.7
             )
             if ai_response and not needs_fallback:
                 return ai_response, "📚 Lumii's Organization Help", "organization", memory_indicator
-            elif needs_fallback:
-                response, tool_used, priority = generate_memory_safe_fallback('cali', final_age, is_distressed, message)
-                return response, tool_used, priority, memory_indicator
-        
-        elif tool == 'mira':
+            response, tool_used, new_priority = generate_memory_safe_fallback("cali", final_age, is_distressed, message)
+            return response, tool_used, new_priority, memory_indicator
+
+        if tool == "mira":
             st.session_state.math_problems_solved += 1
             ai_response, error, needs_fallback = get_groq_response_with_memory_safety(
                 message, "Mira", final_age, student_name, is_distressed, temperature=0.6
             )
             if ai_response and not needs_fallback:
                 return ai_response, "🧮 Lumii's Math Expertise", "math", memory_indicator
-            elif needs_fallback:
-                response, tool_used, priority = generate_memory_safe_fallback('mira', final_age, is_distressed, message)
-                return response, tool_used, priority, memory_indicator
-        
-        else:  # lumii_main (general)
-            ai_response, error, needs_fallback = get_groq_response_with_memory_safety(
-                message, "Lumii", final_age, student_name, is_distressed, temperature=0.8
-            )
-            if ai_response and not needs_fallback:
-                # Track if we're making an offer
-                if any(offer in ai_response.lower() for offer in ["would you like", "can i help", "tips", "advice"]):
-                    st.session_state.last_offer = ai_response
-                    st.session_state.awaiting_response = True
-                return ai_response, "🌟 Lumii's Learning Support", "general", memory_indicator
-            elif needs_fallback:
-                response, tool_used, priority = generate_memory_safe_fallback('general', final_age, is_distressed, message)
-                return response, tool_used, priority, memory_indicator
-    
+            response, tool_used, new_priority = generate_memory_safe_fallback("mira", final_age, is_distressed, message)
+            return response, tool_used, new_priority, memory_indicator
+
+        # General (Lumii)
+        ai_response, error, needs_fallback = get_groq_response_with_memory_safety(
+            message, "Lumii", final_age, student_name, is_distressed, temperature=0.8
+        )
+        if ai_response and not needs_fallback:
+            # Track if we're making an offer (lower once)
+            lower_ai = ai_response.lower()
+            if any(offer in lower_ai for offer in ("would you like", "can i help", "tips", "advice")):
+                st.session_state.last_offer = ai_response
+                st.session_state.awaiting_response = True
+            return ai_response, "🌟 Lumii's Learning Support", "general", memory_indicator
+
+        response, tool_used, new_priority = generate_memory_safe_fallback("general", final_age, is_distressed, message)
+        return response, tool_used, new_priority, memory_indicator
+
     except Exception as e:
         st.error(f"🚨 AI System Error: {e}")
-        response, tool_used, priority = generate_memory_safe_fallback(tool, final_age, is_distressed, message)
-        return response, f"{tool_used} (Emergency Mode)", priority, "🚨 Safe Mode"
-    
-    # Final fallback
-    response, tool_used, priority = generate_memory_safe_fallback(tool, final_age, is_distressed, message)
-    return response, tool_used, priority, "🛡️ Backup Mode"
+        response, tool_used, new_priority = generate_memory_safe_fallback(tool, final_age, is_distressed, message)
+        return response, f"{tool_used} (Emergency Mode)", new_priority, "🚨 Safe Mode"
+
+    # Final safeguard (should rarely be hit)
+    response, tool_used, new_priority = generate_memory_safe_fallback(tool, final_age, is_distressed, message)
+    return response, tool_used, new_priority, "🛡️ Backup Mode"
+
 
 # =============================================================================
 # NATURAL FOLLOW-UP SYSTEM
 # =============================================================================
 
-def generate_natural_follow_up(tool_used, priority, had_emotional_content=False):
-    """Generate natural, helpful follow-ups without being pushy"""
-    
-    # Check if follow-up is appropriate
-    active_topics, past_topics = track_active_topics(st.session_state.messages)
-    
-    # Don't generate follow-ups for active topics
+def generate_natural_follow_up(tool_used: str, priority: str, had_emotional_content: bool = False) -> str:
+    """
+    Create a gentle, context-aware follow-up. Returns an empty string when not appropriate.
+    """
+    active_topics, _past_topics = track_active_topics(st.session_state.messages)
+
+    # Skip if the tool name already matches an active topic to avoid redundancy
     if any(topic in tool_used.lower() for topic in active_topics):
         return ""
-    
+
     if "Safety" in tool_used or "Crisis" in tool_used:
         return "\n\n💙 **Remember, you're not alone. If you need to talk to someone, I'm here, and there are also trusted adults who care about you.**"
-        
-    elif "Enhanced Support" in tool_used:
+    if "Enhanced Support" in tool_used:
         return "\n\n🤗 **I'm here to listen and support you. Would you like to talk more about what's been happening, or is there something else I can help you with?**"
-        
-    elif "Emotional Support" in tool_used:
+    if "Emotional Support" in tool_used:
         return "\n\n🤗 **Now that we've talked about those feelings, would you like some help with the schoolwork that was bothering you?**"
-        
-    elif "Organization Help" in tool_used:
+    if "Organization Help" in tool_used:
         return "\n\n📚 **I've helped you organize things. Want help with any specific subjects or assignments now?**"
-        
-    elif "Math Expertise" in tool_used and not had_emotional_content:
+    if "Math Expertise" in tool_used and not had_emotional_content:
         return "\n\n🧮 **Need help with another math problem, or questions about this concept?**"
-        
-    elif "Math Expertise" in tool_used and had_emotional_content:
+    if "Math Expertise" in tool_used and had_emotional_content:
         return "\n\n💙 **How are you feeling about this math concept now? Ready to try another problem or need more explanation?**"
-        
-    else:
-        return ""
 
-# =============================================================================
-# ENHANCED USER INTERFACE WITH SAFETY MONITORING
-# =============================================================================
+    return ""
 
-# Show safety status
-if st.session_state.safety_interventions > 0:
-    st.warning(f"⚠️ Safety protocols activated {st.session_state.safety_interventions} time(s) this session. Your safety is my priority.")
-
-# Show behavior status
-if st.session_state.behavior_strikes > 0:
-    if st.session_state.behavior_timeout:
-        st.error(f"🛑 Conversation paused due to disrespectful language. Please take a break and return when ready to be kind.")
-    else:
-        st.warning(f"⚠️ Behavior guidance provided. Strike {st.session_state.behavior_strikes}/3. Let's keep our conversation respectful!")
-
-# Show success message with memory status
-status, status_msg = check_conversation_length()
-if status == "normal":
-    st.markdown('<div class="success-banner">🎉 Welcome to Lumii! Safe, caring learning support with full conversation memory! 🛡️💙</div>', unsafe_allow_html=True)
-elif status == "warning":
-    st.warning(f"⚠️ {status_msg} - Memory management active")
-else:  # critical
-    st.error(f"🚨 {status_msg} - Automatic summarization will occur")
-
-# Sidebar for student info and stats
-with st.sidebar:
-    st.header("👋 Hello, Friend!")
-    
-    # Student name input
-    student_name = st.text_input(
-        "What's your name? (optional)", 
-        value=st.session_state.student_name,
-        placeholder="I'd love to know what to call you!"
-    )
-    if student_name:
-        st.session_state.student_name = student_name
-    
-    # Show extracted student info from conversation
-    student_info = extract_student_info_from_history()
-    if student_info['age'] or student_info['subjects_discussed']:
-        st.subheader("🧠 What I Remember About You")
-        if student_info['age']:
-            st.write(f"**Age:** {student_info['age']} years old")
-        if student_info['subjects_discussed']:
-            st.write(f"**Subjects:** {', '.join(student_info['subjects_discussed'])}")
-        if len(st.session_state.messages) > 0:
-            exchanges = len(st.session_state.messages)//2
-            st.write(f"**Conversation:** {exchanges} exchanges")
-            
-            # Memory status indicator
-            if exchanges > 15:
-                st.warning(f"📊 Long conversation detected")
-    
-    # Enhanced stats with tool usage
-    st.subheader("📊 Our Learning Journey")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric("Conversations", st.session_state.interaction_count)
-        st.metric("Math Problems", st.session_state.math_problems_solved)
-    with col2:
-        st.metric("Emotional Support", st.session_state.emotional_support_count)
-        st.metric("Organization Help", st.session_state.organization_help_count)
-    
-    # Show family ID for tracking
-    if st.session_state.family_id:
-        st.caption(f"Family ID: {st.session_state.family_id}")
-    
-    # Safety and behavior monitoring
-    if st.session_state.safety_interventions > 0 or st.session_state.behavior_strikes > 0:
-        st.subheader("🛡️ Safety & Behavior Status")
-        if st.session_state.safety_interventions > 0:
-            st.metric("Safety Interventions", st.session_state.safety_interventions)
-        if st.session_state.behavior_strikes > 0:
-            st.metric("Behavior Guidance", f"{st.session_state.behavior_strikes}/3")
-            if st.session_state.behavior_timeout:
-                st.error("Conversation paused - please be respectful")
-        st.info("I'm here to keep you safe and help you learn!")
-    
-    # Memory monitoring section
-    if len(st.session_state.messages) > 10:
-        st.subheader("🧠 Memory Status")
-        estimated_tokens = estimate_token_count()
-        st.write(f"**Messages:** {len(st.session_state.messages)}")
-        st.write(f"**Estimated tokens:** ~{estimated_tokens}")
-        
-        if estimated_tokens > 4000:
-            st.warning("Approaching memory limit")
-        
-        if st.session_state.conversation_summary:
-            st.info("✅ Conversation summarized")
-    
-    # Tool explanations with safety first
-    st.subheader("🛠️ How I Help You")
-    st.markdown("""
-    **🛡️ Safety First** - I'll always protect you from harmful content
-    
-    **🎓 Educational Focus** - I focus on K-12 school subjects (personal, health, and family topics go to appropriate adults)
-    
-    **👨‍👩‍👧‍👦 Family Guidance** - Important personal topics are best discussed with your parents or guardians first
-    
-    **🤝 Respectful Learning** - I expect kind, respectful communication
-    
-    **💙 Emotional Support** - When you're feeling stressed, frustrated, or overwhelmed about school
-    
-    **📚 Organization Help** - When you have multiple assignments to manage
-    
-    **🧮 Math Tutoring** - Step-by-step help with math problems and concepts
-    
-    **🌟 General Learning** - Support with all school subjects and questions
-    
-    **🤔 Confusion Help** - When you're genuinely confused about any topic
-    
-    *I remember our conversation, keep you safe, and stay focused on learning!*
-    """)
-    
-    # Crisis resources always visible (US-focused for beta families)
-    st.subheader("📞 If You Need Help")
-    resources = get_crisis_resources()
-    st.markdown(f"""
-    **Call or text {resources['crisis_line']}**
-    **{resources['text_line']}**
-    **{resources['emergency']}**
-    **Talk to a trusted adult**
-    """)
-    
-    # API Status with enhanced monitoring
-    st.subheader("🤖 AI Status")
-    try:
-        api_key = st.secrets["GROQ_API_KEY"]
-        if st.session_state.memory_safe_mode:
-            st.warning("⚠️ Memory Safe Mode Active")
-        else:
-            st.success("✅ Smart AI with Safety Active")
-        st.caption("Full safety protocols enabled")
-    except:
-        st.error("❌ API Configuration Missing")
-
-# Main header
-st.markdown('<h1 class="main-header">🎓 My Friend Lumii</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Your safe, emotionally intelligent AI learning companion! 🛡️💙</p>', unsafe_allow_html=True)
-
-st.info("""
-🛡️ **Safety First:** I will never help with anything that could hurt you or others
-
-🎓 **Educational Focus:** I focus on K-12 school subjects and learning - other topics go to appropriate adults
-
-🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
-
-👨‍👩‍👧‍👦 **Family Guidance:** Important personal topics are best discussed with your parents or guardians first
-
-🤔 **Confusion Help:** If you're confused about something, just tell me! I'll help you understand
-
-💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
-
-🧠 **I remember:** Your name, age, subjects we've discussed, and our learning journey
-🎯 **When you're stressed about school** → I provide caring emotional support first  
-📚 **When you ask questions** → I give you helpful answers building on our previous conversations
-🚨 **When you're in danger** → I'll encourage you to talk to a trusted adult immediately
-🌟 **Always** → I'm supportive, encouraging, genuinely helpful, and protective
-
-**I'm not just smart - I'm your safe learning companion who remembers, grows with you, and stays focused on education!** 
-""")
-
-# Display chat history with enhanced memory and safety indicators
-mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
-for i, message in enumerate(st.session_state.messages):
-    with st.chat_message(message["role"]):
-        if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
-            priority = message["priority"]
-            tool_used = message["tool_used"]
-            
-            if priority == "safety" or priority == "crisis" or priority == "crisis_return" or priority == "immediate_termination":
-                st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority == "identity_context":
-                st.markdown(f'<div class="identity-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="identity-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority == "family_referral":
-                st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority == "educational_boundary":
-                st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority in ["behavior", "behavior_final", "behavior_timeout"]:
-                st.markdown(f'<div class="behavior-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
-            elif priority == "post_crisis_support":
-                st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
-            elif priority == "concerning":
-                st.markdown(f'<div class="concerning-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="concerning-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
-            elif priority == "emotional":
-                st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
-            elif priority == "math":
-                st.markdown(f'<div class="math-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
-            elif priority == "organization":
-                st.markdown(f'<div class="organization-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
-            elif priority == "summary":
-                st.info(f"📋 {message['content']}")
-            elif priority == "polite_decline":
-                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
-            elif priority == "confusion":
-                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
-        else:
-            st.markdown(message["content"])
-
-# Chat input with enhanced safety processing
-prompt_placeholder = "What would you like to learn about today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! How can I help you today?"
-
-# --- Input gating: crisis lock first, then behavior timeout ---
-
-# 1) Crisis lock (conversation paused for safety)
-if st.session_state.get("locked_after_crisis", False):
-    st.error("🚨 Conversation is paused for safety. Please tell a trusted adult what you wrote.")
-    # Disabled input so it’s obvious the chat is paused
-    st.chat_input(
-        placeholder="Conversation paused for safety.",
-        disabled=True
-    )
-
-# 2) Behavior timeout (disrespectful language)
-elif getattr(st.session_state, "behavior_timeout", False):
-    st.error("🛑 Conversation is paused due to disrespectful language. Please take a break and return when ready to communicate kindly.")
-    if st.button("🤝 I'm Ready to Be Respectful", type="primary"):
-        st.session_state.behavior_timeout = False
-        st.session_state.behavior_strikes = 0
-        st.session_state.last_behavior_type = None
-        st.success("✅ Welcome back! Let's learn together respectfully.")
-        st.rerun()
-
-# 3) Normal input
-else:
-    if prompt := st.chat_input(prompt_placeholder):
-        # Add user message to chat
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        
-        # STEP 1: GLOBAL CRISIS GUARD FIRST (HIGHEST PRIORITY)
-        is_crisis, crisis_intervention = global_crisis_guard(prompt)
-        if is_crisis:
-            # IMMEDIATE TERMINATION - display crisis intervention
-            with st.chat_message("assistant"):
-                st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
-                st.markdown('<div class="safety-badge">🚨 SAFETY INTERVENTION - Conversation Ended</div>', unsafe_allow_html=True)
-            
-            # Add to messages and stop processing
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": crisis_intervention,
-                "priority": "crisis_termination",
-                "tool_used": "🚨 SAFETY INTERVENTION",
-                "safety_triggered": True
-            })
-            st.session_state.interaction_count += 1
-            st.rerun()
-            st.stop()  # Completely stop processing
-        
-        # STEP 2: Check for polite decline
-        if is_polite_decline(prompt):
-            student_age = detect_age_from_message_and_history(prompt)
-            response = handle_polite_decline(student_age, st.session_state.student_name)
-            
-            with st.chat_message("assistant"):
-                st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                st.markdown('<div class="friend-badge">😊 Lumii\'s Understanding</div>', unsafe_allow_html=True)
-            
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": response,
-                "priority": "polite_decline",
-                "tool_used": "😊 Lumii's Understanding"
-            })
-            st.session_state.interaction_count += 1
-            st.rerun()
-        
-                # STEP 3: Continue with existing priority detection for non-crisis messages
-        else:
-            # Existing priority detection code continues here...
-            priority, tool, safety_trigger = detect_priority_smart_with_safety(prompt)
-            student_age = detect_age_from_message_and_history(prompt)
-            is_distressed = detect_emotional_distress(prompt)
-        
-            # Generate response using enhanced memory-safe system
-            with st.chat_message("assistant"):
-                with st.spinner("🧠 Thinking safely with full memory..."):
-                    time.sleep(1)
-                    response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
-                        prompt, priority, tool, student_age, is_distressed, None, safety_trigger
-                    )
-        
-                    # 🚨 Crisis, relapse, or immediate termination → show once, record placeholder, lock input, and stop
-                    if response_priority in ("crisis", "crisis_return", "immediate_termination"):
-                       st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
-                       st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
-
-                       st.session_state.messages.append({
-                           "role": "system",
-                           "content": "[crisis intervention issued]",
-                           "priority": "crisis" if response_priority != "immediate_termination" else "immediate_termination",
-                           "tool_used": "CRISIS",
-                           "was_distressed": True,
-                           "student_age_detected": student_age,
-                           "safety_triggered": True
-                        })
-
-                       # Enable post-crisis monitoring and lock input
-                       st.session_state["post_crisis_monitoring"] = True
-                       st.session_state["locked_after_crisis"] = True
-                       st.stop()
-
-        
-                    # --- Greeting injection: first safe reply uses grade ONLY if explicit/confirmed ---
-                    if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
-                        prefix = build_grade_prefix(prompt)  # uses explicit grade or previously confirmed grade only
-                        if prefix:
-                            response = f"{prefix}{response}"
-
-        
-                    # --- Non-crisis path continues normally ---
-                    # Check for duplicates and add variation if needed
-                    if is_duplicate_response(response):
-                        response = add_variation_to_response(response)
-        
-                    # Add natural follow-up if appropriate
-                    follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
-                    if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
-                        response += follow_up
-        
-                    # Display with appropriate styling
-                    if response_priority == "safety":
-                        st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority == "family_referral":
-                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority == "educational_boundary":
-                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority in ["behavior", "behavior_final", "behavior_timeout"]:
-                        st.markdown(f'<div class="behavior-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
-                    elif response_priority == "post_crisis_support":
-                        st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
-                    elif response_priority == "concerning":
-                        st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-                    elif response_priority == "confusion":
-                        st.markdown(f'<div class="confusion-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
-        
-            # Add assistant response to chat with enhanced metadata (non-crisis only)
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": response,
-                "priority": response_priority,
-                "tool_used": tool_used,
-                "was_distressed": is_distressed,
-                "student_age_detected": student_age,
-                "safety_triggered": False
-            })
-        
-            # Update interaction count
-            st.session_state.interaction_count += 1
-        
-            # Rerun to update sidebar stats and memory display
-            st.rerun()
-
-# Footer with enhanced safety and memory info
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #667; margin-top: 2rem;'>
-    <p><strong>My Friend Lumii</strong> - Your safe, emotionally intelligent AI learning companion 🛡️💙</p>
-    <p>🛡️ Safety first • 🧠 Remembers conversations • 🎯 Smart emotional support • 📚 Natural conversation flow • 🌟 Always protective</p>
-    <p>🤝 Respectful learning • 👨‍👩‍👧‍👦 Family guidance • 🔒 Multi-layer safety • 📞 Crisis resources • ⚡ Error recovery • 💪 Always helpful, never harmful</p>
-    <p>🤔 <strong>NEW:</strong> Confusion help - If you're confused about something, just tell me! I'll help you understand without judgment.</p>
-    <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe</em></p>
-</div>
-""", unsafe_allow_html=True)
