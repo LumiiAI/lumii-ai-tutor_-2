@@ -3026,6 +3026,7 @@ st.info("""
 """)
 
 # Display chat history with enhanced memory and safety indicators
+mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
@@ -3052,16 +3053,16 @@ for i, message in enumerate(st.session_state.messages):
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
             elif priority == "concerning":
                 st.markdown(f'<div class="concerning-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="concerning-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
+                st.markdown(f'<div class="concerning-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
             elif priority == "emotional":
                 st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
             elif priority == "math":
                 st.markdown(f'<div class="math-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
             elif priority == "organization":
                 st.markdown(f'<div class="organization-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
             elif priority == "summary":
                 st.info(f"📋 {message['content']}")
             elif priority == "polite_decline":
@@ -3072,7 +3073,7 @@ for i, message in enumerate(st.session_state.messages):
                 st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🧠 With Memory</span>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
         else:
             st.markdown(message["content"])
 
@@ -3183,13 +3184,12 @@ else:
                        st.stop()
 
         
-                    # --- Greeting injection: first safe reply uses detected GRADE (fallback to age→grade) ---
+                    # --- Greeting injection: first safe reply uses grade ONLY if explicit/confirmed ---
                     if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
-                        # Use the guarded helper so we ONLY show a grade when it's explicit in this message
-                        # or previously confirmed in session/profile (no age→grade guessing).
-                        prefix = build_grade_prefix(prompt)
+                        prefix = build_grade_prefix(prompt)  # uses explicit grade or previously confirmed grade only
                         if prefix:
                             response = f"{prefix}{response}"
+
         
                     # --- Non-crisis path continues normally ---
                     # Check for duplicates and add variation if needed
