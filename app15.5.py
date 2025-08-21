@@ -1412,24 +1412,25 @@ def detect_problematic_behavior(message: str) -> Optional[str]:
     if detect_confusion(message):
         return None
 
-    message_lower = (message or "").lower().strip()
+    # Normalize smart quotes etc. so "you’re dumb" matches "you're dumb"
+    text = normalize_message(message or "").lower().strip()
 
     # Self-criticism / content criticism are NOT problematic behavior
-    if any(s in message_lower for s in _SELF_CRITICISM_PATTERNS):
+    if any(s in text for s in _SELF_CRITICISM_PATTERNS):
         return None
-    if any(s in message_lower for s in _CONTENT_CRITICISM_PATTERNS):
+    if any(s in text for s in _CONTENT_CRITICISM_PATTERNS):
         return None
 
     # Actual insults to Lumii
-    if any(s in message_lower for s in _DIRECT_INSULTS_TO_AI):
+    if any(s in text for s in _DIRECT_INSULTS_TO_AI):
         return "direct_insult"
 
     # Dismissive language toward help
-    if any(s in message_lower for s in _DISMISSIVE_TOWARD_HELP):
+    if any(s in text for s in _DISMISSIVE_TOWARD_HELP):
         return "dismissive"
 
     # Rude commands / profanity
-    if any(s in message_lower for s in _RUDE_COMMANDS):
+    if any(s in text for s in _RUDE_COMMANDS):
         return "rude"
 
     return None  # No problematic behavior detected
