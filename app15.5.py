@@ -1542,128 +1542,127 @@ What would actually help you feel more engaged? Let's make this work for you. �
     return None
 
 # =============================================================================
-# ENHANCED CONVERSATION FLOW & ACTIVE TOPIC TRACKING
+# ENHANCED CONVERSATION FLOW & ACTIVE TOPIC TRACKING (polished, no behavior change)
 # =============================================================================
+from typing import List, Tuple, Dict, Any
+import uuid  # already imported earlier; harmless if present twice
+import streamlit as st
 
-def track_active_topics(messages):
-    """Track what topics are currently active vs past - FIXED memory leak"""
-    
-    # Limit processing to prevent memory bloat
+# Exact keywords preserved (order matters for user-facing topic lists)
+_ACTIVE_TOPIC_KEYWORDS: Tuple[str, ...] = ("chess", "math", "homework", "school", "friends")
+_PAST_TOPIC_KEYWORDS: Tuple[str, ...] = ("chess", "friends")
+
+
+def track_active_topics(messages: List[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
+    """Return (active_topics, past_topics) based on recent vs. earlier user messages.
+
+    Behavior preserved:
+      - Cap analysis to the last 50 messages (prevents memory bloat).
+      - "Active" topics come from the last 10 messages (≈ 5 exchanges), user messages only.
+      - "Past" topics come from messages before the last 10, user messages only.
+      - Topic keywords are limited to: chess, math, homework, school, friends (active);
+        and chess, friends (past) — identical to original logic.
+    """
+    if not isinstance(messages, list):
+        return [], []
+
+    # Limit processing to prevent memory bloat (same threshold)
     if len(messages) > 50:
         messages = messages[-50:]
-    
-    active_topics = []  # Topics from last 5 exchanges
-    past_topics = []    # Topics from earlier in conversation
-    
-    # Analyze last 10 messages (5 exchanges)
-    recent_messages = messages[-10:] if len(messages) > 10 else messages
-    
+
+    active_topics: List[str] = []
+    past_topics: List[str] = []
+
+    # Analyze last 10 messages (user messages only)
+    recent_messages = messages[-10:]
     for msg in recent_messages:
-        if msg['role'] == 'user':
-            content_lower = msg['content'].lower()
-            
-            # Extract topics mentioned
-            if 'chess' in content_lower and 'chess' not in active_topics:
-                active_topics.append('chess')
-            if 'math' in content_lower and 'math' not in active_topics:
-                active_topics.append('math')
-            if 'homework' in content_lower and 'homework' not in active_topics:
-                active_topics.append('homework')
-            if 'school' in content_lower and 'school' not in active_topics:
-                active_topics.append('school')
-            if 'friends' in content_lower and 'friends' not in active_topics:
-                active_topics.append('friends')
-    
-    # Topics from earlier (before last 5 exchanges)
+        if (msg or {}).get("role") == "user":
+            content_lower = str((msg or {}).get("content", "")).lower()
+            for kw in _ACTIVE_TOPIC_KEYWORDS:
+                if kw in content_lower and kw not in active_topics:
+                    active_topics.append(kw)
+
+    # Topics from earlier (before last 10 messages)
     if len(messages) > 10:
         older_messages = messages[:-10]
         for msg in older_messages:
-            if msg['role'] == 'user':
-                content_lower = msg['content'].lower()
-                if 'chess' in content_lower and 'chess' not in past_topics:
-                    past_topics.append('chess')
-                if 'friends' in content_lower and 'friends' not in past_topics:
-                    past_topics.append('friends')
-    
+            if (msg or {}).get("role") == "user":
+                content_lower = str((msg or {}).get("content", "")).lower()
+                for kw in _PAST_TOPIC_KEYWORDS:
+                    if kw in content_lower and kw not in past_topics:
+                        past_topics.append(kw)
+
     return active_topics, past_topics
 
-def is_appropriate_followup_time(topic, messages):
-    """Determine if it's appropriate to follow up on a topic"""
-    
-    # Check when topic was last mentioned
+
+def is_appropriate_followup_time(topic: str, messages: List[Dict[str, Any]]) -> bool:
+    """True if it's appropriate to follow up on a topic.
+
+    Behavior preserved:
+      - Find the last user mention of `topic` (substring match, case-insensitive).
+      - Count messages since that mention; divide by 2 to estimate exchanges.
+      - Follow up only if at least 10 exchanges have passed.
+    """
+    if not topic or not isinstance(messages, list):
+        return False
+
+    topic_l = topic.lower()
     last_mention_index = -1
+
+    # Search backward for last user mention of the topic
     for i in range(len(messages) - 1, -1, -1):
-        if messages[i]['role'] == 'user' and topic in messages[i]['content'].lower():
+        msg = messages[i] or {}
+        if msg.get("role") == "user" and topic_l in str(msg.get("content", "")).lower():
             last_mention_index = i
             break
-    
+
     if last_mention_index == -1:
         return False  # Topic never mentioned
-    
-    # Calculate exchanges since last mention
+
+    # Exchanges since last mention (same calculation as original)
     messages_since = len(messages) - last_mention_index
     exchanges_since = messages_since // 2
-    
-    # Only follow up if at least 10 exchanges have passed
     return exchanges_since >= 10
 
+
 # =============================================================================
-# ENHANCED SESSION STATE INITIALIZATION
+# ENHANCED SESSION STATE INITIALIZATION (polished, no behavior change)
 # =============================================================================
 
-def initialize_session_state():
-    """Comprehensive session state initialization to prevent KeyErrors"""
-    
+def initialize_session_state() -> None:
+    """Comprehensive session state initialization to prevent KeyErrors."""
     # Basic session state
-    if 'agreed_to_terms' not in st.session_state:
-        st.session_state.agreed_to_terms = False
-    if 'harmful_request_count' not in st.session_state:
-        st.session_state.harmful_request_count = 0
-    if 'safety_warnings_given' not in st.session_state:
-        st.session_state.safety_warnings_given = 0
-    if "last_offer" not in st.session_state:
-        st.session_state.last_offer = None
-    if "awaiting_response" not in st.session_state:
-        st.session_state.awaiting_response = False
+    st.session_state.setdefault("agreed_to_terms", False)
+    st.session_state.setdefault("harmful_request_count", 0)
+    st.session_state.setdefault("safety_warnings_given", 0)
+    st.session_state.setdefault("last_offer", None)
+    st.session_state.setdefault("awaiting_response", False)
 
     # Behavior tracking session state
-    if "behavior_strikes" not in st.session_state:
-        st.session_state.behavior_strikes = 0
-    if "last_behavior_type" not in st.session_state:
-        st.session_state.last_behavior_type = None
-    if "behavior_timeout" not in st.session_state:
-        st.session_state.behavior_timeout = False
+    st.session_state.setdefault("behavior_strikes", 0)
+    st.session_state.setdefault("last_behavior_type", None)
+    st.session_state.setdefault("behavior_timeout", False)
 
     # Family separation support
-    if "family_id" not in st.session_state:
-        st.session_state.family_id = str(uuid.uuid4())[:8]
-    if "student_profiles" not in st.session_state:
-        st.session_state.student_profiles = {}
+    st.session_state.setdefault("family_id", str(uuid.uuid4())[:8])
+    st.session_state.setdefault("student_profiles", {})
 
     # Core app state
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "interaction_count" not in st.session_state:
-        st.session_state.interaction_count = 0
-    if "emotional_support_count" not in st.session_state:
-        st.session_state.emotional_support_count = 0
-    if "organization_help_count" not in st.session_state:
-        st.session_state.organization_help_count = 0
-    if "math_problems_solved" not in st.session_state:
-        st.session_state.math_problems_solved = 0
-    if "student_name" not in st.session_state:
-        st.session_state.student_name = ""
-    if "conversation_summary" not in st.session_state:
-        st.session_state.conversation_summary = ""
-    if "memory_safe_mode" not in st.session_state:
-        st.session_state.memory_safe_mode = False
-    if "safety_interventions" not in st.session_state:
-        st.session_state.safety_interventions = 0
-    if "post_crisis_monitoring" not in st.session_state:
-        st.session_state.post_crisis_monitoring = False
+    st.session_state.setdefault("messages", [])
+    st.session_state.setdefault("interaction_count", 0)
+    st.session_state.setdefault("emotional_support_count", 0)
+    st.session_state.setdefault("organization_help_count", 0)
+    st.session_state.setdefault("math_problems_solved", 0)
+    st.session_state.setdefault("student_name", "")
+    st.session_state.setdefault("conversation_summary", "")
+    st.session_state.setdefault("memory_safe_mode", False)
+    st.session_state.setdefault("safety_interventions", 0)
+    st.session_state.setdefault("post_crisis_monitoring", False)
 
-# Initialize session state
+
+# Initialize session state (idempotent)
 initialize_session_state()
+
 
 # =============================================================================
 # 🧪 TEMPORARY TEST FUNCTION - Remove after testing
