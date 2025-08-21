@@ -216,7 +216,7 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
 
 
 # =============================================================================
-# CONFUSION PATTERNS FOR LEGITIMATE STUDENT CONFUSION
+# CONFUSION PATTERNS FOR LEGITIMATE STUDENT CONFUSION (with smart-quote fix)
 # =============================================================================
 
 from typing import Final, List, Pattern, Dict, Tuple, Optional
@@ -224,22 +224,25 @@ import re
 import streamlit as st
 
 # NOTE: relies on `normalize_message`, `detect_age_from_message_and_history`,
-# and `generate_age_adaptive_crisis_intervention` defined elsewhere in app.
+# and `generate_age_adaptive_crisis_intervention` defined elsewhere in the app.
+
+# Normalize common non-ASCII apostrophes to ASCII "'"
+_APOSTROPHE_RX: Final[Pattern[str]] = re.compile(r"[’‘‛`´′]")
 
 CONFUSION_PATTERNS: Final[List[Pattern[str]]] = [
-    # "i'm so confused" + common misspellings
+    # "i'm so confused" + common misspellings; tolerate smart/variant apostrophes
     re.compile(
-        r"\bi\s*(?:am|['']?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b",
+        r"\bi\s*(?:am|['’′`´]?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b",
         re.IGNORECASE,
     ),
-    # "i don't get/understand/follow"
-    re.compile(r"\b(?:i\s+)?don['']?t\s+(?:get|understand|follow)\b", re.IGNORECASE),
+    # "i don't get/understand/follow" (smart/variant apostrophes tolerated)
+    re.compile(r"\b(?:i\s+)?don['’′`´]?t\s+(?:get|understand|follow)\b", re.IGNORECASE),
     # "this/that/it makes no sense"
     re.compile(r"\b(?:this|that|it)\s+makes?\s+no\s+sense\b", re.IGNORECASE),
-    # "idk" or "i don't know"
-    re.compile(r"\b(?:idk|i\s+don['']?t\s+know)\b", re.IGNORECASE),
-    # "i'm lost/stuck"
-    re.compile(r"\bi\s*(?:am|['']?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
+    # "idk" or "i don't know" (smart/variant apostrophes tolerated)
+    re.compile(r"\b(?:idk|i\s+don['’′`´]?t\s+know)\b", re.IGNORECASE),
+    # "i'm lost/stuck" (smart/variant apostrophes tolerated)
+    re.compile(r"\bi\s*(?:am|['’′`´]?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
 ]
 
 IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
@@ -313,7 +316,6 @@ CRISIS_RESOURCES: Dict[str, Dict[str, str]] = {
 }
 
 # Enhanced response validator patterns
-# (Keep original case sensitivity exactly to avoid behavior changes.)
 FORBIDDEN_RESPONSE_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\bhow to hurt yourself\b"),
     re.compile(r"\bhow to kill yourself\b"),
@@ -356,8 +358,13 @@ _normalize_crisis_resources()
 # =============================================================================
 
 def detect_confusion(message: str) -> bool:
-    """Detect legitimate confusion expressions that should NOT trigger behavior strikes."""
-    normalized_msg = normalize_message(message)
+    """
+    Detect legitimate confusion expressions that should NOT trigger behavior strikes.
+    Smart/variant apostrophes are normalized before downstream processing.
+    """
+    # Normalize smart quotes locally (defensive in case upstream normalization differs)
+    pre = _APOSTROPHE_RX.sub("'", message or "")
+    normalized_msg = normalize_message(pre)
     return any(pattern.search(normalized_msg) for pattern in CONFUSION_PATTERNS)
 
 # =============================================================================
