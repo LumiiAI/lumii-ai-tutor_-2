@@ -56,6 +56,89 @@ def _make_ordinal(n: int) -> str:
         suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
 
+# =============================================================================
+# ACADEMIC-STRESS RESPONSE GUARDS — grade confidence + dev badge gating
+# =============================================================================
+from typing import Optional
+import re
+import streamlit as st
+
+# Reuses existing: GRADE_RX, _make_ordinal
+
+def _extract_explicit_grade_from_text(text: str) -> Optional[int]:
+    """Return grade number if explicitly mentioned in the current message (e.g., '7th grade')."""
+    try:
+        m = GRADE_RX.search(text or "")
+        if not m:
+            return None
+        grp = next((g for g in m.groups() if g), None)  # GRADE_RX has two capturing groups
+        return int(grp) if grp is not None else None
+    except Exception:
+        return None
+
+def _get_confirmed_grade_from_state() -> Optional[int]:
+    """
+    Return a previously confirmed grade from session state if available.
+    - st.session_state['student_grade_confirmed'] == True and ['student_grade'] is int
+    - or st.session_state['student_profile']['grade_level'] when grade_confirmed True (if present)
+    """
+    try:
+        if st.session_state.get("student_grade_confirmed") and isinstance(st.session_state.get("student_grade"), int):
+            return int(st.session_state["student_grade"])
+        prof = st.session_state.get("student_profile") or {}
+        if isinstance(prof, dict) and isinstance(prof.get("grade_level"), int):
+            if prof.get("grade_confirmed", True):
+                return int(prof["grade_level"])
+    except Exception:
+        pass
+    return None
+
+def _grade_is_confident(message: str) -> Optional[int]:
+    """
+    Confidence policy:
+      1) If the user explicitly says a grade in THIS message → use it.
+      2) Else if we have a previously CONFIRMED grade in session/profile → use it.
+      3) Otherwise → don't guess.
+    """
+    explicit = _extract_explicit_grade_from_text(message)
+    if explicit is not None:
+        return explicit
+    return _get_confirmed_grade_from_state()
+
+def build_grade_prefix(message: str) -> str:
+    """Return '7th grade, wow! ' only when grade is confident; otherwise return ''."""
+    g = _grade_is_confident(message)
+    if g is None:
+        return ""
+    try:
+        return f"{_make_ordinal(g)} grade, wow! "
+    except Exception:
+        return ""  # if anything odd, omit instead of guessing
+
+def _is_true_like(val: str) -> bool:
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+def should_show_user_memory_badge() -> bool:
+    """
+    Show 🌟 Lumii's Learning Support🧠 With Memory ONLY when explicitly allowed:
+      - st.secrets['SHOW_MEMORY_BADGE_TO_USERS'] == true
+      - or st.session_state['ui_dev_mode'] == True (dev/testing)
+    Defaults to False (hide for students/parents).
+    """
+    try:
+        if _is_true_like(st.secrets.get("SHOW_MEMORY_BADGE_TO_USERS", "false")):
+            return True
+    except Exception:
+        pass
+    return bool(st.session_state.get("ui_dev_mode", False))
+
+def append_memory_badge_if_allowed(text: str) -> str:
+    """Append the badge only if allowed. Does not change your normal copy."""
+    if should_show_user_memory_badge():
+        return text + "\n🌟 Lumii's Learning Support🧠 With Memory"
+    return text
+
+
 
 # Ensure session keys exist once per session
 st.session_state.setdefault("locked_after_crisis", False)
