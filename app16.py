@@ -1461,6 +1461,10 @@ import re
 import re
 from typing import Final, Tuple
 
+# --- paste this in (replace your whole block), keep your other constants/lists as-is ---
+import re
+from typing import Final, Tuple
+
 # Academic context guard
 _ACADEMIC_INDICATORS: Final[Tuple[str, ...]] = (
     "math","algebra","geometry","calculus","arithmetic",
@@ -1473,7 +1477,7 @@ _ACADEMIC_INDICATORS: Final[Tuple[str, ...]] = (
 def is_academic_context(text: str) -> bool:
     return any(w in text for w in _ACADEMIC_INDICATORS)
 
-# Rude / profanity regex (no substring false-positives)
+# Rude / profanity regex (no substring false-positives like "fun"/"future")
 _RUDE_RX = [
     re.compile(r"\bshut\s*up\b", re.IGNORECASE),
     re.compile(r"\bstop\s+talking\b", re.IGNORECASE),
@@ -1485,15 +1489,15 @@ _RUDE_RX = [
     re.compile(r"\bstop\s+talking\s+to\s+me\b", re.IGNORECASE),
     re.compile(r"\bleave\s+me\s+alone\s+now\b", re.IGNORECASE),
 
-    # profanity variants (won't match "fun", "future", etc.)
-    re.compile(r"\bfuck\W*you\b", re.IGNORECASE),
-    re.compile(r"\bfuck\W*u\b", re.IGNORECASE),
-    re.compile(r"\bf\W*u\b", re.IGNORECASE),          # "f u", "f-u", "f***u"
+    # profanity variants
+    re.compile(r"\bfuck\W*you\b", re.IGNORECASE),     # "fuck you", "fuck-you", "fuckyou"
+    re.compile(r"\bfuck\W*u\b", re.IGNORECASE),       # "fuck u", "fuck-u"
+    re.compile(r"\bf\W*u\b", re.IGNORECASE),          # "f u", "f-u", "f***u" (but NOT "fun")
     re.compile(r"\bf\W*\*+\W*you\b", re.IGNORECASE),  # "f*** you"
     re.compile(r"\bstfu\b", re.IGNORECASE),
 ]
 
-# Commands that should still trigger even in academic context
+# Commands that still trigger even in academic context
 _HARSH_COMMANDS_RX = [
     re.compile(r"\bshut\s*up\b", re.IGNORECASE),
     re.compile(r"\bstop\s+talking\b", re.IGNORECASE),
@@ -1508,7 +1512,7 @@ def detect_problematic_behavior(message: str) -> Optional[str]:
 
     text = normalize_message(message or "").lower().strip()
 
-    # existing bypasses
+    # existing bypasses you already have
     if any(s in text for s in _SELF_CRITICISM_PATTERNS):
         return None
     if any(s in text for s in _CONTENT_CRITICISM_PATTERNS):
@@ -1530,6 +1534,7 @@ def detect_problematic_behavior(message: str) -> Optional[str]:
         return "rude"
 
     return None
+
 
 
     # Normalize smart quotes / whitespace, then lowercase
