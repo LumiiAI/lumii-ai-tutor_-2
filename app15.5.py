@@ -157,20 +157,38 @@ _CONFUSION_TYPO_MAP: Final[List[Pattern[str]]] = [
 
 
 def normalize_message(message: str) -> str:
-    """
-    Normalize a user message for robust pattern matching.
-    - Trims whitespace
-    - Normalizes "im" -> "i'm"
-    - Fixes common 'confused' typos
-    """
-    msg = message.strip()
+    """Normalize message for better pattern matching (smart quotes, typos, spacing)."""
+    # Defensive: coerce to string, strip outer space
+    msg = str(message).strip()
 
-    # Normalize "im" -> "i'm" (keeps other casing intact due to IGNORECASE)
+    # --- Normalize Unicode punctuation to ASCII equivalents ---
+    # Curly quotes/apostrophes and dashes commonly used on phones
+    trans_table = str.maketrans({
+        "’": "'",  # right single quote
+        "‘": "'",  # left single quote
+        "ʼ": "'",  # modifier letter apostrophe
+        "‛": "'",  # reversed single quote
+        "“": '"',  # left double quote
+        "”": '"',  # right double quote
+        "–": "-",  # en dash
+        "—": "-",  # em dash
+        "…": "...",  # ellipsis
+        "\u00A0": " ",  # non-breaking space
+    })
+    msg = msg.translate(trans_table)
+
+    # Contractions + common variants
+    # e.g., "im" -> "i'm" (helps some detectors), keep case-insensitive
     msg = re.sub(r"\bim\b", "i'm", msg, flags=re.IGNORECASE)
 
-    # Normalize common confusion typos
-    for rx in _CONFUSION_TYPO_MAP:
-        msg = rx.sub("confused", msg)
+    # Confusion typos (common in K-12)
+    msg = re.sub(r"\bcofused\b", "confused", msg, flags=re.IGNORECASE)
+    msg = re.sub(r"\bconfusd\b", "confused", msg, flags=re.IGNORECASE)
+    msg = re.sub(r"\bconufsed\b", "confused", msg, flags=re.IGNORECASE)
+    msg = re.sub(r"\bcnofused\b", "confused", msg, flags=re.IGNORECASE)
+
+    # Collapse excessive whitespace
+    msg = re.sub(r"\s+", " ", msg).strip()
 
     return msg
 
@@ -1251,9 +1269,12 @@ _SUBSTANCE_LEGAL_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\blawyer\b"),
     re.compile(r"\bcourt\b"),
     re.compile(r"\bsmoke\b"),
-    re.compile(r"\bvaping\b"),
+    re.compile(r"\bvap(?:e|es|ing)\b"),          # NEW: matches vape / vapes / vaping
+    re.compile(r"\be-?cig(?:arette)?s?\b"),      # NEW: e-cig, e-cigs, e-cigarette(s)
+    re.compile(r"\bjuul\b"),                     # NEW: common brand mention
     re.compile(r"\bweed\b"),
 ]
+
 
 # Life decisions beyond school
 _LIFE_DECISIONS_PATTERNS: Final[List[Pattern[str]]] = [
