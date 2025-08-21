@@ -1417,6 +1417,23 @@ _CONTENT_CRITICISM_PATTERNS: Final[Tuple[str, ...]] = (
     "this strategy sucks", "that plan is dumb", "this way is stupid",
 )
 
+# --- Whitelist: academic frustration is NOT misbehavior ---
+# e.g., "math is stupid", "I hate math", "homework sucks" → allow; no strike.
+_ACADEMIC_FRUSTRATION_RXS: Final[Tuple[re.Pattern[str], ...]] = (
+    re.compile(
+        r"\b(?:math|algebra|geometry|calculus|trig(?:onometry)?|statistics|science|physics|chemistry|biology|school|class(?:es)?|homework|stud(?:y|ies))\s+is\s+(?:stupid|dumb|boring|lame|pointless|useless|hard|annoying|confusing)\b",
+        flags=re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:hate|dislike)\s+(?:math|algebra|geometry|calculus|trig(?:onometry)?|statistics|science|physics|chemistry|biology|school|class(?:es)?|homework|this\s+(?:class|subject|topic))\b",
+        flags=re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:math|school|homework)\s+sucks\b",
+        flags=re.IGNORECASE,
+    ),
+)
+
 _DIRECT_INSULTS_TO_AI: Final[Tuple[str, ...]] = (
     "you are stupid", "you are dumb", "you are an idiot", "you are useless",
     "you suck", "you are terrible", "you are worthless", "you are bad",
@@ -1450,8 +1467,14 @@ def detect_problematic_behavior(message: str) -> Optional[str]:
     if detect_confusion(message):
         return None
 
-    # Normalize smart quotes etc. so "you’re dumb" matches "you're dumb"
+    # Normalize smart quotes / whitespace, then lowercase
     text = normalize_message(message or "").lower().strip()
+
+    # --- Whitelist: subject frustration is NOT misbehavior ---
+    # e.g., "math is stupid", "I hate math", "homework sucks" → allow; no strike.
+    for rx in _ACADEMIC_FRUSTRATION_RXS:
+        if rx.search(text):
+            return None
 
     # Self-criticism / content criticism are NOT problematic behavior
     if any(s in text for s in _SELF_CRITICISM_PATTERNS):
