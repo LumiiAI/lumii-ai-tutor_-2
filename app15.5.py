@@ -944,47 +944,118 @@ This conversation is ending for your safety. Please get help now."""
 # FAMILY REFERRAL TOPICS DETECTION (UNIFIED SEXUAL HEALTH & IDENTITY)
 # =============================================================================
 
-def detect_family_referral_topics(message):
+from typing import Final, List, Pattern, Optional
+import re
+
+# NOTE: This snippet relies on helpers/constants defined elsewhere in your app:
+# - normalize_message(message: str) -> str
+# - ENHANCED_CRISIS_PATTERNS: List[Pattern[str]]
+# - has_explicit_crisis_language(message: str) -> bool
+
+# =============================================================================
+# Precompiled patterns (perf/readability; behavior unchanged)
+# =============================================================================
+
+# Sexual health / puberty / identity (precise tokens with word boundaries)
+_SENSITIVE_REGEXES: Final[List[Pattern[str]]] = [
+    # Sexual health / reproduction / puberty
+    re.compile(r"\bsex\b", re.IGNORECASE),
+    re.compile(r"\bsex\-linked\b", re.IGNORECASE),
+    re.compile(r"\bsexual\b", re.IGNORECASE),
+    re.compile(r"\breproduction\b", re.IGNORECASE),
+    re.compile(r"\breproductive\b", re.IGNORECASE),
+    re.compile(r"\bpregnancy\b", re.IGNORECASE),
+    re.compile(r"\bbirth\s+control\b", re.IGNORECASE),
+    re.compile(r"\bcontraception\b", re.IGNORECASE),
+    re.compile(r"\bmenstruation\b", re.IGNORECASE),
+    re.compile(r"\bperiods?\b", re.IGNORECASE),
+    re.compile(r"\bmenstrual\s+cycle\b", re.IGNORECASE),
+    re.compile(r"\bmenstrual\b", re.IGNORECASE),
+    re.compile(r"\b(?:menstrual|period)\s+cycle\b", re.IGNORECASE),
+    re.compile(r"\bpms\b", re.IGNORECASE),
+    re.compile(r"\bperiod\s+cramps?\b", re.IGNORECASE),
+    re.compile(r"\bdysmenorrhea\b", re.IGNORECASE),
+    re.compile(r"\bpuberty\b", re.IGNORECASE),
+    re.compile(r"\bmasturbation\b", re.IGNORECASE),
+    re.compile(r"\berection\b", re.IGNORECASE),
+    re.compile(r"\bvagina\b", re.IGNORECASE),
+    re.compile(r"\bpenis\b", re.IGNORECASE),
+    re.compile(r"\bbreast\s+development\b", re.IGNORECASE),
+    re.compile(r"\bwet\s+dreams\b", re.IGNORECASE),
+    re.compile(r"\bbody\s+changes\s+during\s+puberty\b", re.IGNORECASE),
+    re.compile(r"\bhormones?\s+and\s+puberty\b", re.IGNORECASE),
+    re.compile(r"\bsti\b", re.IGNORECASE),
+    re.compile(r"\bstd\b", re.IGNORECASE),
+    re.compile(r"\bcondom\b", re.IGNORECASE),
+    re.compile(r"\bplan\s*b\b", re.IGNORECASE),
+    re.compile(r"\bmorning\-after\b", re.IGNORECASE),
+    re.compile(r"\bfertilization\b", re.IGNORECASE),
+    re.compile(r"\bovulation\b", re.IGNORECASE),
+    re.compile(r"\bsemen\b", re.IGNORECASE),
+    re.compile(r"\bsperm\b", re.IGNORECASE),
+    re.compile(r"\bejacu(?:late|lation)\b", re.IGNORECASE),
+    re.compile(r"\bintercourse\b", re.IGNORECASE),
+
+    # Identity / orientation / gender
+    re.compile(r"\bgay\b", re.IGNORECASE),
+    re.compile(r"\blesbian\b", re.IGNORECASE),
+    re.compile(r"\bbisexual\b", re.IGNORECASE),
+    re.compile(r"\btransgender\b", re.IGNORECASE),
+    re.compile(r"\blgbtq\b", re.IGNORECASE),
+    re.compile(r"\bgender\s+identity\b", re.IGNORECASE),
+    re.compile(r"\bsexual\s+orientation\b", re.IGNORECASE),
+    re.compile(r"\bcoming\s+out\b", re.IGNORECASE),
+    re.compile(r"\bam\s+i\s+gay\b", re.IGNORECASE),
+    re.compile(r"\bam\s+i\s+trans\b", re.IGNORECASE),
+    re.compile(r"\bgender\s+dysphoria\b", re.IGNORECASE),
+    re.compile(r"\bnon\-binary\b", re.IGNORECASE),
+    re.compile(r"\bqueer\b", re.IGNORECASE),
+    re.compile(r"\bquestioning\s+sexuality\b", re.IGNORECASE),
+    re.compile(r"\bquestioning\s+gender\b", re.IGNORECASE),
+]
+
+# Identity context helpers
+_IDENTITY_SHARING_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bi\s+am\s+(gay|lesbian|bi|trans|queer|non-binary)\b"),
+    re.compile(r"\bi'm\s+(gay|lesbian|bi|trans|queer|non-binary)\b"),
+    re.compile(r"\bi\s+think\s+i'm\s+(gay|lesbian|bi|trans|queer)\b"),
+    re.compile(r"\bi\s+know\s+i'm\s+(gay|lesbian|bi|trans|queer)\b"),
+]
+
+_IDENTITY_QUESTIONING_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bam\s+i\s+(gay|lesbian|bi|trans|queer)\b"),
+    re.compile(r"\bhow\s+do\s+i\s+know\s+if\s+i'm\b"),
+    re.compile(r"\bwhat\s+if\s+i'm\s+(gay|lesbian|bi|trans)\b"),
+    re.compile(r"\bmight\s+i\s+be\s+(gay|lesbian|bi|trans)\b"),
+]
+
+# =============================================================================
+# Family referral topic detection
+# =============================================================================
+
+def detect_family_referral_topics(message: str) -> bool:
     """
     Conservative (beta) detector for sensitive topics.
     HARD RULE: never trigger family referral if any crisis language is present.
     Uses word boundaries so 'sex' doesn't match inside 'existing'.
     Includes menstrual-cycle variants to catch academic phrasing.
+
+    Returns:
+        True if the message matches sensitive topics (and no crisis is detected),
+        otherwise False.
     """
-    m = normalize_message(message).lower()
+    m = normalize_message(message or "").lower()
 
     # 🔒 Crisis shield (never override crisis)
     if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS):
         return False
 
-    # Sexual health / puberty / identity (precise tokens with word boundaries)
-    sensitive_regexes = [
-        # Sexual health / reproduction / puberty
-        r"\bsex\b", r"\bsex\-linked\b", r"\bsexual\b", r"\breproduction\b", r"\breproductive\b",
-        r"\bpregnancy\b", r"\bbirth\s+control\b", r"\bcontraception\b",
-        r"\bmenstruation\b", r"\bperiods?\b",
-        r"\bmenstrual\s+cycle\b", r"\bmenstrual\b", r"\b(?:menstrual|period)\s+cycle\b",
-        r"\bpms\b", r"\bperiod\s+cramps?\b", r"\bdysmenorrhea\b",
-        r"\bpuberty\b", r"\bmasturbation\b", r"\berection\b",
-        r"\bvagina\b", r"\bpenis\b", r"\bbreast\s+development\b", r"\bwet\s+dreams\b",
-        r"\bbody\s+changes\s+during\s+puberty\b", r"\bhormones?\s+and\s+puberty\b",
-        r"\bsti\b", r"\bstd\b", r"\bcondom\b", r"\bplan\s*b\b", r"\bmorning\-after\b",
-        r"\bfertilization\b", r"\bovulation\b", r"\bsemen\b", r"\bsperm\b",
-        r"\bejacu(?:late|lation)\b", r"\bintercourse\b",
+    # Sexual health / puberty / identity (precompiled patterns)
+    return any(rx.search(m) for rx in _SENSITIVE_REGEXES)
 
-        # Identity / orientation / gender
-        r"\bgay\b", r"\blesbian\b", r"\bbisexual\b", r"\btransgender\b", r"\blgbtq\b",
-        r"\bgender\s+identity\b", r"\bsexual\s+orientation\b", r"\bcoming\s+out\b",
-        r"\bam\s+i\s+gay\b", r"\bam\s+i\s+trans\b", r"\bgender\s+dysphoria\b",
-        r"\bnon\-binary\b", r"\bqueer\b", r"\bquestioning\s+sexuality\b", r"\bquestioning\s+gender\b",
-    ]
-
-    # Use the already-imported re module
-    return any(re.search(rx, m, re.IGNORECASE) for rx in sensitive_regexes)
-
-def generate_family_referral_response(student_age, student_name=""):
+def generate_family_referral_response(student_age: int, student_name: str = "") -> str:
     """Conservative (beta) family referral message.
-    
+
     Beta policy: Lumii does not discuss personal/sensitive topics. We direct
     students to families or trusted adults for age-appropriate guidance.
     Age is not used in messaging during beta.
@@ -1025,42 +1096,31 @@ def generate_family_referral_response(student_age, student_name=""):
             "I'm here to help with schoolwork and studying — what subject should we work on next? 📚"
         )
 
-def detect_identity_context(message):
-    """Detect whether this is sharing identity vs questioning identity"""
-    import re
-    message_lower = message.lower().strip()
-    
-    # Identity sharing patterns (statements)
-    sharing_patterns = [
-        r"\bi\s+am\s+(gay|lesbian|bi|trans|queer|non-binary)\b",
-        r"\bi'm\s+(gay|lesbian|bi|trans|queer|non-binary)\b", 
-        r"\bi\s+think\s+i'm\s+(gay|lesbian|bi|trans|queer)\b",
-        r"\bi\s+know\s+i'm\s+(gay|lesbian|bi|trans|queer)\b",
-    ]
-    
-    # Identity questioning patterns (questions)
-    questioning_patterns = [
-        r"\bam\s+i\s+(gay|lesbian|bi|trans|queer)\b",
-        r"\bhow\s+do\s+i\s+know\s+if\s+i'm\b",
-        r"\bwhat\s+if\s+i'm\s+(gay|lesbian|bi|trans)\b",
-        r"\bmight\s+i\s+be\s+(gay|lesbian|bi|trans)\b",
-    ]
-    
-    # Check for sharing vs questioning
-    is_sharing = any(re.search(pattern, message_lower) for pattern in sharing_patterns)
-    is_questioning = any(re.search(pattern, message_lower) for pattern in questioning_patterns)
-    
+# =============================================================================
+# Identity context detection & messaging
+# =============================================================================
+
+def detect_identity_context(message: str) -> Optional[str]:
+    """Detect whether this is sharing identity vs questioning identity.
+
+    Returns:
+        "identity_sharing" | "identity_questioning" | None
+    """
+    message_lower = (message or "").lower().strip()
+
+    is_sharing = any(rx.search(message_lower) for rx in _IDENTITY_SHARING_PATTERNS)
+    is_questioning = any(rx.search(message_lower) for rx in _IDENTITY_QUESTIONING_PATTERNS)
+
     if is_sharing:
         return "identity_sharing"
-    elif is_questioning:
+    if is_questioning:
         return "identity_questioning"
-    
     return None
 
-def generate_identity_response(context_type, student_age, student_name=""):
-    """Parent-friendly approach: Brief care + immediate adult referral"""
+def generate_identity_response(context_type: str, student_age: int, student_name: str = "") -> Optional[str]:
+    """Parent-friendly approach: Brief care + immediate adult referral."""
     name_part = f"{student_name}, " if student_name else ""
-    
+
     if context_type == "identity_sharing":
         # Response for "I'm gay" - brief acknowledgment + immediate parent/counselor referral
         if student_age <= 11:
@@ -1074,7 +1134,6 @@ These are special personal topics that are best discussed with the people who ca
 They can give you the kind of personal support and guidance I can't provide.
 
 I'm here to help you with schoolwork and learning! What subject would you like to explore? 😊"""
-        
         elif student_age <= 14:
             return f"""💙 {name_part}Thank you for sharing something personal with me.
 
@@ -1086,7 +1145,6 @@ Personal identity topics like this are important conversations to have with:
 They can provide the ongoing personal support and guidance that these topics deserve.
 
 I'm here to help with your academic learning! What subject can we work on together? 📚"""
-        
         else:  # High School
             return f"""💙 {name_part}Thank you for sharing something significant with me.
 
@@ -1098,7 +1156,7 @@ Personal identity topics are important conversations to have with:
 They can provide the personalized guidance and support that these conversations deserve.
 
 I'm here to help with your academic goals and learning! What subject would you like to focus on? 😊"""
-    
+
     elif context_type == "identity_questioning":
         # Response for "Am I gay?" - gentle validation + strong adult referral
         if student_age <= 11:
@@ -1112,7 +1170,6 @@ Questions about yourself are best discussed with the grown-ups who care about yo
 They can give you the kind of personal conversation and support I can't provide.
 
 I'm great at helping with homework and school subjects! What would you like to learn about? 😊"""
-        
         elif student_age <= 14:
             return f"""💙 {name_part}That's a thoughtful personal question.
 
@@ -1124,7 +1181,6 @@ Personal questions like this are best discussed with:
 They can give you the kind of personal guidance that these important questions deserve.
 
 I'm here to help with schoolwork and studying! What academic subject can we work on? 📖"""
-        
         else:  # High School
             return f"""💙 {name_part}That's an important personal question.
 
@@ -1136,8 +1192,9 @@ For personal questions about identity, the best people to talk with are:
 They can offer the personalized conversation that these questions deserve.
 
 I'm excellent at helping with academic subjects and study strategies! What can I help you with today? 😊"""
-    
+
     return None
+
 
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED)
