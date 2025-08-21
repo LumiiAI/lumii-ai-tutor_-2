@@ -346,6 +346,22 @@ CONFUSION_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\bi\s*(?:am|['’′`´]?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
 ]
 
+# Apology patterns (higher priority than confusion so apologies don't trigger confusion flow)
+APOLOGY_PATTERNS: Final[List[Pattern[str]]] = [
+    # "i'm sorry" / "i am sorry" — tolerate smart/variant apostrophes and spacing
+    re.compile(r"\b(?:i\s*am|i['’′`´]?\s*m)\s+sorry\b", re.IGNORECASE),
+    re.compile(r"\bsorry\b", re.IGNORECASE),              # broad catch
+    re.compile(r"\bmy\s+bad\b", re.IGNORECASE),
+    re.compile(r"\bapologiz(?:e|ing|ed)\b", re.IGNORECASE),
+    re.compile(r"\bi\s+didn['’′`´]?t\s+mean\s+to\b", re.IGNORECASE),
+]
+
+def is_apology(message: str) -> bool:
+    """True if the message is an apology (uses same normalization as confusion)."""
+    m = normalize_message(message or "")
+    return any(p.search(m) for p in APOLOGY_PATTERNS)
+
+
 IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
     # Direct + time-bound
     re.compile(
@@ -459,14 +475,15 @@ _normalize_crisis_resources()
 # =============================================================================
 
 def detect_confusion(message: str) -> bool:
+    """Detect legitimate confusion expressions that should NOT trigger behavior strikes.
+    Apologies take priority and should NOT be treated as confusion.
     """
-    Detect legitimate confusion expressions that should NOT trigger behavior strikes.
-    Smart/variant apostrophes are normalized before downstream processing.
-    """
-    # Normalize smart quotes locally (defensive in case upstream normalization differs)
-    pre = _APOSTROPHE_RX.sub("'", message or "")
-    normalized_msg = normalize_message(pre)
+    normalized_msg = normalize_message(message or "")
+    # If the user is apologizing, do not route to confusion flow
+    if is_apology(normalized_msg):
+        return False
     return any(pattern.search(normalized_msg) for pattern in CONFUSION_PATTERNS)
+
 
 # =============================================================================
 # GLOBAL CRISIS GUARD - RUNS FIRST ON EVERY MESSAGE (NEW)
