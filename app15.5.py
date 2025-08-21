@@ -2444,7 +2444,7 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
 
     # 0a) 🎓 Academic "disappear/vanish ... from/in ... class/school" bypass (implicit only)
     if ACADEMIC_DISAPPEAR_RX.search(message_lower):
-        return 'emotional', 'lumii_main', 'academic_disappear'
+        return 'emotional', 'felicity', 'academic_disappear'
 
     # 0b) Implicit crisis patterns (AFTER academic bypass)
     if any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
