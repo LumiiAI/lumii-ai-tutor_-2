@@ -1665,30 +1665,6 @@ initialize_session_state()
 
 
 # =============================================================================
-# 🧪 TEMPORARY TEST FUNCTION - Remove after testing
-# =============================================================================
-
-def test_confusion_detection():
-    """Test that confusion detection works correctly"""
-    test_cases = [
-        "im so cofused",
-        "i'm so confused", 
-        "i dont get it",
-        "this makes no sense",
-        "idk",
-        "i'm lost"
-    ]
-    
-    print("🧪 Testing confusion detection:")
-    for test in test_cases:
-        is_confused = detect_confusion(test)
-        priority, tool, trigger = detect_priority_smart_with_safety(test)
-        print(f"'{test}' → Confused: {is_confused}, Priority: {priority}")
-
-# Uncomment to test:
-# test_confusion_detection()
-
-# =============================================================================
 # PRIVACY DISCLAIMER POPUP - LAUNCH REQUIREMENT
 # =============================================================================
 
