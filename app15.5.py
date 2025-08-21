@@ -3185,17 +3185,11 @@ else:
         
                     # --- Greeting injection: first safe reply uses detected GRADE (fallback to age→grade) ---
                     if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
-                        detected_grade = st.session_state.get("student_grade")
-                        grade_for_greeting = None
-                        if detected_grade is not None:
-                            try:
-                                grade_for_greeting = int(detected_grade)
-                            except Exception:
-                                grade_for_greeting = None
-                        if grade_for_greeting is None:
-                            _age_val = st.session_state.get("student_age", (student_age if ("student_age" in locals() and student_age) else 12))
-                            grade_for_greeting = age_to_grade(int(_age_val))
-                        response = f"{_make_ordinal(grade_for_greeting)} grade, wow! " + response
+                        # Use the guarded helper so we ONLY show a grade when it's explicit in this message
+                        # or previously confirmed in session/profile (no age→grade guessing).
+                        prefix = build_grade_prefix(prompt)
+                        if prefix:
+                            response = f"{prefix}{response}"
         
                     # --- Non-crisis path continues normally ---
                     # Check for duplicates and add variation if needed
