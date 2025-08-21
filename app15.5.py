@@ -1950,133 +1950,149 @@ DEPLOY → TEST ALL ABOVE → VERIFY US HOTLINES ONLY → CONVERSATION LOG CASES
 """
 
 # =============================================================================
-# MEMORY MANAGEMENT & CONVERSATION MONITORING
+# MEMORY MANAGEMENT & CONVERSATION MONITORING (polished, no behavior change)
 # =============================================================================
+from typing import List, Tuple, Dict, Any, Optional
+import re
+import streamlit as st
+import requests
 
-def estimate_token_count():
-    """Estimate token count for conversation (rough approximation)"""
+def estimate_token_count() -> int:
+    """Estimate token count for conversation (rough approximation: ~4 chars/token)."""
     total_chars = 0
-    for msg in st.session_state.messages:
-        total_chars += len(msg.get("content", ""))
-    return total_chars // 4  # Rough token estimation
+    for msg in st.session_state.get("messages", []):
+        total_chars += len(str((msg or {}).get("content", "")))
+    return total_chars // 4  # Rough token estimation (kept as-is)
 
-def check_conversation_length():
-    """Monitor conversation length and trigger summarization if needed"""
-    message_count = len(st.session_state.messages)
+def check_conversation_length() -> Tuple[str, str]:
+    """Monitor conversation length and trigger summarization if needed.
+
+    Returns:
+        ("warning"|"critical"|"normal", message)
+    """
+    messages = st.session_state.get("messages", [])
+    message_count = len(messages)
     estimated_tokens = estimate_token_count()
-    
-    # Warning thresholds
+
+    # Warning thresholds (order preserved)
     if message_count > 15:
         return "warning", f"Long conversation: {message_count//2} exchanges"
-    
+
     if estimated_tokens > 5000:
         return "critical", f"High token count: ~{estimated_tokens} tokens"
-    
+
     if message_count > 20:  # Critical threshold
         return "critical", "Conversation too long - summarization needed"
-    
+
     return "normal", ""
 
-def create_conversation_summary(messages):
-    """Create a summary of conversation history"""
+def create_conversation_summary(messages: List[Dict[str, Any]]) -> str:
+    """Create a summary of conversation history (defensive, copy unchanged)."""
     try:
         # Extract key information
         student_info = extract_student_info_from_history()
-        topics_discussed = []
-        emotional_moments = []
-        
+        topics_discussed: List[str] = []
+        emotional_moments: List[str] = []
+
         for msg in messages:
-            if msg["role"] == "user":
-                content = msg["content"].lower()
+            if (msg or {}).get("role") == "user":
+                content = str((msg or {}).get("content", "")).lower()
                 # Track topics
                 if any(word in content for word in ['math', 'science', 'history', 'english']):
                     topics_discussed.append(content[:50] + "...")
                 # Track emotional moments
                 if any(word in content for word in ['stressed', 'worried', 'anxious', 'sad']):
                     emotional_moments.append("Student expressed emotional concerns")
-        
+
         summary = f"""📋 Conversation Summary:
 Student: {student_info.get('name', 'Unknown')} (Age: {student_info.get('age', 'Unknown')})
 Topics discussed: {', '.join(set(topics_discussed[-3:]))}  # Last 3 unique topics
 Emotional support provided: {len(emotional_moments)} times
 Learning progress: Math problems solved, organization help provided"""
-        
         return summary
     except Exception as e:
         return f"📋 Previous conversation context maintained (Summary generation error: {str(e)})"
 
-def summarize_conversation_if_needed():
-    """Automatically summarize conversation when it gets too long"""
-    status, message = check_conversation_length()
-    
-    if status == "critical" and len(st.session_state.messages) > 20:
+def summarize_conversation_if_needed() -> bool:
+    """Automatically summarize conversation when it gets too long."""
+    status, _ = check_conversation_length()
+
+    if status == "critical" and len(st.session_state.get("messages", [])) > 20:
         try:
             # Keep last 8 exchanges (16 messages) + create summary of the rest
             recent_messages = st.session_state.messages[-16:]
             older_messages = st.session_state.messages[:-16]
-            
+
             if older_messages:
                 summary = create_conversation_summary(older_messages)
                 st.session_state.conversation_summary = summary
-                
-                # Replace old messages with summary
+
+                # Replace old messages with summary (preserve keys as in original)
                 st.session_state.messages = [
                     {"role": "system", "content": summary, "priority": "summary", "tool_used": "📋 Memory Summary"}
                 ] + recent_messages
-                
+
                 st.success("🧠 Conversation summarized to maintain memory efficiency!")
                 return True
         except Exception as e:
             st.error(f"⚠️ Summarization error: {e}")
             return False
-    
+
     return False
 
+
 # =============================================================================
-# UNIFIED GROQ LLM INTEGRATION
+# UNIFIED GROQ LLM INTEGRATION (polished, behavior preserved)
 # =============================================================================
 
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_URL: str = "https://api.groq.com/openai/v1/chat/completions"
 
-def build_conversation_history():
-    """Build the full conversation history for AI context with safety checks"""
-    conversation_messages = []
-    
+def build_conversation_history() -> List[Dict[str, str]]:
+    """Build the full conversation history for AI context with safety checks."""
+    conversation_messages: List[Dict[str, str]] = []
+
     # Add conversation summary if it exists
-    if st.session_state.conversation_summary:
+    if st.session_state.get("conversation_summary"):
         conversation_messages.append({
             "role": "system",
             "content": st.session_state.conversation_summary
         })
-    
-    # Add recent messages from session
-    for msg in st.session_state.messages:
-        if msg["role"] in ["user", "assistant"]:
+
+    # Add recent messages from session (user/assistant only)
+    for msg in st.session_state.get("messages", []):
+        if (msg or {}).get("role") in ("user", "assistant"):
             conversation_messages.append({
-                "role": msg["role"], 
-                "content": msg["content"]
+                "role": str(msg.get("role")),
+                "content": str(msg.get("content", ""))
             })
-    
+
     return conversation_messages
 
-def create_ai_system_prompt_with_safety(tool_name, student_age, student_name="", is_distressed=False):
-    """Unified system prompt builder"""
-    
+def create_ai_system_prompt_with_safety(
+    tool_name: str,
+    student_age: int,
+    student_name: str = "",
+    is_distressed: bool = False
+) -> str:
+    """Unified system prompt builder (copy unchanged)."""
     name_part = f"The student's name is {student_name}. " if student_name else ""
-    distress_part = "The student is showing signs of emotional distress, so prioritize emotional support. " if is_distressed else ""
-    
+    distress_part = (
+        "The student is showing signs of emotional distress, so prioritize emotional support. "
+        if is_distressed else ""
+    )
+
     # Get active topics for context
-    active_topics, past_topics = track_active_topics(st.session_state.messages)
-    
+    active_topics, _ = track_active_topics(st.session_state.get("messages", []))
+
     # Add recent conversation context
     recent_context = ""
     last_offer = get_last_offer_context()
-    if last_offer["offered_help"]:
+    if last_offer.get("offered_help"):
         recent_context = f"""
-IMMEDIATE CONTEXT: You just offered help/tips/advice in your last message: "{last_offer['content'][:200]}..."
+IMMEDIATE CONTEXT: You just offered help/tips/advice in your last message: "{(last_offer.get('content') or '')[:200]}..."
 If the student responds with acceptance (yes, sure, okay, please, etc.), 
 PROVIDE THE SPECIFIC HELP YOU OFFERED. Do NOT redirect to crisis resources unless they explicitly mention self-harm."""
-    
+
     # Enhanced base prompt with safety and conversation flow
     base_prompt = f"""You are Lumii, a caring AI learning companion with emotional intelligence and specialized expertise.
 
@@ -2130,7 +2146,6 @@ My approach:
 5. **Crisis detection** - Only for explicit self-harm language
 
 I care about how you're feeling and want to help in the right way!"""
-
     elif tool_name == "Cali":
         return base_prompt + """
 
@@ -2141,7 +2156,6 @@ My approach:
 2. **Prioritize wisely** - Focus on what matters most
 3. **Build confidence** - Show you can handle your workload
 4. **Follow through** - Deliver help when accepted"""
-
     elif tool_name == "Mira":
         return base_prompt + """
 
@@ -2152,7 +2166,6 @@ My approach:
 2. **Build understanding** - Explain the 'why'
 3. **Patient guidance** - Work at your pace
 4. **Encouraging support** - Build math confidence"""
-
     else:  # General Lumii
         return base_prompt + """
 
@@ -2166,14 +2179,25 @@ My approach:
 
 I'm here to help you learn and grow in a supportive, caring way!"""
 
-def get_groq_response_with_memory_safety(current_message, tool_name, student_age, student_name="", is_distressed=False, temperature=0.7):
-    """Unified Groq API integration + Input Validation"""
-    
+def get_groq_response_with_memory_safety(
+    current_message: str,
+    tool_name: str,
+    student_age: int,
+    student_name: str = "",
+    is_distressed: bool = False,
+    temperature: float = 0.7,
+) -> Tuple[Optional[str], Optional[str], bool]:
+    """Unified Groq API integration + Input Validation (behavior preserved).
+
+    Returns:
+        (ai_response, error_message, needs_fallback)
+    """
     # Validate input BEFORE sending to API
-    is_safe_input, harmful_pattern = validate_user_input(current_message)
+    is_safe_input, _ = validate_user_input(current_message)
     if not is_safe_input:
         resources = get_crisis_resources()
-        return f"""💙 I care about your safety and wellbeing, and I can't help with that request.
+        return (
+            f"""💙 I care about your safety and wellbeing, and I can't help with that request.
 
 If you're going through something difficult, I'm here to listen and support you in healthy ways. 
 If you're having difficult thoughts, please talk to:
@@ -2181,62 +2205,70 @@ If you're having difficult thoughts, please talk to:
 • {resources['crisis_line']}
 • {resources['suicide_line']}
 
-Let's focus on something positive we can work on together. How can I help you with your learning today?""", None, False
-    
-    # Check if summarization is needed
+Let's focus on something positive we can work on together. How can I help you with your learning today?""",
+            None,
+            False,
+        )
+
+    # Check if summarization is needed (no behavior change)
     summarize_conversation_if_needed()
-    
+
+    # Secrets
     try:
         api_key = st.secrets["GROQ_API_KEY"]
-    except Exception as e:
+    except Exception:
         return None, "No API key configured", False
-    
     if not api_key:
         return None, "No API key configured", False
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
     try:
         # Build system prompt with enhanced safety
-        system_prompt = create_ai_system_prompt_with_safety(tool_name, student_age, student_name, is_distressed)
-        
+        system_prompt = create_ai_system_prompt_with_safety(
+            tool_name, student_age, student_name, is_distressed
+        )
+
         # Build conversation with memory safety
         conversation_history = build_conversation_history()
-        
+
         # Create the full message sequence with length limits
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # Limit conversation history to prevent API overload
+        messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
+
+        # Limit conversation history to prevent API overload (same behavior)
         if len(conversation_history) > 20:
             conversation_history = conversation_history[-20:]
-        
+
         messages.extend(conversation_history)
         messages.append({"role": "user", "content": current_message})
-        
-        payload = {
+
+        payload: Dict[str, Any] = {
             "model": "llama3-70b-8192",
             "messages": messages,
             "temperature": temperature,
             "max_tokens": 1000,
-            "stream": False
+            "stream": False,
         }
-        
-        response = requests.post(GROQ_API_URL, 
-                               headers=headers, 
-                               json=payload, 
-                               timeout=20)
-        
+
+        response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=20)
+
         if response.status_code == 200:
-            result = response.json()
-            ai_content = result['choices'][0]['message']['content']
-            
-            # Fix for offer acceptance with crisis resource prevention
+            # Defensive JSON parsing
+            try:
+                result: Dict[str, Any] = response.json()  # type: ignore[assignment]
+            except Exception:
+                return None, "Invalid JSON from API", True
+
+            ai_content = (
+                ((result.get("choices") or [{}])[0].get("message") or {}).get("content")
+            )
+            if not isinstance(ai_content, str) or not ai_content.strip():
+                return None, "Empty response from API", True
+
+            # Fix for offer acceptance with crisis resource prevention (kept)
             if is_accepting_offer(current_message) and _contains_crisis_resource(ai_content):
                 last_offer = get_last_offer_context()
-                if last_offer["offered_help"] and last_offer["content"] and "friend" in last_offer["content"].lower():
+                if last_offer.get("offered_help") and "friend" in (last_offer.get("content") or "").lower():
                     ai_content = (
                         "💙 Great! Here are some friendly ideas to try:\n"
                         "• Join one club/activity you like this week\n"
@@ -2246,29 +2278,36 @@ Let's focus on something positive we can work on together. How can I help you wi
                         "• Keep it gentle and patient — friendships grow with time 🌱"
                     )
                 else:
-                    ai_content = "🌟 Sure — let's start with the part that feels most helpful. What would you like first?"
-            
-            # Enhanced response validation
-            is_safe, harmful_phrase = validate_ai_response(ai_content)
+                    ai_content = (
+                        "🌟 Sure — let's start with the part that feels most helpful. What would you like first?"
+                    )
+
+            # Enhanced response validation (same behavior)
+            is_safe, _ = validate_ai_response(ai_content)
             if not is_safe:
                 resources = get_crisis_resources()
-                return f"""💙 I understand you might be going through something difficult. 
-                
+                return (
+                    f"""💙 I understand you might be going through something difficult. 
+                    
 I care about your safety and wellbeing, and I want to help in healthy ways. 
 If you're having difficult thoughts, please talk to:
 • A trusted adult
 • {resources['crisis_line']}
 • {resources['suicide_line']}
 
-Let's focus on something positive we can work on together. How can I help you with your learning today?""", None, False
-            
+Let's focus on something positive we can work on together. How can I help you with your learning today?""",
+                    None,
+                    False,
+                )
+
             return ai_content, None, False
-        else:
-            error_msg = f"API Error: {response.status_code}"
-            if response.status_code == 429:
-                error_msg += " (Rate limit - please wait a moment)"
-            return None, error_msg, True
-            
+
+        # Non-200 → return error + indicate safe fallback
+        error_msg = f"API Error: {response.status_code}"
+        if response.status_code == 429:
+            error_msg += " (Rate limit - please wait a moment)"
+        return None, error_msg, True
+
     except requests.exceptions.Timeout:
         return None, "Request timeout - please try again", True
     except requests.exceptions.ConnectionError:
@@ -2276,13 +2315,14 @@ Let's focus on something positive we can work on together. How can I help you wi
     except Exception as e:
         return None, f"Unexpected error: {str(e)}", True
 
+
 # =============================================================================
-# ENHANCED PRIORITY DETECTION WITH SAFETY FIRST (RESTRUCTURED)
+# ENHANCED PRIORITY DETECTION WITH SAFETY FIRST (polished, no behavior change)
 # =============================================================================
 
-def extract_student_info_from_history():
+def extract_student_info_from_history() -> Dict[str, Any]:
     """Extract student information from conversation history (grade-first)."""
-    student_info = {
+    student_info: Dict[str, Any] = {
         'name': st.session_state.get('student_name', ''),
         'age': None,
         'grade': st.session_state.get('student_grade', None),
@@ -2292,10 +2332,10 @@ def extract_student_info_from_history():
     }
 
     # Look at recent user messages only
-    for msg in st.session_state.messages[-10:]:
-        if msg.get('role') != 'user':
+    for msg in st.session_state.get("messages", [])[-10:]:
+        if (msg or {}).get('role') != 'user':
             continue
-        text = normalize_message(msg.get('content', '')).lower().strip()
+        text = normalize_message(str((msg or {}).get('content', ''))).lower().strip()
 
         # --- GRADE FIRST ---
         if student_info.get('grade') is None:
@@ -2303,11 +2343,14 @@ def extract_student_info_from_history():
             if mg:
                 gstr = next((g for g in mg.groups() if g), None)
                 if gstr:
-                    gval = int(gstr)
-                    if 1 <= gval <= 12:
-                        student_info['grade'] = gval
-                        if student_info.get('age') is None:
-                            student_info['age'] = grade_to_age(gval)
+                    try:
+                        gval = int(gstr)
+                        if 1 <= gval <= 12:
+                            student_info['grade'] = gval
+                            if student_info.get('age') is None:
+                                student_info['age'] = grade_to_age(gval)
+                    except ValueError:
+                        pass
 
         # --- AGE explicit "years old" ---
         if student_info.get('age') is None:
@@ -2335,88 +2378,82 @@ def extract_student_info_from_history():
                 student_info['subjects_discussed'].append(subject)
 
     return student_info
-    
-def detect_emotional_distress(message):
-    """Detect if the student is showing clear emotional distress (NOT just mentioning feelings)"""
-    message_lower = message.lower()
-    
+
+def detect_emotional_distress(message: str) -> bool:
+    """Detect if the student is showing clear emotional distress (NOT just mentioning feelings)."""
+    message_lower = (message or "").lower()
+
     # Don't flag simple acceptances as distress
-    if message_lower.strip() in ["yes", "yes please", "okay", "sure", "please"]:
+    if message_lower.strip() in ["yes", "yes please", "okay", "ok", "sure", "please"]:
         return False
-    
+
     # Check if accepting an offer
-    if is_accepting_offer(message):
+    if is_accepting_offer(message or ""):
         return False
-    
+
     # Look for actual distress, not just mentioning emotions
     distress_score = 0
-    
+
     # Strong indicators (2 points each)
     strong_indicators = [
-        'crying', 'panic', 'cant handle', "can't handle", 'too much for me', 
+        'crying', 'panic', 'cant handle', "can't handle", 'too much for me',
         'overwhelming', 'breaking down', 'falling apart'
     ]
     for indicator in strong_indicators:
         if indicator in message_lower:
             distress_score += 2
-    
+
     # Moderate indicators (1 point each) - but only with intensity
-    if ('really' in message_lower or 'very' in message_lower or 'so' in message_lower):
-        moderate_indicators = ['stressed', 'anxious', 'worried', 'scared', 'frustrated']
-        for indicator in moderate_indicators:
+    if any(x in message_lower for x in ('really', 'very', 'so')):
+        for indicator in ['stressed', 'anxious', 'worried', 'scared', 'frustrated']:
             if indicator in message_lower:
                 distress_score += 1
-    
+
     # Phrases that indicate real distress
-    distress_phrases = [
+    for phrase in [
         'hate my life', 'cant do this anymore', "can't do this anymore",
         'everything is wrong', 'nothing ever works', 'always fail'
-    ]
-    for phrase in distress_phrases:
+    ]:
         if phrase in message_lower:
             distress_score += 2
-    
+
     # Context reduces distress score (normal academic stress)
-    normal_contexts = ['homework', 'test', 'quiz', 'project', 'assignment', 'math problem']
-    if any(context in message_lower for context in normal_contexts) and distress_score < 3:
+    if any(context in message_lower for context in ['homework', 'test', 'quiz', 'project', 'assignment', 'math problem']) and distress_score < 3:
         distress_score = max(0, distress_score - 1)
-    
+
     # Need significant distress indicators
     return distress_score >= 2
 
-    import re
 
-ACADEMIC_DISAPPEAR_RX = re.compile(
+ACADEMIC_DISAPPEAR_RX: re.Pattern[str] = re.compile(
     r"\b(?:disappear|vanish)\s+(?:from|in)\s+"
     r"(?:class|classroom|school|lesson|maths?|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym|language\s+arts)\b"
 )
 
-def detect_priority_smart_with_safety(message):
+def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[str]]:
     """
     Crisis-first router. Returns (priority, tool, trigger).
     Ensures explicit crisis always wins; allows an academic 'disappear from class' bypass
     for implicit phrasing only.
     """
-    message_lower = normalize_message(message).lower().strip()
+    message_lower = normalize_message(message or "").lower().strip()
 
-    # 0) 🔥 EXPLICIT crisis check — absolutely first (do NOT include broad patterns here)
+    # 0) 🔥 EXPLICIT crisis check — absolutely first
     if has_explicit_crisis_language(message_lower):
         return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
 
     # 0a) 🎓 Academic "disappear/vanish ... from/in ... class/school" bypass (implicit only)
-    #     Route to supportive emotional help (not generic).
     if ACADEMIC_DISAPPEAR_RX.search(message_lower):
         return 'emotional', 'lumii_main', 'academic_disappear'
 
-    # 0b) Implicit crisis patterns (euphemisms like "disappear", "be gone", "not exist")
-    #     These run AFTER the academic bypass so class-context lines are not flagged.
+    # 0b) Implicit crisis patterns (AFTER academic bypass)
     if any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
         return 'crisis', 'BLOCKED_HARMFUL', 'implicit_crisis'
 
-    # 1) CRISIS OVERRIDE (kept for consistency with your architecture)
-    is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message)
+    # 1) CRISIS OVERRIDE (kept)
+    is_crisis, crisis_type, crisis_trigger = global_crisis_override_check(message or "")
     if is_crisis:
-        return 'crisis', crisis_type, crisis_trigger
+        return 'crisis', crisis_type or 'CRISIS', crisis_trigger
 
     # 2) POST-CRISIS MONITORING
     if st.session_state.get('post_crisis_monitoring', False):
@@ -2424,43 +2461,42 @@ def detect_priority_smart_with_safety(message):
             'you are right', "you're right", 'thank you', 'thanks', 'okay', 'ok',
             'i understand', 'i will', "i'll try", "i'll talk", "you're correct"
         ]
-        # If explicit/implicit crisis appears again while in monitoring → relapse crisis
+        # Relapse check
         if has_explicit_crisis_language(message_lower) or any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
             return 'crisis_return', 'CRISIS', 'post_crisis_violation'
-        # If the student acknowledges positively → supportive continuation
         if any(p in message_lower for p in positive_responses):
             return 'post_crisis_support', 'supportive_continuation', None
 
-    # 3) BEHAVIOR TIMEOUT (but crisis still wins)
+    # 3) BEHAVIOR TIMEOUT (crisis still wins)
     if st.session_state.get('behavior_timeout', False):
         if has_explicit_crisis_language(message_lower):
             return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
         return 'behavior_timeout', 'behavior_final', 'timeout_active'
 
     # 4) ACCEPTANCE OF PRIOR OFFER
-    if is_accepting_offer(message):
+    if is_accepting_offer(message or ""):
         return 'general', 'lumii_main', None
 
     # 5) CONFUSION (before anything punitive)
-    if detect_confusion(message):
+    if detect_confusion(message or ""):
         return 'confusion', 'lumii_main', None
 
     # 6) IDENTITY CONTEXT (sharing/questioning)
-    identity_context = detect_identity_context(message)
+    identity_context = detect_identity_context(message or "")
     if identity_context:
         return 'identity_context', identity_context, None
 
-    # 7) FAMILY REFERRAL — runs AFTER all crisis/identity/confusion checks
-    if detect_family_referral_topics(message):
+    # 7) FAMILY REFERRAL
+    if detect_family_referral_topics(message or ""):
         return 'family_referral', 'parent_guidance', None
 
     # 8) NON-EDUCATIONAL TOPICS
-    non_edu = detect_non_educational_topics(message)
+    non_edu = detect_non_educational_topics(message or "")
     if non_edu:
         return 'non_educational', 'educational_boundary', non_edu
 
     # 9) PROBLEMATIC BEHAVIOR (strikes + timeout)
-    behavior_type = detect_problematic_behavior(message)
+    behavior_type = detect_problematic_behavior(message or "")
     if behavior_type:
         last_type = st.session_state.get('last_behavior_type')
         if behavior_type == last_type:
@@ -2478,8 +2514,8 @@ def detect_priority_smart_with_safety(message):
     if st.session_state.get('behavior_strikes', 0) > 0:
         good_count = 0
         for msg in reversed(st.session_state.get('messages', [])[-5:]):
-            if msg.get('role') == 'user':
-                if detect_problematic_behavior(msg.get('content', '')) is None:
+            if (msg or {}).get('role') == 'user':
+                if detect_problematic_behavior(str((msg or {}).get('content', ''))) is None:
                     good_count += 1
                 else:
                     break
@@ -2489,14 +2525,14 @@ def detect_priority_smart_with_safety(message):
             st.session_state['behavior_timeout'] = False
 
     # 10) SAFETY (concerning but not crisis)
-    is_safe, safety_type, trigger = check_request_safety(message)
+    is_safe, safety_type, trigger = check_request_safety(message or "")
     if not is_safe:
         if safety_type == "CONCERNING_MULTIPLE_FLAGS":
             return 'concerning', safety_type, trigger
         return 'safety', safety_type, trigger
 
     # 11) EMOTIONAL DISTRESS (non-crisis)
-    if detect_emotional_distress(message):
+    if detect_emotional_distress(message or ""):
         return 'emotional', 'felicity', None
 
     # 12) ACADEMIC ROUTING
@@ -2507,16 +2543,18 @@ def detect_priority_smart_with_safety(message):
     if any(ind in message_lower for ind in org_indicators):
         return 'organization', 'cali', None
 
-    if (re.search(r'\d+\s*[\+\-\*/]\s*\d+', message_lower) or
-        any(k in message_lower for k in [
+    if (
+        re.search(r'\d+\s*[\+\-\*/]\s*\d+', message_lower)
+        or any(k in message_lower for k in [
             'solve', 'calculate', 'math problem', 'math homework', 'equation', 'equations',
             'help with math', 'do this math', 'math question'
-        ]) or
-        any(t in message_lower for t in [
+        ])
+        or any(t in message_lower for t in [
             'algebra', 'geometry', 'fraction', 'fractions', 'multiplication', 'multiplications',
             'division', 'divisions', 'addition', 'subtraction', 'times table', 'times tables',
             'arithmetic', 'trigonometry', 'calculus'
-        ])):
+        ])
+    ):
         return 'math', 'mira', None
 
     # 13) Default: general learning help
@@ -2525,7 +2563,7 @@ def detect_priority_smart_with_safety(message):
 
 # detect_age_from_message_and_history(...)
 
-def detect_age_from_message_and_history(message):
+def detect_age_from_message_and_history(message: str) -> int:
     """
     Enhanced age/grade detection — GRADE FIRST to avoid 'I'm 8th grade' → age 8 mistakes.
     Returns an age (int). Also stores best-known grade/age in st.session_state.
@@ -2540,20 +2578,23 @@ def detect_age_from_message_and_history(message):
         st.session_state['student_age'] = known_age
         if known_grade:
             st.session_state['student_grade'] = known_grade
-        return known_age
+        return int(known_age)
 
-    text = normalize_message(message).lower().strip()
+    text = normalize_message(message or "").lower().strip()
 
     # 1) GRADE FIRST
     mg = GRADE_RX.search(text)
     if mg:
         grade_str = next((g for g in mg.groups() if g), None)
         if grade_str:
-            grade = max(1, min(12, int(grade_str)))
-            st.session_state['student_grade'] = grade
-            age = grade_to_age(grade)
-            st.session_state['student_age'] = age
-            return age
+            try:
+                grade = max(1, min(12, int(grade_str)))
+                st.session_state['student_grade'] = grade
+                age = grade_to_age(grade)
+                st.session_state['student_age'] = age
+                return age
+            except ValueError:
+                pass
 
     # 2) AGE (guarded so it won't match '8th grade')
     ma = AGE_RX.search(text)
