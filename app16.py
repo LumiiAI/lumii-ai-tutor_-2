@@ -976,259 +976,156 @@ You're not alone. People want to help you. Please reach out immediately.
 This conversation is ending for your safety. Please get help now."""
 
 # =============================================================================
-# FAMILY REFERRAL TOPICS DETECTION (UNIFIED SEXUAL HEALTH & IDENTITY)
+# SENSITIVE TOPIC REFERRAL (BETA) — always refer to parents/trusted adults
 # =============================================================================
 
-from typing import Final, List, Pattern, Optional
+from typing import Final, List, Pattern, Optional, Tuple
 import re
 
-# NOTE: This snippet relies on helpers/constants defined elsewhere in your app:
+# This snippet relies on helpers/constants in your app:
 # - normalize_message(message: str) -> str
 # - ENHANCED_CRISIS_PATTERNS: List[Pattern[str]]
 # - has_explicit_crisis_language(message: str) -> bool
 
-# =============================================================================
-# Precompiled patterns (perf/readability; behavior unchanged)
-# =============================================================================
+# -------------------------------
+# Patterns (word-boundary based)
+# -------------------------------
 
-# Sexual health / puberty / identity (precise tokens with word boundaries)
-_SENSITIVE_REGEXES: Final[List[Pattern[str]]] = [
-    # Sexual health / reproduction / puberty
-    re.compile(r"\bsex\b", re.IGNORECASE),
-    re.compile(r"\bsex\-linked\b", re.IGNORECASE),
-    re.compile(r"\bsexual\b", re.IGNORECASE),
-    re.compile(r"\breproduction\b", re.IGNORECASE),
-    re.compile(r"\breproductive\b", re.IGNORECASE),
-    re.compile(r"\bpregnancy\b", re.IGNORECASE),
-    re.compile(r"\bbirth\s+control\b", re.IGNORECASE),
-    re.compile(r"\bcontraception\b", re.IGNORECASE),
-    re.compile(r"\bmenstruation\b", re.IGNORECASE),
-    re.compile(r"\bperiods?\b", re.IGNORECASE),
-    re.compile(r"\bmenstrual\s+cycle\b", re.IGNORECASE),
-    re.compile(r"\bmenstrual\b", re.IGNORECASE),
-    re.compile(r"\b(?:menstrual|period)\s+cycle\b", re.IGNORECASE),
-    re.compile(r"\bpms\b", re.IGNORECASE),
-    re.compile(r"\bperiod\s+cramps?\b", re.IGNORECASE),
-    re.compile(r"\bdysmenorrhea\b", re.IGNORECASE),
-    re.compile(r"\bpuberty\b", re.IGNORECASE),
-    re.compile(r"\bmasturbation\b", re.IGNORECASE),
-    re.compile(r"\berection\b", re.IGNORECASE),
-    re.compile(r"\bvagina\b", re.IGNORECASE),
-    re.compile(r"\bpenis\b", re.IGNORECASE),
-    re.compile(r"\bbreast\s+development\b", re.IGNORECASE),
-    re.compile(r"\bwet\s+dreams\b", re.IGNORECASE),
-    re.compile(r"\bbody\s+changes\s+during\s+puberty\b", re.IGNORECASE),
-    re.compile(r"\bhormones?\s+and\s+puberty\b", re.IGNORECASE),
-    re.compile(r"\bsti\b", re.IGNORECASE),
-    re.compile(r"\bstd\b", re.IGNORECASE),
-    re.compile(r"\bcondom\b", re.IGNORECASE),
-    re.compile(r"\bplan\s*b\b", re.IGNORECASE),
-    re.compile(r"\bmorning\-after\b", re.IGNORECASE),
-    re.compile(r"\bfertilization\b", re.IGNORECASE),
-    re.compile(r"\bovulation\b", re.IGNORECASE),
-    re.compile(r"\bsemen\b", re.IGNORECASE),
-    re.compile(r"\bsperm\b", re.IGNORECASE),
-    re.compile(r"\bejacu(?:late|lation)\b", re.IGNORECASE),
-    re.compile(r"\bintercourse\b", re.IGNORECASE),
+_SENSITIVE_LABELS: Final[dict[str, List[Pattern[str]]]] = {
+    # Sexual health / activity / puberty
+    "sexual": [
+        re.compile(r"\bsex\b", re.IGNORECASE),
+        re.compile(r"\bsexual\b", re.IGNORECASE),
+        re.compile(r"\b(have|do)\s+sex\b", re.IGNORECASE),
+        re.compile(r"\bsleep\s+with\b", re.IGNORECASE),
+        re.compile(r"\bcondoms?\b", re.IGNORECASE),
+        re.compile(r"\bcontraception\b", re.IGNORECASE),
+        re.compile(r"\bbirth\s*control\b", re.IGNORECASE),
+        re.compile(r"\bpregnan(t|cy)\b", re.IGNORECASE),
+        re.compile(r"\b(sti|std)s?\b", re.IGNORECASE),
+        re.compile(r"\bpuberty\b", re.IGNORECASE),
+        re.compile(r"\bmenstruation\b", re.IGNORECASE),
+        re.compile(r"\bperiod(s)?\b", re.IGNORECASE),
+        re.compile(r"\bovulation\b", re.IGNORECASE),
+        re.compile(r"\bejacu(?:late|lation)\b", re.IGNORECASE),
+        re.compile(r"\bmasturbation\b", re.IGNORECASE),
+    ],
 
-    # Identity / orientation / gender
-    re.compile(r"\bgay\b", re.IGNORECASE),
-    re.compile(r"\blesbian\b", re.IGNORECASE),
-    re.compile(r"\bbisexual\b", re.IGNORECASE),
-    re.compile(r"\btransgender\b", re.IGNORECASE),
-    re.compile(r"\blgbtq\b", re.IGNORECASE),
-    re.compile(r"\bgender\s+identity\b", re.IGNORECASE),
-    re.compile(r"\bsexual\s+orientation\b", re.IGNORECASE),
-    re.compile(r"\bcoming\s+out\b", re.IGNORECASE),
-    re.compile(r"\bam\s+i\s+gay\b", re.IGNORECASE),
-    re.compile(r"\bam\s+i\s+trans\b", re.IGNORECASE),
-    re.compile(r"\bgender\s+dysphoria\b", re.IGNORECASE),
-    re.compile(r"\bnon\-binary\b", re.IGNORECASE),
-    re.compile(r"\bqueer\b", re.IGNORECASE),
-    re.compile(r"\bquestioning\s+sexuality\b", re.IGNORECASE),
-    re.compile(r"\bquestioning\s+gender\b", re.IGNORECASE),
+    # Gender/sexual identity (always referral per your policy)
+    "identity": [
+        re.compile(r"\bgay\b", re.IGNORECASE),
+        re.compile(r"\blesbian\b", re.IGNORECASE),
+        re.compile(r"\bbisexual\b", re.IGNORECASE),
+        re.compile(r"\btrans(gender)?\b", re.IGNORECASE),
+        re.compile(r"\bnon-?binary\b", re.IGNORECASE),
+        re.compile(r"\blgbtq\+?\b", re.IGNORECASE),
+        re.compile(r"\bgender\s+identity\b", re.IGNORECASE),
+        re.compile(r"\bsexual\s+orientation\b", re.IGNORECASE),
+        re.compile(r"\bcoming\s+out\b", re.IGNORECASE),
+        re.compile(r"\bam\s+i\s+(gay|bi|trans|lesbian|queer)\b", re.IGNORECASE),
+    ],
+
+    # Religion / belief
+    "religion": [
+        re.compile(r"\bshould\s+i\s+go\s+to\s*churc?h\b", re.IGNORECASE),  # handles 'church'/'curch'
+        re.compile(r"\b(church|mosque|synagogue|temple)\b", re.IGNORECASE),
+        re.compile(r"\b(convert|become)\b.*\b(christian|muslim|jew(ish)?|hindu|buddhist)\b", re.IGNORECASE),
+        re.compile(r"\breligion\b", re.IGNORECASE),
+    ],
+
+    # Substances (vaping, nicotine, alcohol, cannabis, etc.)
+    "substance": [
+        re.compile(r"\b(vape|vaping|e-?cig(arette)?s?)\b", re.IGNORECASE),
+        re.compile(r"\bnicotine\b", re.IGNORECASE),
+        re.compile(r"\bcig(arette)?s?\b", re.IGNORECASE),
+        re.compile(r"\b(alcohol|drinking|drunk)\b", re.IGNORECASE),
+        re.compile(r"\b(weed|cannabis|marijuana|thc|edibles?)\b", re.IGNORECASE),
+        re.compile(r"\bvape\s+pen\b", re.IGNORECASE),
+    ],
+
+    # Dating / relationships / hookups
+    "dating": [
+        re.compile(r"\b(should\s+i\s+)?date\b", re.IGNORECASE),
+        re.compile(r"\bboyfriend|girlfriend\b", re.IGNORECASE),
+        re.compile(r"\bhook\s*up\b", re.IGNORECASE),
+        re.compile(r"\bcrush\b", re.IGNORECASE),
+    ],
+
+    # Body image / risky products
+    "body_image": [
+        re.compile(r"\bsteroids?\b", re.IGNORECASE),
+        re.compile(r"\bdiet\s*pills?\b", re.IGNORECASE),
+    ],
+
+    # Sharing explicit images
+    "self_images": [
+        re.compile(r"\b(send|share)\s+(nudes?|explicit\s+pics?|naked\s+pics?)\b", re.IGNORECASE),
+    ],
+}
+
+_SENSITIVE_REGEXES: Final[List[Pattern[str]]] = [p for plist in _SENSITIVE_LABELS.values() for p in plist]
+
+# Crisis / imminent risk (handled elsewhere; do not override)
+_CRISIS_RX: Final[List[Pattern[str]]] = [
+    re.compile(r"\b(kill\s+myself|suicide|want\s+to\s+die|end\s+my\s+life)\b", re.IGNORECASE),
+    re.compile(r"\b(self[-\s]?harm|cut(ting)?\s+myself)\b", re.IGNORECASE),
+    re.compile(r"\b(overdose|od)\b", re.IGNORECASE),
 ]
 
-# Identity context helpers
-_IDENTITY_SHARING_PATTERNS: Final[List[Pattern[str]]] = [
-    re.compile(r"\bi\s+am\s+(gay|lesbian|bi|trans|queer|non-binary)\b"),
-    re.compile(r"\bi'm\s+(gay|lesbian|bi|trans|queer|non-binary)\b"),
-    re.compile(r"\bi\s+think\s+i'm\s+(gay|lesbian|bi|trans|queer)\b"),
-    re.compile(r"\bi\s+know\s+i'm\s+(gay|lesbian|bi|trans|queer)\b"),
-]
-
-_IDENTITY_QUESTIONING_PATTERNS: Final[List[Pattern[str]]] = [
-    re.compile(r"\bam\s+i\s+(gay|lesbian|bi|trans|queer)\b"),
-    re.compile(r"\bhow\s+do\s+i\s+know\s+if\s+i'm\b"),
-    re.compile(r"\bwhat\s+if\s+i'm\s+(gay|lesbian|bi|trans)\b"),
-    re.compile(r"\bmight\s+i\s+be\s+(gay|lesbian|bi|trans)\b"),
-]
-
-# =============================================================================
-# Family referral topic detection
-# =============================================================================
+# -------------------------------
+# Detection
+# -------------------------------
 
 def detect_family_referral_topics(message: str) -> bool:
     """
-    Conservative (beta) detector for sensitive topics.
-    HARD RULE: never trigger family referral if any crisis language is present.
-    Uses word boundaries so 'sex' doesn't match inside 'existing'.
-    Includes menstrual-cycle variants to catch academic phrasing.
-
-    Returns:
-        True if the message matches sensitive topics (and no crisis is detected),
-        otherwise False.
+    Returns True if any non-crisis sensitive topic is detected (always refer out).
+    Never returns True on crisis language — let your crisis handler take over.
     """
-    m = normalize_message(message or "").lower()
-
-    # 🔒 Crisis shield (never override crisis)
-    if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS):
+    m = normalize_message(message or "")
+    if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS) or any(rx.search(m) for rx in _CRISIS_RX):
         return False
-
-    # Sexual health / puberty / identity (precompiled patterns)
     return any(rx.search(m) for rx in _SENSITIVE_REGEXES)
 
-def generate_family_referral_response(student_age: int, student_name: str = "") -> str:
-    """Conservative (beta) family referral message.
-
-    Beta policy: Lumii does not discuss personal/sensitive topics. We direct
-    students to families or trusted adults for age-appropriate guidance.
-    Age is not used in messaging during beta.
+def detect_family_referral_label(message: str) -> Optional[str]:
     """
-    name_part = f"{student_name}, " if student_name else ""
+    Optional helper: returns the first matching sensitive-topic label
+    (e.g., 'sexual', 'religion', 'substance', …) or None.
+    """
+    m = normalize_message(message or "")
+    if has_explicit_crisis_language(m) or any(p.search(m) for p in ENHANCED_CRISIS_PATTERNS) or any(rx.search(m) for rx in _CRISIS_RX):
+        return None
+    for label, patterns in _SENSITIVE_LABELS.items():
+        if any(rx.search(m) for rx in patterns):
+            return label
+    return None
 
+# -------------------------------
+# Referral response
+# -------------------------------
+
+def generate_family_referral_response(student_age: int, student_name: str = "") -> str:
+    """Single, consistent referral message. (Age only tunes the tone slightly.)"""
+    name_part = f"{student_name}, " if student_name else ""
     if student_age <= 11:
         return (
-            f"🛡️ {name_part}for safety during our **beta**, Lumii can't discuss this personal topic.\n\n"
-            "Because kids online can misreport age, we're being extra conservative to keep everyone safe. "
-            "The best people to help with personal or sensitive questions are:\n"
+            f"🛡️ {name_part}for safety during our **beta**, I can’t discuss this personal topic.\n\n"
+            "The best people to help are:\n"
             "• Your parent or guardian\n"
             "• Your school counselor\n"
-            "• A trusted family member or another trusted adult\n\n"
+            "• Another trusted adult in your life\n\n"
             "They can give the right, age-appropriate guidance for you.\n\n"
-            "I'm still great at **schoolwork**! If you'd like, we can switch to topics I *can* help with, like:\n"
-            "• Math (algebra, geometry, word problems)\n"
-            "• Science (biology, chemistry, physics)\n"
-            "• Reading & writing (essays, summaries)\n"
-            "• Study skills and exam prep\n\n"
-            "Tell me what homework or class topic you want to work on next. 💪📚\n\n"
-            "I'm your learning buddy who helps with school subjects. "
-            "For big questions like this, the best people to talk to are:\n"
-            "• Your mom, dad, or family\n"
-            "• Your teacher or school counselor\n"
-            "• Another trusted grown-up\n\n"
-            "These are important topics that your family can help you understand in the way that's right for your family.\n"
-            "I'm great at helping with homework and making school fun! What would you like to learn about? 😊"
+            "I’m great at helping with **schoolwork**! What homework or class topic should we work on? 📚"
         )
     else:
         return (
-            f"🛡️ {name_part}during our **beta**, I can't discuss this personal topic.\n\n"
-            "To keep everyone safe, the best people to help with personal or sensitive questions are:\n"
-            "• Your parents or guardians\n"
+            f"🛡️ {name_part}during our **beta**, I can’t discuss this personal topic here.\n\n"
+            "Please talk with:\n"
+            "• A parent or guardian\n"
             "• Your school counselor\n"
-            "• Another trusted adult in your life\n\n"
-            "They can give guidance that fits your family's values and your needs.\n\n"
-            "I'm here to help with schoolwork and studying — what subject should we work on next? 📚"
+            "• Another trusted adult or healthcare professional\n\n"
+            "They can provide guidance that fits your family’s values and your needs.\n\n"
+            "I’m here to help with studying — what subject should we work on next? 📚"
         )
-
-# =============================================================================
-# Identity context detection & messaging
-# =============================================================================
-
-def detect_identity_context(message: str) -> Optional[str]:
-    """Detect whether this is sharing identity vs questioning identity.
-
-    Returns:
-        "identity_sharing" | "identity_questioning" | None
-    """
-    message_lower = (message or "").lower().strip()
-
-    is_sharing = any(rx.search(message_lower) for rx in _IDENTITY_SHARING_PATTERNS)
-    is_questioning = any(rx.search(message_lower) for rx in _IDENTITY_QUESTIONING_PATTERNS)
-
-    if is_sharing:
-        return "identity_sharing"
-    if is_questioning:
-        return "identity_questioning"
-    return None
-
-def generate_identity_response(context_type: str, student_age: int, student_name: str = "") -> Optional[str]:
-    """Parent-friendly approach: Brief care + immediate adult referral."""
-    name_part = f"{student_name}, " if student_name else ""
-
-    if context_type == "identity_sharing":
-        # Response for "I'm gay" - brief acknowledgment + immediate parent/counselor referral
-        if student_age <= 11:
-            return f"""💙 {name_part}Thank you for sharing something important with me.
-
-These are special personal topics that are best discussed with the people who care about you most:
-• Your parents or family
-• Your school counselor  
-• Another trusted grown-up
-
-They can give you the kind of personal support and guidance I can't provide.
-
-I'm here to help you with schoolwork and learning! What subject would you like to explore? 😊"""
-        elif student_age <= 14:
-            return f"""💙 {name_part}Thank you for sharing something personal with me.
-
-Personal identity topics like this are important conversations to have with:
-• Your parents or guardians
-• Your school counselor
-• A trusted adult in your life
-
-They can provide the ongoing personal support and guidance that these topics deserve.
-
-I'm here to help with your academic learning! What subject can we work on together? 📚"""
-        else:  # High School
-            return f"""💙 {name_part}Thank you for sharing something significant with me.
-
-Personal identity topics are important conversations to have with:
-• Your parents or guardians (if you feel comfortable)
-• Your school counselor who has professional training
-• A trusted adult or healthcare provider
-
-They can provide the personalized guidance and support that these conversations deserve.
-
-I'm here to help with your academic goals and learning! What subject would you like to focus on? 😊"""
-
-    elif context_type == "identity_questioning":
-        # Response for "Am I gay?" - gentle validation + strong adult referral
-        if student_age <= 11:
-            return f"""💙 {name_part}That's an important personal question.
-
-Questions about yourself are best discussed with the grown-ups who care about you:
-• Your parents or family
-• Your school counselor
-• Another trusted adult
-
-They can give you the kind of personal conversation and support I can't provide.
-
-I'm great at helping with homework and school subjects! What would you like to learn about? 😊"""
-        elif student_age <= 14:
-            return f"""💙 {name_part}That's a thoughtful personal question.
-
-Personal questions like this are best discussed with:
-• Your parents or guardians
-• Your school counselor
-• A trusted adult who can provide ongoing support
-
-They can give you the kind of personal guidance that these important questions deserve.
-
-I'm here to help with schoolwork and studying! What academic subject can we work on? 📖"""
-        else:  # High School
-            return f"""💙 {name_part}That's an important personal question.
-
-For personal questions about identity, the best people to talk with are:
-• Your parents or guardians (if you feel comfortable)
-• Your school counselor with professional training
-• Trusted adults or healthcare providers who can provide guidance
-
-They can offer the personalized conversation that these questions deserve.
-
-I'm excellent at helping with academic subjects and study strategies! What can I help you with today? 😊"""
-
-    return None
 
 
 # =============================================================================
