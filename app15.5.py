@@ -13,147 +13,207 @@ INTERNAL DEVELOPMENT NOTES (NOT VISIBLE TO USERS):
 SAFETY STATUS: 🇺🇸 OPTIMIZED FOR US BETA FAMILIES
 """
 
-import streamlit as st
-import requests
+from typing import Final, List, Pattern
+
 import json
-import time
 import re
+import time
 import uuid
 from datetime import datetime
 
+import requests
+import streamlit as st
+
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
-GRADE_RX = re.compile(
+GRADE_RX: Final[Pattern[str]] = re.compile(
     r"\b(?:grade\s*(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)\s*grade)\b",
     re.IGNORECASE,
 )
 
 # e.g., "I'm 13", "I am 13" — but NOT "I'm 8th grade"
-AGE_RX = re.compile(
+AGE_RX: Final[Pattern[str]] = re.compile(
     r"\b(?:i[' ]?m|i am)\s+(\d{1,2})(?!\s*(?:st|nd|rd|th)\s*grade)\b",
     re.IGNORECASE,
 )
 
+
 def grade_to_age(grade_num: int) -> int:
-    # typical US mapping ≈ grade + 5, clamped 6–18
+    """Approximate US age from grade: age ≈ grade + 5, clamped to [6, 18]."""
     return max(6, min(18, int(grade_num) + 5))
 
+
 def age_to_grade(age_num: int) -> int:
-    # inverse mapping ≈ age − 5, clamped 1–12
+    """Approximate US grade from age: grade ≈ age − 5, clamped to [1, 12]."""
     return max(1, min(12, int(age_num) - 5))
 
-# Helper for nice ordinals (1st, 2nd, 3rd, 4th...)
+
 def _make_ordinal(n: int) -> str:
+    """Return English ordinal string for an integer (e.g., 1 -> '1st')."""
     if 11 <= (n % 100) <= 13:
         suffix = "th"
     else:
         suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
 
-# Make sure this exists once at startup
-if 'locked_after_crisis' not in st.session_state:
-    st.session_state['locked_after_crisis'] = False
+
+# Ensure session keys exist once per session
+st.session_state.setdefault("locked_after_crisis", False)
 
 # =============================================================================
 # NORMALIZATION FUNCTION FOR BETTER PATTERN MATCHING
 # =============================================================================
 
+# Common confusion typos (K-12) -> "confused"
+_CONFUSION_TYPO_MAP: Final[List[Pattern[str]]] = [
+    re.compile(r"\bcofused\b", re.IGNORECASE),
+    re.compile(r"\bconfusd\b", re.IGNORECASE),
+    re.compile(r"\bconufsed\b", re.IGNORECASE),
+    re.compile(r"\bcnofused\b", re.IGNORECASE),
+]
+
+
 def normalize_message(message: str) -> str:
-    """Normalize message for better pattern matching"""
+    """
+    Normalize a user message for robust pattern matching.
+    - Trims whitespace
+    - Normalizes "im" -> "i'm"
+    - Fixes common 'confused' typos
+    """
     msg = message.strip()
-    
-    # Contractions + punctuation
-    msg = re.sub(r"'", "'", msg)
-    msg = re.sub(r'\bim\b', "i'm", msg, flags=re.IGNORECASE)
-    
-    # Confusion typos (common in K-12)
-    msg = re.sub(r'\bcofused\b', 'confused', msg, flags=re.IGNORECASE)
-    msg = re.sub(r'\bconfusd\b', 'confused', msg, flags=re.IGNORECASE)
-    msg = re.sub(r'\bconufsed\b', 'confused', msg, flags=re.IGNORECASE)
-    msg = re.sub(r'\bcnofused\b', 'confused', msg, flags=re.IGNORECASE)
-    
+
+    # Normalize "im" -> "i'm" (keeps other casing intact due to IGNORECASE)
+    msg = re.sub(r"\bim\b", "i'm", msg, flags=re.IGNORECASE)
+
+    # Normalize common confusion typos
+    for rx in _CONFUSION_TYPO_MAP:
+        msg = rx.sub("confused", msg)
+
     return msg
 
-# Page configuration
-st.set_page_config(
-    page_title="My Friend Lumii - Your AI Learning Companion",
-    page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+
+# Page configuration (guarded to avoid duplicate configuration errors)
+if not st.session_state.get("_page_configured", False):
+    st.set_page_config(
+        page_title="My Friend Lumii - Your AI Learning Companion",
+        page_icon="🎓",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    st.session_state["_page_configured"] = True
 
 # =============================================================================
 # ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (CRITICAL SAFETY FIXES)
 # =============================================================================
 
 # Enhanced crisis patterns with typo tolerance and euphemisms - CHATGPT CRITICAL FIXES APPLIED
-ENHANCED_CRISIS_PATTERNS = [
+ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
     # Core self-harm patterns with typo tolerance
-    re.compile(r'\bi\s+(?:think\s+)?(?:maybe\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|dissapeare|vanish|go\s+away|fade\s+away)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:want\s+to|wanna|wish\s+i\s+could)\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish)\b', re.IGNORECASE),
-    re.compile(r'\b(?:better\s+if\s+)?i\s+(?:just\s+)?(?:disappeared|dissapeared|vanished|went\s+away)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+should\s+(?:just\s+)?(?:not\s+exist|stop\s+existing|be\s+gone)\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b', re.IGNORECASE),
-    
+    re.compile(
+        r"\bi\s+(?:think\s+)?(?:maybe\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|dissapeare|vanish|go\s+away|fade\s+away)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bi\s+(?:want\s+to|wanna|wish\s+i\s+could)\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:better\s+if\s+)?i\s+(?:just\s+)?(?:disappeared|dissapeared|vanished|went\s+away)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bi\s+should\s+(?:just\s+)?(?:not\s+exist|stop\s+existing|be\s+gone)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:die|kil+\s*myself)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:hurt|harm)\s+myself\b", re.IGNORECASE
+    ),
+    re.compile(
+        r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:end|stop)\s+(?:my\s+life|everything)\b",
+        re.IGNORECASE,
+    ),
     # 🚨 FIXED: "if i'm gone" vs "if i was gone"
-    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
-    re.compile(r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b', re.IGNORECASE),
-    
+    re.compile(
+        r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bwould\s+be\s+(?:happier|better)\s+(?:if\s+)?(?:i\s+was\s+gone|without\s+me)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:happier|better)\s+(?:if\s+)?(?:i\s+(?:just\s+)?(?:disappeared|was\s+gone|wasnt\s+here))\b",
+        re.IGNORECASE,
+    ),
     # Teen crisis expressions
-    re.compile(r'\bno\s+one\s+would\s+miss\s+me\b', re.IGNORECASE),
-    re.compile(r'\b(?:i\s+)?wish\s+i\s+(?:were|was)\s+dead\b', re.IGNORECASE),
-    re.compile(r'\b(?:better|better\s+off)\s+dead\b', re.IGNORECASE),
-    re.compile(r'\b(?:unalive|unalive\s+myself|self\s*delete|delete\s+myself|off\s+myself)\b', re.IGNORECASE),
-    re.compile(r'\b(?:kms|kys)\b', re.IGNORECASE),
-    re.compile(r'\bend\s+it\s+all\b', re.IGNORECASE),
-    re.compile(r'\b(?:stop|quit)\s+(?:existing|being\s+alive)\b', re.IGNORECASE),
-    re.compile(r'\b(?:i\s+just\s+)?(?:want|wanna)\s+(?:to\s+)?(?:sleep\s+forever|not\s+wake\s+up)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+don\'?t\s+deserve\s+to\s+live\b', re.IGNORECASE),
-    re.compile(r'\bi\s+shouldn\'?t\s+exist\b', re.IGNORECASE),
-    
+    re.compile(r"\bno\s+one\s+would\s+miss\s+me\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+)?wish\s+i\s+(?:were|was)\s+dead\b", re.IGNORECASE),
+    re.compile(r"\b(?:better|better\s+off)\s+dead\b", re.IGNORECASE),
+    re.compile(r"\b(?:unalive|unalive\s+myself|self\s*delete|delete\s+myself|off\s+myself)\b", re.IGNORECASE),
+    re.compile(r"\b(?:kms|kys)\b", re.IGNORECASE),
+    re.compile(r"\bend\s+it\s+all\b", re.IGNORECASE),
+    re.compile(r"\b(?:stop|quit)\s+(?:existing|being\s+alive)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+just\s+)?(?:want|wanna)\s+(?:to\s+)?(?:sleep\s+forever|not\s+wake\s+up)\b", re.IGNORECASE),
+    re.compile(r"\bi\s+don\'?t\s+deserve\s+to\s+live\b", re.IGNORECASE),
+    re.compile(r"\bi\s+shouldn\'?t\s+exist\b", re.IGNORECASE),
     # Methods and passive wish phrasing
-    re.compile(r'\b(?:jump\s+off|hang\s+myself|od|overdos(?:e|ing))\b', re.IGNORECASE),
+    re.compile(r"\b(?:jump\s+off|hang\s+myself|od|overdos(?:e|ing))\b", re.IGNORECASE),
     re.compile(r"\bi'?d\s+be\s+ok(?:ay)?\s+if\s+(?:a\s+)?car\s+hit\s+me\b", re.IGNORECASE),
     re.compile(r"\bi\s+hope\s+i\s+don'?t\s+wake\s+up\b", re.IGNORECASE),
-    
     # 🚨 Critical fixes
-    re.compile(r'\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b', re.IGNORECASE),
-    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
-    re.compile(r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b', re.IGNORECASE),
-    re.compile(r'\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|["\'\′]?\s*m)\s+gone\b', re.IGNORECASE),
-    
+    re.compile(
+        r"\bi\s+(?:think\s+)?(?:i\s+)?should\s+(?:just\s+)?(?:disappear|dissapear|disapear|vanish|go\s+away|not\s+be\s+here|stop\s+existing)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?(?:i\s+(?:was|were)\s+gone|without\s+me)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|['\′]?\s*m)\s+gone\b",
+        re.IGNORECASE,
+    ),
     # "I want to end it"
-    re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
-    
+    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
     # Euphemisms / typos
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*dissapear\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disapear\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*vanish\b', re.IGNORECASE),
-    re.compile(r'\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*(?:go\s+away|fade\s+away)\b', re.IGNORECASE),
-    re.compile(r'\b(?:don\'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b', re.IGNORECASE),
-    re.compile(r'\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b', re.IGNORECASE),
-    re.compile(r'\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b', re.IGNORECASE),
-    
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disappear\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*dissapear\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*disapear\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*vanish\b", re.IGNORECASE),
+    re.compile(r"\b(?:wan(?:t|na))\s+(?:t+o|do|2)?\s*(?:go\s+away|fade\s+away)\b", re.IGNORECASE),
+    re.compile(r"\b(?:don'?t|dont)\s+(?:wan(?:t|na))\s+(?:t+o|do|2)\s+(?:be\s+here|exist|live)\s+anymore\b", re.IGNORECASE),
+    re.compile(r"\bno\s+(?:reason|point)\s+(?:t+o|do|2)\s+(?:live|be\s+here|exist)\b", re.IGNORECASE),
+    re.compile(r"\bworld\s+(?:would\s+be\s+)?better\s+without\s+me\b", re.IGNORECASE),
     # Direct expressions
-    re.compile(r'\bkill\s+myself\b', re.IGNORECASE),
-    re.compile(r'\bhurt\s+myself\b', re.IGNORECASE),
-    re.compile(r'\bend\s+my\s+life\b', re.IGNORECASE),
-    re.compile(r'\bcommit\s+suicide\b', re.IGNORECASE),
-    re.compile(r'\bcut\s+myself\b', re.IGNORECASE),
-    re.compile(r'\bself\s*-?\s*harm\b', re.IGNORECASE),
-    
+    re.compile(r"\bkill\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bhurt\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bend\s+my\s+life\b", re.IGNORECASE),
+    re.compile(r"\bcommit\s+suicide\b", re.IGNORECASE),
+    re.compile(r"\bcut\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bself\s*-?\s*harm\b", re.IGNORECASE),
     # Immediate action
-    re.compile(r'\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b', re.IGNORECASE),
-    re.compile(r'\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b', re.IGNORECASE),
-    re.compile(r'\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b', re.IGNORECASE),
+    re.compile(r"\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b", re.IGNORECASE),
+    re.compile(r"\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b", re.IGNORECASE),
 ]
+
 
 # =============================================================================
 # CONFUSION PATTERNS FOR LEGITIMATE STUDENT CONFUSION
