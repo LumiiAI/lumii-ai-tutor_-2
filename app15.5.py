@@ -219,91 +219,102 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
 # CONFUSION PATTERNS FOR LEGITIMATE STUDENT CONFUSION
 # =============================================================================
 
-CONFUSION_PATTERNS = [
+from typing import Final, List, Pattern, Dict, Tuple, Optional
+import re
+import streamlit as st
+
+# NOTE: relies on `normalize_message`, `detect_age_from_message_and_history`,
+# and `generate_age_adaptive_crisis_intervention` defined elsewhere in app.
+
+CONFUSION_PATTERNS: Final[List[Pattern[str]]] = [
     # "i'm so confused" + common misspellings
-    re.compile(r"\bi\s*(?:am|['']?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b", re.IGNORECASE),
-    
+    re.compile(
+        r"\bi\s*(?:am|['']?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b",
+        re.IGNORECASE,
+    ),
     # "i don't get/understand/follow"
     re.compile(r"\b(?:i\s+)?don['']?t\s+(?:get|understand|follow)\b", re.IGNORECASE),
-    
     # "this/that/it makes no sense"
     re.compile(r"\b(?:this|that|it)\s+makes?\s+no\s+sense\b", re.IGNORECASE),
-    
     # "idk" or "i don't know"
     re.compile(r"\b(?:idk|i\s+don['']?t\s+know)\b", re.IGNORECASE),
-    
     # "i'm lost/stuck"
     re.compile(r"\bi\s*(?:am|['']?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
 ]
 
-IMMEDIATE_TERMINATION_PATTERNS = [
+IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
     # Direct + time-bound
-    re.compile(r'\bkill\s+myself\s+(?:now|right\s+now|today|tonight|this\s+(?:minute|instant|evening|afternoon))\b', re.IGNORECASE),
-    re.compile(r'\bhurt\s+myself\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
-    re.compile(r'\bcut\s+myself\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
-    re.compile(r'\bend(?:ing)?\s+my\s+life\s+(?:now|today|tonight)\b', re.IGNORECASE),
-
-    # Commit / overdose
-    re.compile(r'\bcommit\s+suicide\b', re.IGNORECASE),
-    re.compile(r'\b(?:overdos(?:e|ing)|od)\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
-
-    # "End it" / make it stop (immediate)
-    re.compile(r'\bend\s+it\s+(?:now|today|tonight)\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b', re.IGNORECASE),
-    re.compile(r'\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?make\s+it\s+all\s+stop\b', re.IGNORECASE),
-
-    # Future intent phrased as immediate plan
-    # Covers: "I'm/I'm/Im going to/gonna ... myself" and "I will ..."
     re.compile(
-        r'\b(?:i\s*(?:am|[\'′]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b',
-        re.IGNORECASE
+        r"\bkill\s+myself\s+(?:now|right\s+now|today|tonight|this\s+(?:minute|instant|evening|afternoon))\b",
+        re.IGNORECASE,
     ),
-    re.compile(r'\bi\s+will\s+(?:kill|hurt|end)\s+myself\b', re.IGNORECASE),
-
+    re.compile(r"\bhurt\s+myself\s+(?:now|right\s+now|today|tonight)\b", re.IGNORECASE),
+    re.compile(r"\bcut\s+myself\s+(?:now|right\s+now|today|tonight)\b", re.IGNORECASE),
+    re.compile(r"\bend(?:ing)?\s+my\s+life\s+(?:now|today|tonight)\b", re.IGNORECASE),
+    # Commit / overdose
+    re.compile(r"\bcommit\s+suicide\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:overdos(?:e|ing)|od)\s+(?:now|right\s+now|today|tonight)\b",
+        re.IGNORECASE,
+    ),
+    # "End it" / make it stop (immediate)
+    re.compile(r"\bend\s+it\s+(?:now|today|tonight)\b", re.IGNORECASE),
+    re.compile(r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?end\s+it\b", re.IGNORECASE),
+    re.compile(
+        r"\bi\s+(?:just\s+)?wan(?:t|na)\s+(?:to\s+)?make\s+it\s+all\s+stop\b",
+        re.IGNORECASE,
+    ),
+    # Future intent phrased as immediate plan
+    re.compile(
+        r"\b(?:i\s*(?:am|[\'′]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bi\s+will\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
     # Your original queries (kept, but hardened with IGNORECASE + spacing)
-    re.compile(r'\bhow\s+to\s+die\b', re.IGNORECASE),
-    re.compile(r'\bpainless\s+death\b', re.IGNORECASE),
-
+    re.compile(r"\bhow\s+to\s+die\b", re.IGNORECASE),
+    re.compile(r"\bpainless\s+death\b", re.IGNORECASE),
     # Specific phrases you had (normalized + IGNORECASE)
-    re.compile(r'\bwant\s+to\s+hurt\s+myself\s+right\s+now\b', re.IGNORECASE),
-    re.compile(r'\bgoing\s+to\s+kill\s+myself\b', re.IGNORECASE),
-    re.compile(r'\bdecided\s+to\s+die\b', re.IGNORECASE),
-
+    re.compile(r"\bwant\s+to\s+hurt\s+myself\s+right\s+now\b", re.IGNORECASE),
+    re.compile(r"\bgoing\s+to\s+kill\s+myself\b", re.IGNORECASE),
+    re.compile(r"\bdecided\s+to\s+die\b", re.IGNORECASE),
     # Practical pill-taking immediate intent (optional but useful)
-    re.compile(r'\btake\s+\d+\s+(?:pills|tablets)\s+(?:now|right\s+now|today|tonight)\b', re.IGNORECASE),
+    re.compile(
+        r"\btake\s+\d+\s+(?:pills|tablets)\s+(?:now|right\s+now|today|tonight)\b",
+        re.IGNORECASE,
+    ),
 ]
 
-
 # US Crisis Resources for Beta Launch (English-speaking families)
-US_CRISIS_RESOURCES = {
+US_CRISIS_RESOURCES: Final[Dict[str, str]] = {
     "crisis_line": "988 (Suicide & Crisis Lifeline)",
-    "text_line": "Crisis Text Line: Text HOME to 741741", 
+    "text_line": "Crisis Text Line: Text HOME to 741741",
     "emergency": "911 for immediate emergency",
-    "additional": "Tell a parent, teacher, or trusted adult"
+    "additional": "Tell a parent, teacher, or trusted adult",
 }
 
 # Keep Slovenia as backup for development/testing
-SLOVENIA_CRISIS_RESOURCES = {
+SLOVENIA_CRISIS_RESOURCES: Final[Dict[str, str]] = {
     "crisis_line": "TOM telefon za otroke in mladostnike: 116 111 (brezplačno, 24/7)",
-    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)", 
+    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)",
     "emergency": "Klic v sili: 113 (policija) ali 112 (vse nujne službe)",
-    "additional": "Klic v duševni stiski: 01 520 99 00"
+    "additional": "Klic v duševni stiski: 01 520 99 00",
 }
 
-CRISIS_RESOURCES = {
+CRISIS_RESOURCES: Dict[str, Dict[str, str]] = {
     "US": US_CRISIS_RESOURCES,
     "SI": SLOVENIA_CRISIS_RESOURCES,
     "EU": {
         "crisis_line": "European Emergency Line: 116 123",
-        "suicide_line": "Local crisis helpline or 116 123", 
+        "suicide_line": "Local crisis helpline or 116 123",
         "emergency": "Emergency services: 112",
-        "additional": "Contact local mental health services"
+        "additional": "Contact local mental health services",
     },
-    "DEFAULT": US_CRISIS_RESOURCES  # 🇺🇸 Changed default to US for beta families
+    "DEFAULT": US_CRISIS_RESOURCES,  # 🇺🇸 Changed default to US for beta families
 }
 
 # Enhanced response validator patterns
-FORBIDDEN_RESPONSE_PATTERNS = [
+# (Keep original case sensitivity exactly to avoid behavior changes.)
+FORBIDDEN_RESPONSE_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\bhow to hurt yourself\b"),
     re.compile(r"\bhow to kill yourself\b"),
     re.compile(r"\btake these pills\b"),
@@ -322,21 +333,21 @@ FORBIDDEN_RESPONSE_PATTERNS = [
 ]
 
 # Input validation patterns (mirror output validation for user input)
-FORBIDDEN_INPUT_PATTERNS = FORBIDDEN_RESPONSE_PATTERNS + [
+FORBIDDEN_INPUT_PATTERNS: Final[List[Pattern[str]]] = FORBIDDEN_RESPONSE_PATTERNS + [
     re.compile(r"\bjailbreak\b.*\b(ignore|bypass|override)\b"),
     re.compile(r"\bpretend you are\b.*\b(not safe|harmful|dangerous)\b"),
     re.compile(r"\bact like\b.*\b(evil|harmful|bad)\b"),
 ]
 
-def _normalize_crisis_resources():
-    """Give every locale both 'crisis_line' and 'suicide_line' to avoid KeyErrors."""
+def _normalize_crisis_resources() -> None:
+    """Ensure each locale dict has all expected keys to avoid KeyErrors."""
     for _, rs in CRISIS_RESOURCES.items():
-        crisis = rs.get('crisis_line') or rs.get('suicide_line') or ""
-        rs['crisis_line'] = crisis
-        rs['suicide_line'] = rs.get('suicide_line', crisis)
-        rs['text_line'] = rs.get('text_line', "")
-        rs['emergency'] = rs.get('emergency', "")
-        rs['additional'] = rs.get('additional', "")
+        crisis = rs.get("crisis_line") or rs.get("suicide_line") or ""
+        rs["crisis_line"] = crisis
+        rs["suicide_line"] = rs.get("suicide_line", crisis)
+        rs["text_line"] = rs.get("text_line", "")
+        rs["emergency"] = rs.get("emergency", "")
+        rs["additional"] = rs.get("additional", "")
 
 _normalize_crisis_resources()
 
@@ -344,8 +355,8 @@ _normalize_crisis_resources()
 # CONFUSION DETECTION FOR LEGITIMATE STUDENT CONFUSION
 # =============================================================================
 
-def detect_confusion(message):
-    """Detect legitimate confusion expressions that should NOT trigger behavior strikes"""
+def detect_confusion(message: str) -> bool:
+    """Detect legitimate confusion expressions that should NOT trigger behavior strikes."""
     normalized_msg = normalize_message(message)
     return any(pattern.search(normalized_msg) for pattern in CONFUSION_PATTERNS)
 
@@ -353,79 +364,98 @@ def detect_confusion(message):
 # GLOBAL CRISIS GUARD - RUNS FIRST ON EVERY MESSAGE (NEW)
 # =============================================================================
 
+# Precompiled context regex for ambiguous ideation cues in recent messages
+_CTX_IDEATION_EUPHEMISM_RX: Final[Pattern[str]] = re.compile(
+    r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|['\"′]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)"
+)
+
 def _contextual_crisis_boost(message: str) -> bool:
-    """🚨 CHATGPT CRITICAL FIX: Context-aware crisis detection for ambiguous phrases"""
+    """🚨 Context-aware crisis detection for ambiguous phrases like 'end it'."""
     m = message.lower()
     if re.search(r"\bend\s+it\b", m):
-        # Check recent conversation context for crisis indicators
+        # Safely read recent conversation context (last ~6 user messages)
+        recent_msgs = st.session_state.get("messages", [])
         recent_user = " ".join(
-            msg["content"].lower() for msg in st.session_state.messages[-6:]
-            if msg.get("role") == "user"
+            (msg.get("content", "") or "").lower()
+            for msg in recent_msgs[-6:]
+            if isinstance(msg, dict) and msg.get("role") == "user"
         )
-        # If recent context includes ideation euphemisms, treat "end it" as crisis
-        # FIXED: Updated to catch "im gone" as well as "i'm gone"
-        if re.search(r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|[''""]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)", recent_user):
+        if _CTX_IDEATION_EUPHEMISM_RX.search(recent_user):
             return True
     return False
 
-def global_crisis_guard(message):
-    """ChatGPT's improved crisis guard with proper control flow"""
+# Academic keywords and explicit crisis phrases (tuples for immutability/tiny perf win)
+_ACADEMIC_INDICATORS: Final[Tuple[str, ...]] = (
+    "homework", "math", "science", "biology", "chemistry", "physics", "test", "class",
+    "school", "assignment", "quiz", "project", "studying", "exam", "grade", "teacher",
+)
+
+_EXPLICIT_CRISIS_PHRASES: Final[Tuple[str, ...]] = (
+    "kill myself", "hurt myself", "end my life", "suicide", "cut myself", "i want to die",
+    "i want to kill myself", "i will kill myself", "i want to end my life",
+)
+
+# Generic crisis patterns with context-aware exclusions (precompiled)
+_DISAPPEAR_PATTERNS: Final[List[Pattern[str]]] = [
+    # Avoid "disappear from class/school ..." via negative lookahead
+    re.compile(
+        r"\bdisappear\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bvanish\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:i\s+don['']t\s+want\s+to\s+exist|i\s+want\s+to\s+disappear)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:end\s+it\s+all|end\s+everything)\b", re.IGNORECASE),
+]
+
+def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
+    """Improved crisis guard with academic-context bypass and explicit phrase override."""
     msg = normalize_message(message)
     ml = msg.lower().strip()
-    
+
     # 1) Context flags
-    academic_indicators = [
-        "homework","math","science","biology","chemistry","physics","test","class",
-        "school","assignment","quiz","project","studying","exam","grade","teacher"
-    ]
-    has_academic_context = any(w in ml for w in academic_indicators)
-    
-    explicit_crisis_phrases = [
-        "kill myself","hurt myself","end my life","suicide","cut myself","i want to die",
-        "i want to kill myself","i will kill myself","i want to end my life"
-    ]
-    has_explicit_crisis = any(p in ml for p in explicit_crisis_phrases)
-    
+    has_academic_context = any(w in ml for w in _ACADEMIC_INDICATORS)
+    has_explicit_crisis = any(p in ml for p in _EXPLICIT_CRISIS_PHRASES)
+
     # 2) Guard clause: academic bypass unless explicit
     if has_academic_context and not has_explicit_crisis:
         return False, None  # Hard exit - nothing below should run
-    
+
     # 3) Generic crisis patterns with context-aware exclusions
-    disappear_patterns = [
-        # Avoid "disappear from class/school" etc using negative lookahead
-        r"\bdisappear\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
-        r"\bvanish\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
-        r"\b(?:i\s+don['']t\s+want\s+to\s+exist|i\s+want\s+to\s+disappear)\b",
-        r"\b(?:end\s+it\s+all|end\s+everything)\b"
-    ]
-    
-    for pat in disappear_patterns:
-        if re.search(pat, ml, flags=re.IGNORECASE):
+    for rx in _DISAPPEAR_PATTERNS:
+        if rx.search(ml):
             student_age = detect_age_from_message_and_history(message)
-            student_name = st.session_state.get('student_name', '')
+            student_name = st.session_state.get("student_name", "")
             intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
-            st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-            st.session_state.post_crisis_monitoring = True
+            st.session_state["safety_interventions"] = st.session_state.get("safety_interventions", 0) + 1
+            st.session_state["post_crisis_monitoring"] = True
             return True, intervention
-    
+
     # 4) Explicit phrases always win
     if has_explicit_crisis:
         student_age = detect_age_from_message_and_history(message)
-        student_name = st.session_state.get('student_name', '')
+        student_name = st.session_state.get("student_name", "")
         intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
-        st.session_state.safety_interventions = st.session_state.get('safety_interventions', 0) + 1
-        st.session_state.post_crisis_monitoring = True
+        st.session_state["safety_interventions"] = st.session_state.get("safety_interventions", 0) + 1
+        st.session_state["post_crisis_monitoring"] = True
         return True, intervention
-    
+
     return False, None
-    
-def get_crisis_resources():
-    """Get locale-appropriate crisis resources - DEFAULTS TO US FOR BETA FAMILIES"""
+
+def get_crisis_resources() -> Dict[str, str]:
+    """Get locale-appropriate crisis resources (🇺🇸 defaults to US for beta families)."""
     try:
-        locale = st.secrets.get("LOCALE", "US")  # 🇺🇸 Changed default to US
+        locale = st.secrets.get("LOCALE", "US")  # Do not move secrets into code
         return CRISIS_RESOURCES.get(locale, US_CRISIS_RESOURCES)
-    except:
+    except Exception:
+        # Conservative fallback for any access issues
         return US_CRISIS_RESOURCES  # 🇺🇸 US fallback for beta families
+
 
 # =============================================================================
 # CONVERSATION FLOW FIXES (NEW)
