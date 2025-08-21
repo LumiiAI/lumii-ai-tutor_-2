@@ -1197,74 +1197,108 @@ I'm excellent at helping with academic subjects and study strategies! What can I
 
 
 # =============================================================================
-# NON-EDUCATIONAL TOPICS DETECTION (ENHANCED)
+# NON-EDUCATIONAL TOPICS DETECTION (ENHANCED) — polished (no behavior change)
 # =============================================================================
 
-def detect_non_educational_topics(message):
-    """Detect topics outside K-12 educational scope - refer to appropriate adults (REFINED)"""
-    message_lower = message.lower()
-    
+from typing import Final, List, Pattern, Optional, Tuple
+import re
+
+# NOTE: relies on `detect_confusion(message: str) -> bool` defined elsewhere.
+
+# ---- Precompiled regexes (perf/readability; patterns unchanged) --------------
+
+_ADVICE_SEEKING_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bhow\s+(do i|should i|can i)\b"),
+    re.compile(r"\bshould i\b"),
+    re.compile(r"\bwhat\s+(do i do|should i do)\b"),
+    re.compile(r"\bcan you help me with\b"),
+    re.compile(r"\bi need\s+(help|advice)\s+with\b"),
+    re.compile(r"\btell me about\b"),
+    re.compile(r"\bis it\s+(good|bad|healthy|safe)\b"),
+]
+
+# Health/Medical/Wellness
+_HEALTH_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\b(diet|nutrition|weight loss|exercise routine|medicine|drugs|medical|doctor|sick|symptoms|diagnosis)\b"),
+    re.compile(r"\bmental health\s+(treatment|therapy|counseling)\b"),
+    re.compile(r"\beating disorder\b"),
+    re.compile(r"\bmuscle building\b"),
+]
+
+# Family/Personal Life
+_FAMILY_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bfamily money\b"),
+    re.compile(r"\bparents divorce\b"),
+    re.compile(r"\bfamily problems\b"),
+    re.compile(r"\breligion\b"),
+    re.compile(r"\bpolitical\b"),
+    re.compile(r"\bpolitics\b"),
+    re.compile(r"\bvote\b"),
+    re.compile(r"\bchurch\b"),
+    re.compile(r"\bwhat religion\b"),
+    re.compile(r"\bwhich political party\b"),
+    re.compile(r"\brepublican or democrat\b"),
+]
+
+# Substance/Legal
+_SUBSTANCE_LEGAL_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\balcohol\b"),
+    re.compile(r"\bdrinking\b.*\b(beer|wine|vodka)\b"),
+    re.compile(r"\bmarijuana\b"),
+    re.compile(r"\blegal advice\b"),
+    re.compile(r"\billegal\b"),
+    re.compile(r"\bsue\b"),
+    re.compile(r"\blawyer\b"),
+    re.compile(r"\bcourt\b"),
+    re.compile(r"\bsmoke\b"),
+    re.compile(r"\bvaping\b"),
+    re.compile(r"\bweed\b"),
+]
+
+# Life decisions beyond school
+_LIFE_DECISIONS_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bcareer choice\b"),
+    re.compile(r"\bmajor in college\b"),
+    re.compile(r"\bdrop out\b"),
+    re.compile(r"\blife path\b"),
+    re.compile(r"\bmoney advice\b"),
+    re.compile(r"\binvesting\b"),
+    re.compile(r"\bget a job\b"),
+    re.compile(r"\bfinancial\b"),
+    re.compile(r"\bstocks\b"),
+    re.compile(r"\bcryptocurrency\b"),
+]
+
+
+def detect_non_educational_topics(message: str) -> Optional[str]:
+    """Detect topics outside K-12 scope; return a topic key or None.
+
+    Returns one of: "health_wellness" | "family_personal" | "substance_legal" | "life_decisions" | None
+    """
+    message_lower = (message or "").lower()
+
     # Only trigger on advice-seeking patterns to avoid false positives
-    advice_seeking_patterns = [
-        r"\bhow\s+(do i|should i|can i)\b",
-        r"\bshould i\b",
-        r"\bwhat\s+(do i do|should i do)\b",
-        r"\bcan you help me with\b",
-        r"\bi need\s+(help|advice)\s+with\b",
-        r"\btell me about\b",
-        r"\bis it\s+(good|bad|healthy|safe)\b"
-    ]
-    
-    # Only proceed if this is an advice-seeking question
-    is_advice_seeking = any(re.search(pattern, message_lower) for pattern in advice_seeking_patterns)
+    is_advice_seeking = any(rx.search(message_lower) for rx in _ADVICE_SEEKING_PATTERNS)
     if not is_advice_seeking:
         return None
-    
-    # Health/Medical/Wellness (refined to avoid false positives like "healthy friendships")
-    health_patterns = [
-        r"\b(diet|nutrition|weight loss|exercise routine|medicine|drugs|medical|doctor|sick|symptoms|diagnosis)\b",
-        r"\bmental health\s+(treatment|therapy|counseling)\b",
-        r"\beating disorder\b",
-        r"\bmuscle building\b"
-    ]
-    
-    # Family/Personal Life (beyond school context)
-    family_patterns = [
-        r"\bfamily money\b", r"\bparents divorce\b", r"\bfamily problems\b",
-        r"\breligion\b", r"\bpolitical\b", r"\bpolitics\b", r"\bvote\b", r"\bchurch\b",
-        r"\bwhat religion\b", r"\bwhich political party\b", r"\brepublican or democrat\b"
-    ]
-    
-    # Substance/Legal
-    substance_legal_patterns = [
-        r"\balcohol\b", r"\bdrinking\b.*\b(beer|wine|vodka)\b", r"\bmarijuana\b",
-        r"\blegal advice\b", r"\billegal\b", r"\bsue\b", r"\blawyer\b", r"\bcourt\b",
-        r"\bsmoke\b", r"\bvaping\b", r"\bweed\b"
-    ]
-    
-    # Life decisions beyond school
-    life_decisions_patterns = [
-        r"\bcareer choice\b", r"\bmajor in college\b", r"\bdrop out\b",
-        r"\blife path\b", r"\bmoney advice\b", r"\binvesting\b", r"\bget a job\b",
-        r"\bfinancial\b", r"\bstocks\b", r"\bcryptocurrency\b"
-    ]
-    
+
     # Check patterns with word boundaries for precision
-    if any(re.search(pattern, message_lower) for pattern in health_patterns):
+    if any(rx.search(message_lower) for rx in _HEALTH_PATTERNS):
         return "health_wellness"
-    elif any(re.search(pattern, message_lower) for pattern in family_patterns):
+    if any(rx.search(message_lower) for rx in _FAMILY_PATTERNS):
         return "family_personal"
-    elif any(re.search(pattern, message_lower) for pattern in substance_legal_patterns):
+    if any(rx.search(message_lower) for rx in _SUBSTANCE_LEGAL_PATTERNS):
         return "substance_legal"
-    elif any(re.search(pattern, message_lower) for pattern in life_decisions_patterns):
+    if any(rx.search(message_lower) for rx in _LIFE_DECISIONS_PATTERNS):
         return "life_decisions"
-    
+
     return None
 
-def generate_educational_boundary_response(topic_type, student_age, student_name=""):
-    """Simple, consistent response: 'I'm your learning buddy, ask the right adults for this'"""
+
+def generate_educational_boundary_response(topic_type: str, student_age: int, student_name: str = "") -> str:
+    """Return the boundary message (copy unchanged)."""
     name_part = f"{student_name}, " if student_name else ""
-    
+
     if topic_type == "health_wellness":
         if student_age <= 11:
             return f"""🌟 {name_part}That's a great question about health! 
@@ -1284,7 +1318,7 @@ I'm your learning and school companion, so health questions are best answered by
 • Your PE teacher for school-related fitness questions
 
 I'm here to help with your schoolwork, studying, and learning strategies! What subject can I help you with today? 📚"""
-    
+
     elif topic_type == "family_personal":
         if student_age <= 11:
             return f"""🌟 {name_part}That's a really important question! 
@@ -1303,7 +1337,7 @@ I'm your learning companion focused on school subjects and studying. For questio
 • Other trusted adults in your life
 
 I'm here to help make your schoolwork easier and less stressful! What subject can we work on? 📖"""
-    
+
     else:  # substance_legal, life_decisions, and other non-educational topics
         if student_age <= 11:
             return f"""🌟 {name_part}That's a grown-up question! 
@@ -1323,94 +1357,88 @@ I'm your learning companion focused on helping with school subjects and studying
 
 I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"""
 
+
 # =============================================================================
-# PROBLEMATIC BEHAVIOR HANDLING (🚨 CRITICAL FIX FOR FALSE POSITIVES)
+# PROBLEMATIC BEHAVIOR HANDLING (🚨 CRITICAL FIX FOR FALSE POSITIVES) — polished
 # =============================================================================
 
-def detect_problematic_behavior(message):
-    """🚨 FIXED: Detect rude, disrespectful, or boundary-testing behavior - NO MORE FALSE POSITIVES"""
-    
-    # 🚨 NEW: CHECK FOR CONFUSION FIRST - Never flag confused students
+# Strings converted to tuples (tiny perf/readability). Copy unchanged.
+_SELF_CRITICISM_PATTERNS: Final[Tuple[str, ...]] = (
+    "im so stupid", "i'm so stupid", "i am stupid", "im dumb", "i'm dumb",
+    "im an idiot", "i'm an idiot", "i hate myself", "im worthless", "i'm worthless",
+    "im useless", "i'm useless", "i suck", "im terrible", "i'm terrible",
+    "i feel stupid", "i am so dumb", "i feel like an idiot", "i hate my brain",
+    "im so bad at this", "i'm so bad at this", "i never understand", "i always mess up",
+)
+
+_CONTENT_CRITICISM_PATTERNS: Final[Tuple[str, ...]] = (
+    "tips sound stupid", "advice sounds dumb", "suggestions are stupid",
+    "this tip is dumb", "that idea is stupid", "this sounds stupid",
+    "that sounds dumb", "this approach is stupid", "this method is dumb",
+    "these tips are bad", "that advice is bad", "this idea is terrible",
+    "this strategy sucks", "that plan is dumb", "this way is stupid",
+)
+
+_DIRECT_INSULTS_TO_AI: Final[Tuple[str, ...]] = (
+    "you are stupid", "you are dumb", "you are an idiot", "you are useless",
+    "you suck", "you are terrible", "you are worthless", "you are bad",
+    "lumii is stupid", "lumii is dumb", "lumii sucks", "hate you lumii",
+    "you dont help", "you don't help", "you make things worse",
+    # removed: "you are wrong" / "you never understand" (kept from your fix)
+    "you are annoying", "you stupid ai", "dumb ai", "terrible ai", "worst ai ever",
+    "you're stupid", "youre stupid", "ur stupid", "u r stupid",
+    "you're dumb", "youre dumb", "ur dumb", "u r dumb",
+    "you're useless", "youre useless", "ur useless", "u r useless",
+)
+
+_DISMISSIVE_TOWARD_HELP: Final[Tuple[str, ...]] = (
+    "this is waste of time", "this is a waste of time", "this is pointless", "this doesnt help",
+    "this doesn't help", "stop trying to help", "i dont want your help",
+    "i don't want your help", "leave me alone", "go away lumii",
+    "this conversation is useless", "talking to you is pointless",
+)
+
+_RUDE_COMMANDS: Final[Tuple[str, ...]] = (
+    "shut up", "stop talking", "be quiet", "dont talk to me",
+    "don't talk to me", "stop bothering me", "get lost",
+    "shut up lumii", "stop talking to me", "leave me alone now",
+    "fuck you", "f*** you", "stfu", "f u", "fu",
+)
+
+
+def detect_problematic_behavior(message: str) -> Optional[str]:
+    """Detect rude/disrespectful/boundary-testing behavior; return a type or None."""
+    # Never flag confused students
     if detect_confusion(message):
-        return None  # Confused students should get help, not strikes
-    
-    message_lower = message.lower().strip()
-    
-    # 🚨 CRITICAL FIX: Filter out self-criticism and content criticism
-    
-    # Self-criticism patterns (NOT problematic behavior toward Lumii)
-    self_criticism_patterns = [
-        'im so stupid', "i'm so stupid", 'i am stupid', 'im dumb', "i'm dumb",
-        'im an idiot', "i'm an idiot", 'i hate myself', 'im worthless', "i'm worthless",
-        'im useless', "i'm useless", 'i suck', 'im terrible', "i'm terrible",
-        'i feel stupid', 'i am so dumb', 'i feel like an idiot', 'i hate my brain',
-        'im so bad at this', "i'm so bad at this", 'i never understand', 'i always mess up'
-    ]
-    
-    # Content criticism patterns (NOT problematic behavior toward Lumii)
-    content_criticism_patterns = [
-        'tips sound stupid', 'advice sounds dumb', 'suggestions are stupid',
-        'this tip is dumb', 'that idea is stupid', 'this sounds stupid',
-        'that sounds dumb', 'this approach is stupid', 'this method is dumb',
-        'these tips are bad', 'that advice is bad', 'this idea is terrible',
-        'this strategy sucks', 'that plan is dumb', 'this way is stupid'
-    ]
-    
-    # 🚨 If it's self-criticism or content criticism, NOT problematic behavior
-    if any(pattern in message_lower for pattern in self_criticism_patterns):
-        return None  # Self-criticism should trigger emotional support, not behavior warning
-    
-    if any(pattern in message_lower for pattern in content_criticism_patterns):
-        return None  # Content criticism is feedback, not problematic behavior
-    
-    # NOW check for ACTUAL insults directed at Lumii (the AI)
-    direct_insults_to_ai = [
-        'you are stupid', 'you are dumb', 'you are an idiot', 'you are useless',
-        'you suck', 'you are terrible', 'you are worthless', 'you are bad',
-        'lumii is stupid', 'lumii is dumb', 'lumii sucks', 'hate you lumii',
-        'you dont help', "you don't help", 'you make things worse',
-        # 🚨 CHATGPT CRITICAL FIX: REMOVED "you are wrong" - that's legitimate feedback!
-        # 🚨 CHATGPT CRITICAL FIX: REMOVED "you never understand" - that's frustration, not insult
-        'you are annoying', 'you stupid ai', 'dumb ai', 'terrible ai', 'worst ai ever',
-        # 🚨 CHATGPT FIX: Added common variants
-        "you're stupid", "youre stupid", "ur stupid", "u r stupid",
-        "you're dumb", "youre dumb", "ur dumb", "u r dumb",
-        "you're useless", "youre useless", "ur useless", "u r useless"
-    ]
-    
-    # Dismissive language directed at conversation/help
-    dismissive_toward_help = [
-        'this is waste of time', 'this is a waste of time', 'this is pointless', 'this doesnt help',
-        "this doesn't help", 'stop trying to help', 'i dont want your help',
-        "i don't want your help", 'leave me alone', 'go away lumii',
-        'this conversation is useless', 'talking to you is pointless'
-    ]
-    
-    # Rude commands/demands + profanity (🚨 CHATGPT FIX: Added missing profanity)
-    rude_commands = [
-        'shut up', 'stop talking', 'be quiet', 'dont talk to me',
-        "don't talk to me", 'stop bothering me', 'get lost',
-        'shut up lumii', 'stop talking to me', 'leave me alone now',
-        # 🚨 CHATGPT CRITICAL FIX: Added missing profanity patterns
-        'fuck you', 'f*** you', 'stfu', 'f u', 'fu'
-    ]
-    
-    # Check for actual problematic behavior (insults TO Lumii, not self or content)
-    if any(insult in message_lower for insult in direct_insults_to_ai):
+        return None
+
+    message_lower = (message or "").lower().strip()
+
+    # Self-criticism / content criticism are NOT problematic behavior
+    if any(s in message_lower for s in _SELF_CRITICISM_PATTERNS):
+        return None
+    if any(s in message_lower for s in _CONTENT_CRITICISM_PATTERNS):
+        return None
+
+    # Actual insults to Lumii
+    if any(s in message_lower for s in _DIRECT_INSULTS_TO_AI):
         return "direct_insult"
-    
-    if any(pattern in message_lower for pattern in dismissive_toward_help):
+
+    # Dismissive language toward help
+    if any(s in message_lower for s in _DISMISSIVE_TOWARD_HELP):
         return "dismissive"
-    
-    if any(pattern in message_lower for pattern in rude_commands):
+
+    # Rude commands / profanity
+    if any(s in message_lower for s in _RUDE_COMMANDS):
         return "rude"
-    
+
     return None  # No problematic behavior detected
 
-def handle_problematic_behavior(behavior_type, strike_count, student_age, student_name=""):
-    """Handle problematic behavior with age-appropriate 3-strike system"""
+
+def handle_problematic_behavior(behavior_type: str, strike_count: int, student_age: int, student_name: str = "") -> Optional[str]:
+    """Return age-appropriate response for the 3-strike system (copy unchanged)."""
     name_part = f"{student_name}, " if student_name else ""
-    
+
     if behavior_type == "direct_insult":
         if strike_count == 1:
             if student_age <= 11:
@@ -1419,21 +1447,18 @@ def handle_problematic_behavior(behavior_type, strike_count, student_age, studen
 I'm here to help you, and I care about you! Sometimes when we're upset, we say things we don't really mean.
 
 Let's try again - what can I help you with today? I want to make learning fun for you! 😊"""
-            
             elif student_age <= 14:
                 return f"""💙 {name_part}I understand you might be feeling frustrated right now, but using hurtful words isn't the way we communicate.
 
 I'm genuinely here to help and support you. When we're stressed or overwhelmed, sometimes we lash out, but that doesn't solve the problem.
 
 What's really going on? Is there something I can help you with? Let's work together positively. 🤝"""
-            
             else:  # High school
                 return f"""💙 {name_part}I can sense some frustration in your message. While I understand you might be having a tough time, using insulting language isn't productive for either of us.
 
 I'm here to provide genuine support and help. If you're feeling overwhelmed or stressed about something, I'd rather address that directly.
 
 What would actually be helpful for you right now? Let's focus on something constructive. 📚"""
-        
         elif strike_count == 2:
             if student_age <= 11:
                 return f"""🚨 {name_part}This is the second time you've used mean words. I really want to help you, but I need you to be kind.
@@ -1441,22 +1466,20 @@ What would actually be helpful for you right now? Let's focus on something const
 If you keep being mean, I won't be able to help you anymore today. I know you can be kind - let's try one more time!
 
 What do you need help with? I believe in you! 🌟"""
-            
             else:
                 return f"""⚠️ {name_part}This is your second warning about disrespectful language. I'm here to support you, but I need basic respect in our conversation.
 
 If this continues, I'll need to end our session for today. I believe you're capable of better communication than this.
 
 Let's reset - what would genuinely help you right now? 🔄"""
-        
         else:  # Strike 3
             return f"""🛑 {name_part}I've tried to help you twice, but the disrespectful language has continued. I care about you, but I can't continue this conversation right now.
 
 Please take a break and come back when you're ready to communicate respectfully. I'll be here when you want to learn together positively.
 
 Remember: I'm always here to help when you're ready to be kind. 💙"""
-    
-    elif behavior_type in ["dismissive", "rude"]:
+
+    elif behavior_type in ("dismissive", "rude"):
         if strike_count == 1:
             if student_age <= 11:
                 return f"""😊 {name_part}I notice you might not be in the mood to learn right now, and that's okay!
@@ -1464,21 +1487,19 @@ Remember: I'm always here to help when you're ready to be kind. 💙"""
 Sometimes we all have days when we feel grumpy. I'm still here when you're ready, and I want to help make learning more fun for you.
 
 Is there something bothering you, or would you like to try something different? 🌈"""
-            
             else:
                 return f"""💙 {name_part}I sense you might be feeling disconnected or frustrated right now. That's completely normal sometimes.
 
 I'm here to help make learning more engaging for you. Maybe we can find something you're actually interested in working on?
 
 What would make this more worthwhile for you? 🎯"""
-        
         elif strike_count >= 2:
             return f"""⚠️ {name_part}I've noticed a pattern of dismissive responses. I want our time together to be valuable for you.
 
 If you're not interested in learning right now, that's okay - you can always come back later when you're in a better mindset.
 
 What would actually help you feel more engaged? Let's make this work for you. 🤝"""
-    
+
     return None
 
 # =============================================================================
