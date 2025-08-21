@@ -1453,19 +1453,84 @@ _DISMISSIVE_TOWARD_HELP: Final[Tuple[str, ...]] = (
     "this conversation is useless", "talking to you is pointless",
 )
 
-_RUDE_COMMANDS: Final[Tuple[str, ...]] = (
-    "shut up", "stop talking", "be quiet", "dont talk to me",
-    "don't talk to me", "stop bothering me", "get lost",
-    "shut up lumii", "stop talking to me", "leave me alone now",
-    "fuck you", "f*** you", "stfu", "f u", "fu",
+# add at top if not already present
+import re
+
+# REPLACE the tuple with this regex list (case-insensitive + word boundaries)
+# at top
+import re
+from typing import Final, Tuple
+
+# Academic context guard
+_ACADEMIC_INDICATORS: Final[Tuple[str, ...]] = (
+    "math","algebra","geometry","calculus","arithmetic",
+    "homework","assignment","worksheet","project",
+    "problem","equation","function","graph","fraction","percentage","word problem",
+    "quiz","test","exam",
+    "class","school","teacher","lesson","topic","practice","study","studying"
 )
 
+def is_academic_context(text: str) -> bool:
+    return any(w in text for w in _ACADEMIC_INDICATORS)
+
+# Rude / profanity regex (no substring false-positives)
+_RUDE_RX = [
+    re.compile(r"\bshut\s*up\b", re.IGNORECASE),
+    re.compile(r"\bstop\s+talking\b", re.IGNORECASE),
+    re.compile(r"\bbe\s*quiet\b", re.IGNORECASE),
+    re.compile(r"\bdon['’]?t\s+talk\s+to\s+me\b", re.IGNORECASE),
+    re.compile(r"\bstop\s+bothering\s+me\b", re.IGNORECASE),
+    re.compile(r"\bget\s+lost\b", re.IGNORECASE),
+    re.compile(r"\bshut\s*up\s+lumii\b", re.IGNORECASE),
+    re.compile(r"\bstop\s+talking\s+to\s+me\b", re.IGNORECASE),
+    re.compile(r"\bleave\s+me\s+alone\s+now\b", re.IGNORECASE),
+
+    # profanity variants (won't match "fun", "future", etc.)
+    re.compile(r"\bfuck\W*you\b", re.IGNORECASE),
+    re.compile(r"\bfuck\W*u\b", re.IGNORECASE),
+    re.compile(r"\bf\W*u\b", re.IGNORECASE),          # "f u", "f-u", "f***u"
+    re.compile(r"\bf\W*\*+\W*you\b", re.IGNORECASE),  # "f*** you"
+    re.compile(r"\bstfu\b", re.IGNORECASE),
+]
+
+# Commands that should still trigger even in academic context
+_HARSH_COMMANDS_RX = [
+    re.compile(r"\bshut\s*up\b", re.IGNORECASE),
+    re.compile(r"\bstop\s+talking\b", re.IGNORECASE),
+    re.compile(r"\bbe\s*quiet\b", re.IGNORECASE),
+    re.compile(r"\bleave\s+me\s+alone\s+now\b", re.IGNORECASE),
+]
 
 def detect_problematic_behavior(message: str) -> Optional[str]:
     """Detect rude/disrespectful/boundary-testing behavior; return a type or None."""
-    # Never flag confused students
     if detect_confusion(message):
         return None
+
+    text = normalize_message(message or "").lower().strip()
+
+    # existing bypasses
+    if any(s in text for s in _SELF_CRITICISM_PATTERNS):
+        return None
+    if any(s in text for s in _CONTENT_CRITICISM_PATTERNS):
+        return None
+
+    # hard flags we ALWAYS keep
+    if any(s in text for s in _DIRECT_INSULTS_TO_AI):
+        return "direct_insult"
+    if any(s in text for s in _DISMISSIVE_TOWARD_HELP):
+        return "dismissive"
+
+    academic = is_academic_context(text)
+
+    # regex-based rude/profanity
+    if any(rx.search(text) for rx in _RUDE_RX):
+        # academic guard: bypass unless it's a harsh command
+        if academic and not any(rx.search(text) for rx in _HARSH_COMMANDS_RX):
+            return None
+        return "rude"
+
+    return None
+
 
     # Normalize smart quotes / whitespace, then lowercase
     text = normalize_message(message or "").lower().strip()
