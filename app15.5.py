@@ -465,51 +465,81 @@ def get_crisis_resources() -> Dict[str, str]:
 
 
 # =============================================================================
-# CONVERSATION FLOW FIXES (NEW)
+# CONVERSATION FLOW FIXES (NEW) — polished with type hints & safer guards
 # =============================================================================
 
-def is_polite_decline(message):
-    """Detect polite declines that shouldn't end conversation - ENHANCED SAFETY"""
-    message_lower = message.lower().strip()
-    
+from typing import Dict, Optional, Tuple, List, Iterable
+import random
+import re
+import streamlit as st
+
+# NOTE: This module assumes the app defines `ENHANCED_CRISIS_PATTERNS`,
+# `normalize_message`, `detect_age_from_message_and_history`, and
+# `generate_age_adaptive_crisis_intervention` elsewhere.
+
+# Immutable constants (tiny perf/readability win)
+_POLITE_DECLINE_BASICS: Tuple[str, ...] = ("no", "no thanks", "not now", "maybe later")
+_CRISIS_INDICATORS: Tuple[str, ...] = (
+    "disappear", "dissapear", "vanish", "end it", "better off", "no point",
+    "give up", "hopeless", "worthless", "burden", "hurt myself", "kill myself",
+)
+_POLITE_DECLINES_SAFE: Tuple[str, ...] = (
+    "no thanks", "not now", "maybe later", "not right now", "no thank you",
+    "i'm good", "i'm ok", "not today", "maybe tomorrow", "later", "nah",
+)
+_ACCEPT_HEADS: Tuple[str, ...] = (
+    "yes", "yes please", "sure", "okay", "ok", "yeah", "yep", "sounds good",
+    "that would help", "please", "definitely", "absolutely", "yup", "sure thing",
+    "okay please", "sounds great",
+)
+_OFFER_PATTERNS: Tuple[str, ...] = (
+    "would you like", "can i help", "let me help", "i can offer",
+    "tips", "advice", "suggestions", "would you like some",
+    "want some help", "help you with", "give you some tips",
+    "share some advice", "show you how",
+)
+_OFFER_KEYWORDS: Tuple[str, ...] = (
+    "helpful tips", "tips", "study tips", "help with studying",
+    "approach your studying", "study plan", "organize", "break it down",
+    "step by step", "guide you through", "math homework", "science test",
+    "friendship tips", "friend", "making friends",
+)
+
+def _iter_recent_user_contents(messages: Iterable[dict], n: int) -> List[str]:
+    """Safely collect up to `n` most recent user message contents (lowercased)."""
+    out: List[str] = []
+    for msg in list(messages)[-n:]:
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            out.append(str(msg.get("content", "")).lower())
+    return out
+
+def is_polite_decline(message: str) -> bool:
+    """Detect polite declines that shouldn't end conversation - ENHANCED SAFETY."""
+    message_lower = (message or "").lower().strip()
+
     # 🚨 CRITICAL: Never treat crisis-context "no" as polite decline
-    if message_lower in ["no", "no thanks", "not now", "maybe later"]:
+    if message_lower in _POLITE_DECLINE_BASICS:
         # Check recent conversation for crisis context
-        recent_user_messages = []
-        for msg in st.session_state.messages[-5:]:
-            if msg.get('role') == 'user':
-                recent_user_messages.append(msg.get('content', '').lower())
-        
-        recent_context = " ".join(recent_user_messages)
-        crisis_indicators = [
-            "disappear", "dissapear", "vanish", "end it", "better off", "no point",
-            "give up", "hopeless", "worthless", "burden", "hurt myself", "kill myself"
-        ]
-        
-        # If crisis context detected, this is NOT a polite decline
-        if any(indicator in recent_context for indicator in crisis_indicators):
+        recent_msgs = st.session_state.get("messages", [])
+        recent_context = " ".join(_iter_recent_user_contents(recent_msgs, 5))
+        if any(ind in recent_context for ind in _CRISIS_INDICATORS):
             return False
-    
-    # Original polite decline detection
-    polite_declines = [
-        "no thanks", "not now", "maybe later", "not right now",
-        "no thank you", "i'm good", "i'm ok", "not today",
-        "maybe tomorrow", "later", "nah"
-    ]
-    
-    # Only consider polite decline if EXACTLY matching safe phrases
-    for decline in polite_declines:
+
+    # Original polite decline detection (exact or near-exact matches only)
+    for decline in _POLITE_DECLINES_SAFE:
         if message_lower == decline:
             return True
-        if message_lower.startswith(decline + " ") and len(message_lower) < len(decline) + 20:
-            return True
-    
+        if message_lower.startswith(decline + " "):
+            # Allow short tails only (<= ~20 chars)
+            if len(message_lower) < len(decline) + 20:
+                return True
+
     return False
 
-def handle_polite_decline(student_age, student_name=""):
-    """Handle polite declines without ending conversation"""
+def handle_polite_decline(student_age: int, student_name: str = "") -> str:
+    """Handle polite declines without ending conversation (copy unchanged)."""
     name_part = f"{student_name}, " if student_name else ""
-    
+
     if student_age <= 11:
         return f"""😊 {name_part}That's totally okay! 
 
@@ -520,7 +550,6 @@ Would you like to:
 • Or just sit quietly for a bit?
 
 I'm here whenever you're ready! 🌟"""
-    
     elif student_age <= 14:
         return f"""😊 {name_part}No worries at all! 
 
@@ -531,7 +560,6 @@ Maybe you'd like to:
 • Or just have a casual conversation?
 
 I'm here when you want to chat about anything! 💙"""
-    
     else:  # High school
         return f"""😊 {name_part}Absolutely fine! 
 
@@ -543,82 +571,64 @@ Feel free to:
 
 I'm here to support you however feels right! 🤗"""
 
-def is_duplicate_response(new_response):
-    """Check if new response is duplicate of last response"""
-    if len(st.session_state.messages) > 0:
-        for msg in reversed(st.session_state.messages):
-            if msg["role"] == "assistant":
-                return new_response[:100].strip() == msg["content"][:100].strip()
+def is_duplicate_response(new_response: str) -> bool:
+    """Check if new response is duplicate of last assistant response (first 100 chars)."""
+    msgs = st.session_state.get("messages", [])
+    if not msgs:
+        return False
+    for msg in reversed(msgs):
+        if isinstance(msg, dict) and msg.get("role") == "assistant":
+            prev = str(msg.get("content", ""))
+            return (new_response or "")[:100].strip() == prev[:100].strip()
     return False
 
-def add_variation_to_response(base_response):
-    """Add variation to prevent exact duplicates"""
-    import random
-    variations = [
+def add_variation_to_response(base_response: str) -> str:
+    """Add light variation to prevent exact duplicates (copy unchanged)."""
+    variations = (
         "\n\n🌟 Let's try a different approach this time!",
         "\n\n💡 Here's another way to think about it:",
         "\n\n🎯 Want to explore this from a new angle?",
         "\n\n✨ Let me add something helpful:",
-    ]
-    return base_response + random.choice(variations)
+    )
+    return (base_response or "") + random.choice(variations)
 
 # =============================================================================
 # ENHANCED CONVERSATION CONTEXT TRACKING - FIXED
 # =============================================================================
 
-def get_last_offer_context():
-    """Track what was offered in the last assistant message - ENHANCED"""
-    if len(st.session_state.messages) > 0:
-        for msg in reversed(st.session_state.messages):
-            if msg["role"] == "assistant":
-                content = msg["content"].lower()
-                # Enhanced detection patterns
-                offer_patterns = [
-                    "would you like", "can i help", "let me help", "i can offer", 
-                    "tips", "advice", "suggestions", "would you like some",
-                    "want some help", "help you with", "give you some tips",
-                    "share some advice", "show you how"
-                ]
-                if any(offer in content for offer in offer_patterns):
-                    return {"offered_help": True, "content": msg["content"]}
-                break
+def get_last_offer_context() -> Dict[str, Optional[str]]:
+    """Track what was offered in the last assistant message - ENHANCED."""
+    msgs = st.session_state.get("messages", [])
+    if not msgs:
+        return {"offered_help": False, "content": None}
+
+    for msg in reversed(msgs):
+        if isinstance(msg, dict) and msg.get("role") == "assistant":
+            content = str(msg.get("content", ""))
+            lc = content.lower()
+            if any(pat in lc for pat in _OFFER_PATTERNS):
+                return {"offered_help": True, "content": content}
+            break
     return {"offered_help": False, "content": None}
 
 # 🎯 FIXED: is_accepting_offer() function
-def is_accepting_offer(message):
-    """Check if message is accepting a previous offer - ENHANCED FOR SPECIFIC REQUESTS"""
-    msg = message.strip().lower()
-    
-    # Generic acceptance phrases
-    accept_heads = ("yes", "yes please", "sure", "okay", "ok", "yeah", "yep", 
-                   "sounds good", "that would help", "please", "definitely", 
-                   "absolutely", "yup", "sure thing", "okay please", "sounds great")
-    
+def is_accepting_offer(message: str) -> bool:
+    """Check if message is accepting a previous offer - ENHANCED FOR SPECIFIC REQUESTS."""
+    msg = (message or "").strip().lower()
     last_offer = get_last_offer_context()
     if not last_offer["offered_help"]:
         return False
-    
-    # 🆕 NEW: Check for specific help requests that match what was offered
-    if last_offer["content"]:
-        offer_content = last_offer["content"].lower()
-        
-        # Look for key phrases from the offer in the user's message
-        offer_keywords = [
-            "helpful tips", "tips", "study tips", "help with studying", 
-            "approach your studying", "study plan", "organize", "break it down",
-            "step by step", "guide you through", "math homework", "science test",
-            "friendship tips", "friend", "making friends"
-        ]
-        
-        # If user mentions specific help that was offered, count as acceptance
-        for keyword in offer_keywords:
-            if keyword in offer_content and keyword in msg:
-                # Extra safety: make sure it's not a crisis context
-                if not any(pattern.search(msg) for pattern in ENHANCED_CRISIS_PATTERNS):
-                    return True
-    
+
+    # 🆕 NEW: Specific help requests matching what was offered
+    offer_content = (last_offer["content"] or "").lower()
+    for keyword in _OFFER_KEYWORDS:
+        if keyword in offer_content and keyword in msg:
+            # Extra safety: ensure it's not crisis context
+            if not any(pattern.search(msg) for pattern in ENHANCED_CRISIS_PATTERNS):
+                return True
+
     # Original logic: Generic acceptances
-    for head in accept_heads:
+    for head in _ACCEPT_HEADS:
         if msg == head:
             return True
         if msg.startswith(head + " "):
@@ -627,58 +637,32 @@ def is_accepting_offer(message):
             if any(pattern.search(tail) for pattern in ENHANCED_CRISIS_PATTERNS):
                 return False  # Not a safe acceptance
             return True
-    
+
     return False
 
 # 🧪 TEST THE FIX
-def test_conversation_flow_fix():
-    """Test that the fix works for Lucy's scenario"""
-    
-    # Simulate the offer context
-    test_offer_context = {
-        "offered_help": True,
-        "content": "helpful tips on how to approach your studying and make the most of your time before the test"
-    }
-    
+def test_conversation_flow_fix() -> None:
+    """Test that the fix works for Lucy's scenario (prints expectations)."""
     test_cases = [
-        # Should be recognized as accepting help
         ("helpful tips on how to approach your studying", True),
         ("study tips please", True),
         ("help with studying", True),
         ("yes please", True),
         ("sure", True),
-        
-        # Should NOT be recognized (different context)
         ("i don't want help", False),
         ("that's stupid", False),
         ("whatever", False),
     ]
-    
     for message, expected in test_cases:
-        # Mock the last offer context
-        # result = is_accepting_offer(message)  # You'll need to test this in your app
         print(f"'{message}' → Should be {expected}")
 
-# 🎯 WHY THIS FIXES LUCY'S ISSUE:
-"""
-Before Fix:
-Lucy: "helpful tips on how to approach your studying"
-is_accepting_offer(): False (doesn't start with "yes"/"sure")
-→ Goes to behavior detection → Strike 1 ❌
-
-After Fix: 
-Lucy: "helpful tips on how to approach your studying"
-is_accepting_offer(): True (matches offered keyword "helpful tips")
-→ Provides study tips ✅
-"""
-
 def _contains_crisis_resource(text: str) -> bool:
-    """Detect crisis/hotline language that shouldn't appear during normal help acceptance"""
-    t = text.lower()
-    crisis_markers = [
+    """Detect crisis/hotline language that shouldn't appear during normal help acceptance."""
+    t = (text or "").lower()
+    crisis_markers = (
         "116 111", "116 123", "112", "113", "crisis", "suicide", "samarijan", "tom telefon",
-        "hotline", "trusted adult", "emergency", "klic v sili", "duševni stiski"
-    ]
+        "hotline", "trusted adult", "emergency", "klic v sili", "duševni stiski",
+    )
     return any(m in t for m in crisis_markers)
 
 # =============================================================================
