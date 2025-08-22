@@ -1002,7 +1002,7 @@ _OFFER_KEYWORDS: Tuple[str, ...] = (
     "friendship tips", "friend", "making friends",
 )
 
-def _iter_recent_user_contents(messages: Iterable[dict], n: int) -> List[str]:
+def _iter_recent_user_contents(messages: List[dict], n: int) -> List[str]:
     """Safely collect up to `n` most recent user message contents (lowercased)."""
     out: List[str] = []
     for msg in list(messages)[-n:]:
