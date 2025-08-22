@@ -230,15 +230,15 @@ def normalize_message(message: str) -> str:
     # --- Normalize Unicode punctuation to ASCII equivalents ---
     # Curly quotes/apostrophes and dashes commonly used on phones
     trans_table = str.maketrans({
-        "'": "'",  # right single quote
-        "'": "'",  # left single quote
-        "ʼ": "'",  # modifier letter apostrophe
-        "‛": "'",  # reversed single quote
-        """: '"',  # left double quote
-        """: '"',  # right double quote
-        "–": "-",  # en dash
-        "—": "-",  # em dash
-        "…": "...",  # ellipsis
+        "\u2019": "'",  # right single quote
+        "\u2018": "'",  # left single quote
+        "\u02BC": "'",  # modifier letter apostrophe
+        "\u201B": "'",  # reversed single quote
+        "\u201C": '"',  # left double quote
+        "\u201D": '"',  # right double quote
+        "\u2013": "-",  # en dash
+        "\u2014": "-",  # em dash
+        "\u2026": "...",  # ellipsis
         "\u00A0": " ",  # non-breaking space
     })
     msg = msg.translate(trans_table)
@@ -302,7 +302,7 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
     ),
     # 🚨 FIXED: "if i'm gone" vs "if i was gone"
     re.compile(
-        r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b',
+        r'\b(?:everybody|everyone|people|family|my\s+(?:parents|family|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:if\s+)?i\s*(?:am|["\u2019\u2032]?\s*m)\s+gone\b',
         re.IGNORECASE,
     ),
     re.compile(
@@ -338,7 +338,7 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
         re.IGNORECASE,
     ),
     re.compile(
-        r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b',
+        r'\b(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\u2019\u2032]?\s*m)\s+gone\b',
         re.IGNORECASE,
     ),
     re.compile(
@@ -346,7 +346,7 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
         re.IGNORECASE,
     ),
     re.compile(
-        r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\'\′]?\s*m)\s+gone\b',
+        r'\bi\s+(?:really\s+)?think\s+(?:it\s+)?would\s+be\s+(?:happier|better)\s+(?:for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+)?(?:if\s+)?i\s*(?:am|["\u2019\u2032]?\s*m)\s+gone\b',
         re.IGNORECASE,
     ),
     re.compile(
@@ -354,7 +354,7 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
         re.IGNORECASE,
     ),
     re.compile(
-        r"\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|['\′]?\s*m)\s+gone\b",
+        r"\b(?:better|happier)\s+for\s+(?:every(?:one|body)|people|them|my\s+(?:family|parents|friends))\s+if\s+i\s*(?:am|[\u2019\u2032]?\s*m)\s+gone\b",
         re.IGNORECASE,
     ),
     # "I want to end it"
@@ -394,32 +394,32 @@ import streamlit as st
 # and `generate_age_adaptive_crisis_intervention` defined elsewhere in the app.
 
 # Normalize common non-ASCII apostrophes to ASCII "'"
-_APOSTROPHE_RX: Final[Pattern[str]] = re.compile(r"[''‛`´′]")
+_APOSTROPHE_RX: Final[Pattern[str]] = re.compile(r"[\u2019\u2018\u201B`\u00B4\u2032]")
 
 CONFUSION_PATTERNS: Final[List[Pattern[str]]] = [
     # "i'm so confused" + common misspellings; tolerate smart/variant apostrophes
     re.compile(
-        r"\bi\s*(?:am|['′`´]?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b",
+        r"\bi\s*(?:am|[\u2019\u2032`\u00B4]?\s*m)\s+(?:so\s+)?(?:confus(?:e|ed|ing)|cofused|confusd|conufsed|cnofused)\b",
         re.IGNORECASE,
     ),
     # "i don't get/understand/follow" (smart/variant apostrophes tolerated)
-    re.compile(r"\b(?:i\s+)?don['′`´]?t\s+(?:get|understand|follow)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+)?don[\u2019\u2032`\u00B4]?t\s+(?:get|understand|follow)\b", re.IGNORECASE),
     # "this/that/it makes no sense"
     re.compile(r"\b(?:this|that|it)\s+makes?\s+no\s+sense\b", re.IGNORECASE),
     # "idk" or "i don't know" (smart/variant apostrophes tolerated)
-    re.compile(r"\b(?:idk|i\s+don['′`´]?t\s+know)\b", re.IGNORECASE),
+    re.compile(r"\b(?:idk|i\s+don[\u2019\u2032`\u00B4]?t\s+know)\b", re.IGNORECASE),
     # "i'm lost/stuck" (smart/variant apostrophes tolerated)
-    re.compile(r"\bi\s*(?:am|['′`´]?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
+    re.compile(r"\bi\s*(?:am|[\u2019\u2032`\u00B4]?\s*m)\s+(?:lost|stuck)\b", re.IGNORECASE),
 ]
 
 # Apology patterns (higher priority than confusion so apologies don't trigger confusion flow)
 APOLOGY_PATTERNS: Final[List[Pattern[str]]] = [
     # "i'm sorry" / "i am sorry" – tolerate smart/variant apostrophes and spacing
-    re.compile(r"\b(?:i\s*am|i['′`´]?\s*m)\s+sorry\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s*am|i[\u2019\u2032`\u00B4]?\s*m)\s+sorry\b", re.IGNORECASE),
     re.compile(r"\bsorry\b", re.IGNORECASE),              # broad catch
     re.compile(r"\bmy\s+bad\b", re.IGNORECASE),
     re.compile(r"\bapologiz(?:e|ing|ed)\b", re.IGNORECASE),
-    re.compile(r"\bi\s+didn['′`´]?t\s+mean\s+to\b", re.IGNORECASE),
+    re.compile(r"\bi\s+didn[\u2019\u2032`\u00B4]?t\s+mean\s+to\b", re.IGNORECASE),
 ]
 
 def is_apology(message: str) -> bool:
@@ -452,7 +452,7 @@ IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
     ),
     # Future intent phrased as immediate plan
     re.compile(
-        r"\b(?:i\s*(?:am|[\'′]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b",
+        r"\b(?:i\s*(?:am|[\u2019\u2032]?\s*m)\s+)?(?:going\s+to|gonna)\s+(?:kill|hurt|end)\s+myself\b",
         re.IGNORECASE,
     ),
     re.compile(r"\bi\s+will\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
@@ -707,7 +707,7 @@ def detect_confusion(message: str) -> bool:
 
 # Precompiled context regex for ambiguous ideation cues in recent messages
 _CTX_IDEATION_EUPHEMISM_RX: Final[Pattern[str]] = re.compile(
-    r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|['\"′]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)"
+    r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|[\"\u2019\u2032]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)"
 )
 
 def _contextual_crisis_boost(message: str) -> bool:
