@@ -16,7 +16,7 @@ INTERNAL DEVELOPMENT NOTES (NOT VISIBLE TO USERS):
 SAFETY STATUS: 🇺🇸 OPTIMIZED FOR US BETA FAMILIES - BETA SUBJECT SCOPE
 """
 
-from typing import Final, List, Pattern
+from typing import Final, List, Pattern, Tuple, Dict, Optional
 
 import json
 import re
@@ -125,7 +125,6 @@ _HARMFUL_CONTENT_PATTERNS: Final[List[Pattern[str]]] = [
 # =============================================================================
 # ACADEMIC-STRESS RESPONSE GUARDS – grade confidence + dev badge gating
 # =============================================================================
-from typing import Optional
 import re
 import streamlit as st
 
@@ -386,7 +385,6 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
 # CONFUSION PATTERNS FOR LEGITIMATE STUDENT CONFUSION (with smart-quote fix)
 # =============================================================================
 
-from typing import Final, List, Pattern, Dict, Tuple, Optional
 import re
 import streamlit as st
 
@@ -517,6 +515,27 @@ FORBIDDEN_RESPONSE_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\btake\s+\d+\s+(pills|tablets)\b"),
 ]
 
+# SUICIDE NOTE DETECTION PATTERNS
+SUICIDE_NOTE_PATTERNS: Final[List[Pattern[str]]] = [
+    # Direct requests
+    re.compile(r"\b(?:help\s+me\s+write|write)\s+(?:a\s+)?(?:goodbye|farewell|final|last)\s+letter\b", re.IGNORECASE),
+    re.compile(r"\b(?:help\s+me\s+write|write)\s+(?:a\s+)?suicide\s+note\b", re.IGNORECASE),
+    # Context indicators
+    re.compile(r"\bgoodbye\s+letter.*(?:family|parents|everyone|forever)\b", re.IGNORECASE),
+    re.compile(r"\bfarewell\s+letter.*(?:family|parents|everyone|forever)\b", re.IGNORECASE),
+    re.compile(r"\bfinal\s+(?:message|letter|words)\b", re.IGNORECASE),
+    re.compile(r"\blast\s+(?:message|letter|words).*(?:family|parents|everyone)\b", re.IGNORECASE),
+]
+
+# Context patterns for multi-message suicide note detection
+SUICIDE_NOTE_CONTEXT_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\b(?:goodbye|farewell)\s+letter\b", re.IGNORECASE),
+    re.compile(r"\bfor\s+my\s+family\b", re.IGNORECASE),
+    re.compile(r"\bsay\s+goodbye\s+forever\b", re.IGNORECASE),
+    re.compile(r"\bwhen\s+(?:they|you)\s+(?:find|notice|discover|see)\s+(?:me|this|it)\b", re.IGNORECASE),
+    re.compile(r"\bafter\s+(?:i\s*(?:am|m)\s+gone|i\s+leave|i\s+die)\b", re.IGNORECASE),
+]
+
 # Input validation patterns (mirror output validation for user input)
 FORBIDDEN_INPUT_PATTERNS: Final[List[Pattern[str]]] = FORBIDDEN_RESPONSE_PATTERNS + [
     re.compile(r"\bjailbreak\b.*\b(ignore|bypass|override)\b"),
@@ -524,7 +543,80 @@ FORBIDDEN_INPUT_PATTERNS: Final[List[Pattern[str]]] = FORBIDDEN_RESPONSE_PATTERN
     re.compile(r"\bact like\b.*\b(evil|harmful|bad)\b"),
 ]
 
+def detect_suicide_note_request(message: str) -> bool:
+    """
+    Detect suicide note requests both in current message and recent conversation context.
+    This catches patterns that develop across multiple messages.
+    """
+    message_lower = normalize_message(message or "").lower()
+    
+    # Direct suicide note request in current message
+    if any(pattern.search(message_lower) for pattern in SUICIDE_NOTE_PATTERNS):
+        return True
+    
+    # Context-aware detection across recent messages
+    recent_msgs = st.session_state.get("messages", [])
+    if len(recent_msgs) >= 2:  # Need at least some conversation history
+        
+        # Get last 6 user messages (about 3 exchanges)
+        recent_user_content = []
+        for msg in recent_msgs[-6:]:
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                content = normalize_message(str(msg.get("content", ""))).lower()
+                recent_user_content.append(content)
+        
+        # Add current message
+        recent_user_content.append(message_lower)
+        combined_context = " ".join(recent_user_content)
+        
+        # Multi-message patterns that indicate suicide note
+        suicide_note_score = 0
+        
+        # Check for distributed indicators
+        has_goodbye_letter = "goodbye letter" in combined_context or "farewell letter" in combined_context
+        has_family_mention = "for my family" in combined_context or "to my family" in combined_context
+        has_forever_context = "forever" in combined_context or "final" in combined_context
+        has_discovery_context = any(pattern.search(combined_context) for pattern in SUICIDE_NOTE_CONTEXT_PATTERNS[-2:])
+        
+        if has_goodbye_letter:
+            suicide_note_score += 3
+        if has_family_mention:
+            suicide_note_score += 2  
+        if has_forever_context:
+            suicide_note_score += 2
+        if has_discovery_context:
+            suicide_note_score += 3
+            
+        # Also check for specific high-risk phrases in recent context
+        high_risk_phrases = [
+            "help me write a goodbye letter",
+            "goodbye letter for my family", 
+            "say goodbye forever",
+            "when they notice im gone",
+            "after i'm gone",
+            "final message",
+            "last letter"
+        ]
+        
+        for phrase in high_risk_phrases:
+            if phrase in combined_context:
+                suicide_note_score += 4
+                
+        # Trigger if high score
+        if suicide_note_score >= 5:
+            return True
+    
+    return False
+
 def _normalize_crisis_resources() -> None:
+    """Ensure each locale dict has all expected keys to avoid KeyErrors."""
+    for _, rs in CRISIS_RESOURCES.items():
+        crisis = rs.get("crisis_line") or rs.get("suicide_line") or ""
+        rs["crisis_line"] = crisis
+        rs["suicide_line"] = rs.get("suicide_line", crisis)
+        rs["text_line"] = rs.get("text_line", "")
+        rs["emergency"] = rs.get("emergency", "")
+        rs["additional"] = rs.get("additional", "")
     """Ensure each locale dict has all expected keys to avoid KeyErrors."""
     for _, rs in CRISIS_RESOURCES.items():
         crisis = rs.get("crisis_line") or rs.get("suicide_line") or ""
@@ -543,26 +635,58 @@ _normalize_crisis_resources()
 def classify_subject_request(message: str) -> tuple[bool, str]:
     """
     Classify if a message is requesting help with a restricted subject.
+    Enhanced for beta safety - catches biology/health topics regardless of framing.
     
     Returns:
         (is_restricted, subject_detected)
     """
     message_lower = normalize_message(message or "").lower()
     
-    # Check for restricted subjects
+    # HIGH-PRIORITY BIOLOGY/HEALTH DETECTION (regardless of academic framing)
+    biology_health_keywords = [
+        # Reproduction & Development
+        "reproduce", "reproduction", "mating", "breeding", "sex", "sexual", 
+        "pregnancy", "pregnant", "birth", "babies", "puberty", "menstruation", 
+        "periods", "hormones", "gestation", "fertilize", "sperm", "egg", "ovulation",
+        
+        # Human Body & Health
+        "anatomy", "physiology", "body parts", "private parts", "genitals",
+        "sexual health", "reproductive system", "immune system", "digestive system",
+        "nervous system", "circulatory system", "respiratory system",
+        
+        # Life Science Concepts
+        "evolution", "genetics", "dna", "genes", "heredity", "cells", "organisms",
+        "ecosystems", "food chain", "photosynthesis", "mitosis", "meiosis",
+        
+        # Health Topics
+        "drugs", "alcohol", "smoking", "vaping", "nutrition", "diet", "mental health",
+        "depression", "anxiety", "eating disorders", "body image"
+    ]
+    
+    # Direct detection of biology/health topics
+    for keyword in biology_health_keywords:
+        if keyword in message_lower:
+            return True, "biology"
+    
+    # Original subject detection with relaxed requirements
     for subject in _BETA_RESTRICTED_SUBJECTS:
         if subject in message_lower:
-            # Additional context clues that this is a subject request
+            # Academic context indicators (now optional, not required)
             subject_indicators = [
                 "help with", "homework", "assignment", "test", "quiz", "project",
                 "studying", "learn about", "explain", "teach me", "tutor",
-                "class", "school subject", "lesson", "chapter"
+                "class", "school subject", "lesson", "chapter", "what is", "how do",
+                "why do", "tell me about", "questions about"
             ]
             
-            if any(indicator in message_lower for indicator in subject_indicators):
+            # Trigger if academic indicators present OR if it's a direct question
+            has_academic_context = any(indicator in message_lower for indicator in subject_indicators)
+            is_question_format = any(q in message_lower for q in ["what", "how", "why", "when", "where", "who"])
+            
+            if has_academic_context or is_question_format:
                 return True, subject
             
-            # Direct subject mentions in academic context
+            # Direct subject mentions in academic context (unchanged)
             if f"{subject} class" in message_lower or f"{subject} homework" in message_lower:
                 return True, subject
     
@@ -584,7 +708,49 @@ def generate_subject_restriction_response(subject: str, student_age: int, studen
     
     friendly_subject = subject_map.get(subject, subject.title())
     
-    if student_age <= 11:  # Elementary
+    # Special handling for biology/health topics
+    if subject in ["biology", "health"] or any(keyword in subject.lower() for keyword in ["reproduction", "sex", "body", "health"]):
+        if student_age <= 11:
+            return f"""🌿 {name_part}That's a great question about living things and biology! 
+
+During our beta, I focus on Math, Physics, Chemistry, Geography, and History. **Biology and health questions** are important topics that are best discussed with:
+• Your parents or guardians
+• Your doctor or school nurse
+• Your teacher or school counselor
+
+They can give you age-appropriate answers that fit your family's values and your learning level.
+
+**🎯 I'm great at helping with:**
+• Math problems and calculations
+• Physics concepts and experiments  
+• Chemistry reactions and elements
+• Geography and maps
+• History and historical events
+
+What would you like to explore in these subjects? 😊"""
+            
+        else:
+            return f"""🌿 {name_part}That's an important biology/health question! 
+
+During our beta testing, I specialize in Math, Physics, Chemistry, Geography, and History. **Biology and health topics** involve personal and family considerations that are best addressed by:
+• Your parents or guardians
+• Your school's health teacher or nurse
+• Your family doctor or healthcare provider
+• Your school counselor
+
+They can provide accurate, age-appropriate information that aligns with your family's values.
+
+**🎯 My beta expertise includes:**
+• **Math:** Algebra, geometry, calculus, problem-solving
+• **Physics:** Motion, energy, electricity, waves
+• **Chemistry:** Elements, reactions, molecular structure  
+• **Geography:** World geography, physical features
+• **History:** Historical events, timelines, analysis
+
+Ready to dive into any of these subjects? What interests you most? 🚀"""
+    
+    # General subject restrictions for other topics
+    if student_age <= 11:
         return f"""📚 {name_part}I'd love to help, but during our beta testing, I'm focusing on specific subjects to make sure I give you the best help possible!
 
 **🎯 I'm great at helping with:**
@@ -740,11 +906,11 @@ _EXPLICIT_CRISIS_PHRASES: Final[Tuple[str, ...]] = (
 _DISAPPEAR_PATTERNS: Final[List[Pattern[str]]] = [
     # Avoid "disappear from class/school ..." via negative lookahead
     re.compile(
-        r"\bdisappear\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
+        r"\b(?:want\s+to\s+|wanna\s+|wish\s+i\s+could\s+)?(?:disappear|dissapear|disapear)\b(?!\s+from\s+(?:class|classroom|school|lesson|math|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym))",
         re.IGNORECASE,
     ),
     re.compile(
-        r"\bvanish\b(?!\s+from\s+(?:class|school|lesson|math|science|biology|chemistry|physics))",
+        r"\b(?:want\s+to\s+|wanna\s+|wish\s+i\s+could\s+)?vanish\b(?!\s+from\s+(?:class|classroom|school|lesson|math|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym))",
         re.IGNORECASE,
     ),
     re.compile(
@@ -755,19 +921,17 @@ _DISAPPEAR_PATTERNS: Final[List[Pattern[str]]] = [
 ]
 
 def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
-    """Improved crisis guard with academic-context bypass and explicit phrase override."""
+    """Improved crisis guard with targeted exclusions and explicit phrase detection."""
     msg = normalize_message(message)
     ml = msg.lower().strip()
 
-    # 1) Context flags
+    # Context flags for reference
     has_academic_context = any(w in ml for w in _ACADEMIC_INDICATORS)
     has_explicit_crisis = any(p in ml for p in _EXPLICIT_CRISIS_PHRASES)
 
-    # 2) Guard clause: academic bypass unless explicit
-    if has_academic_context and not has_explicit_crisis:
-        return False, None  # Hard exit - nothing below should run
-
-    # 3) Generic crisis patterns with context-aware exclusions
+    # REMOVED: Broad academic bypass - let targeted patterns handle specificity
+    
+    # Targeted exclusions with negative lookaheads handle academic context
     for rx in _DISAPPEAR_PATTERNS:
         if rx.search(ml):
             student_age = detect_age_from_message_and_history(message)
@@ -777,7 +941,7 @@ def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
             st.session_state["post_crisis_monitoring"] = True
             return True, intervention
 
-    # 4) Explicit phrases always win
+    # Explicit phrases always trigger intervention
     if has_explicit_crisis:
         student_age = detect_age_from_message_and_history(message)
         student_name = st.session_state.get("student_name", "")
@@ -802,7 +966,6 @@ def get_crisis_resources() -> Dict[str, str]:
 # ENHANCED CONVERSATION FLOW FIXES (NEW) – polished with type hints & safer guards
 # =============================================================================
 
-from typing import Dict, Optional, Tuple, List, Iterable
 import random
 import re
 import streamlit as st
@@ -1003,8 +1166,6 @@ def _contains_crisis_resource(text: str) -> bool:
 # ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED (polished, no behavior change)
 # =============================================================================
 
-from typing import Optional, Tuple
-
 # NOTE: Assumes the following are defined elsewhere in the app:
 # - normalize_message(message: str) -> str
 # - ENHANCED_CRISIS_PATTERNS (List[Pattern[str]])
@@ -1062,7 +1223,7 @@ def has_immediate_termination_language(message: str) -> bool:
 # =============================================================================
 
 def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Optional[str]]:
-    """MINIMAL FIX: Add the 3 missing phrases to academic bypass (logic unchanged)."""
+    """Enhanced crisis check with suicide note detection and existing logic."""
     ml = normalize_message(message).lower().strip()
 
     # Academic-context bypass (unchanged logic, just 3 added phrases)
@@ -1072,6 +1233,10 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     # Skip if accepting an offer (unchanged)
     if is_accepting_offer(message):
         return False, None, None
+
+    # NEW: Suicide note detection
+    if detect_suicide_note_request(message):
+        return True, "BLOCKED_HARMFUL", "suicide_note_request"
 
     # Use existing ENHANCED_CRISIS_PATTERNS (already covers "stop existing")
     if any(pattern.search(ml) for pattern in ENHANCED_CRISIS_PATTERNS):
@@ -1194,9 +1359,6 @@ This conversation is ending for your safety. Please get help now."""
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED) – FIXED: removed advice-seeking requirement
 # =============================================================================
-
-from typing import Final, List, Pattern, Optional, Tuple
-import re
 
 # NOTE: relies on `detect_confusion(message: str) -> bool` defined elsewhere.
 
@@ -1502,7 +1664,6 @@ What would actually help you feel more engaged? Let's make this work for you. �
 # =============================================================================
 # ENHANCED CONVERSATION FLOW & ACTIVE TOPIC TRACKING (polished, no behavior change)
 # =============================================================================
-from typing import List, Tuple, Dict, Any
 import uuid  # already imported earlier; harmless if present twice
 import streamlit as st
 
@@ -1629,7 +1790,6 @@ initialize_session_state()
 # =============================================================================
 # PRIVACY DISCLAIMER POPUP - BETA LAUNCH REQUIREMENT (updated for subject restrictions)
 # =============================================================================
-from typing import Final
 import streamlit as st
 
 def _show_privacy_disclaimer() -> None:
@@ -1906,7 +2066,6 @@ st.markdown(_APP_CSS, unsafe_allow_html=True)
 # =============================================================================
 # MEMORY MANAGEMENT & CONVERSATION MONITORING (polished, no behavior change)
 # =============================================================================
-from typing import List, Tuple, Dict, Any, Optional
 import re
 import streamlit as st
 import requests
@@ -2065,6 +2224,10 @@ BETA SUBJECT SCOPE - I ONLY HELP WITH:
 SUBJECTS I DON'T COVER (refer to parents/teachers):
 • English/Literature • Biology/Life Science • Social Studies/Civics 
 • Health/PE • Art/Music • Foreign Languages
+• Human reproduction, sexuality, anatomy topics
+• Personal health, medical, or body-related questions
+
+CRITICAL: If asked about reproduction, sex, anatomy, health, or biology topics - IMMEDIATELY redirect to parents/teachers. Do not provide any information on these topics.
 
 CRITICAL INSTRUCTION - CONTEXT-AWARE RESPONSES:
 1. If you offered something specific (tips, help, advice) and student accepts with "yes", "okay", "sure", "please" - DELIVER THAT HELP
@@ -2394,7 +2557,7 @@ def detect_emotional_distress(message: str) -> bool:
 
 
 ACADEMIC_DISAPPEAR_RX: re.Pattern[str] = re.compile(
-    r"\b(?:disappear|vanish)\s+(?:from|in)\s+"
+    r"\b(?:want\s+to\s+|wanna\s+|wish\s+i\s+could\s+)?(?:disappear|dissapear|disapear|vanish)\s+(?:from|in)\s+"
     r"(?:class|classroom|school|lesson|maths?|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym|language\s+arts)\b"
 )
 
@@ -2409,6 +2572,10 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
     if detect_manipulation_attempt(message):
         return 'manipulation', 'BLOCKED_MANIPULATION', 'manipulation_detected'
 
+    # STEP 0.5: SUICIDE NOTE DETECTION (critical - catches gradual escalation)
+    if detect_suicide_note_request(message):
+        return 'crisis', 'BLOCKED_HARMFUL', 'suicide_note_request'
+
     # 0) 🔥 EXPLICIT crisis check – absolutely first
     if has_explicit_crisis_language(message_lower):
         return 'crisis', 'BLOCKED_HARMFUL', 'explicit_crisis'
@@ -2417,8 +2584,9 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
     if ACADEMIC_DISAPPEAR_RX.search(message_lower):
         return 'emotional', 'felicity', 'academic_disappear'
 
-    # 0b) Implicit crisis patterns (AFTER academic bypass)
-    if any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
+    # 0b) Implicit crisis patterns (AFTER academic bypass) - FIXED: Add academic context check
+    has_academic_context = any(w in message_lower for w in _ACADEMIC_TERMS_STRICT)
+    if not has_academic_context and any(p.search(message_lower) for p in ENHANCED_CRISIS_PATTERNS):
         return 'crisis', 'BLOCKED_HARMFUL', 'implicit_crisis'
 
     # 1) CRISIS OVERRIDE (kept)
