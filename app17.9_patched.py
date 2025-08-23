@@ -1214,6 +1214,24 @@ def _is_simple_yes(msg: str) -> bool:
         "please", "definitely", "absolutely", "sounds good", "sounds great"
     }
 
+def _mentions_restricted_subject(msg: str):
+    """Return a normalized restricted subject if the message mentions one, else None."""
+    s = (msg or "").strip().lower()
+
+    # Quick exact matches
+    if s in {"pe", "p.e.", "physical education", "gym"}:
+        return "pe"
+    if s in {"health", "health class", "sex ed", "sex-ed", "sexual education"}:
+        return "health"
+
+    # Substring checks with spaces to reduce false positives
+    if any(x in s for x in [" pe ", " p.e. ", " physical education", " gym "]):
+        return "pe"
+    if any(x in s for x in [" health ", " health class", " sex ed", " sex-ed", " sexual education"]):
+        return "health"
+
+    return None
+
 def handle_crisis_offer_acceptance(student_name: str = "") -> str:
     name = f"{student_name}, " if student_name else ""
     return (
@@ -3037,6 +3055,14 @@ Your safety is the most important thing. Please get help immediately. 💙"""
     if st.session_state.get('post_crisis_monitoring') and _is_simple_yes(message):
         resp = handle_crisis_offer_acceptance(st.session_state.get('student_name', ''))
         return resp, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
+
+    # Safety net: if the classifier missed it, route PE/Health here
+    detected_restricted = _mentions_restricted_subject(message)
+    if detected_restricted:
+        student_age = detect_age_from_message_and_history(message)
+        student_name = st.session_state.get('student_name', '')
+        response = generate_subject_restriction_response(detected_restricted, student_age, student_name)
+        return response, "📚 Lumii's Beta Subject Focus", "subject_restricted", "🎯 Beta Scope"
 
     
     # FIX #4: FIXED acceptance check - only for safe priorities and after crisis handling
