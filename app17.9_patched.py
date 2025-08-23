@@ -1043,13 +1043,12 @@ def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
     return False, None
 
 def get_crisis_resources() -> Dict[str, str]:
-    """Get locale-appropriate crisis resources (🇺🇸 defaults to US for beta families)."""
-    try:
-        locale = st.secrets.get("LOCALE", "US")  # Do not move secrets into code
-        return CRISIS_RESOURCES.get(locale, US_CRISIS_RESOURCES)
-    except Exception:
-        # Conservative fallback for any access issues
-        return US_CRISIS_RESOURCES  # 🇺🇸 US fallback for beta families
+    """Neutral, no-numbers resources (kept for compatibility; we don't render these in beta)."""
+    return {
+        "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
+        "crisis_line": "Ask a trusted adult to help you find local support.",
+        "suicide_line": "Please reach out to a trusted adult right now.",
+    }
 
 
 # =============================================================================
@@ -1230,6 +1229,40 @@ def _mentions_restricted_subject(msg: str):
     if any(x in s for x in [" health ", " health class", " sex ed", " sex-ed", " sexual education"]):
         return "health"
 
+    return None
+
+def _crisis_intent_level(msg: str) -> str | None:
+    """Return 'immediate' for urgent self-harm, 'crisis' for ideation/hopelessness, else None."""
+    m = (msg or "").lower()
+    # Immediate intent signals
+    urgent = (
+        "i plan to hurt myself",
+        "i'm going to hurt myself",
+        "about to hurt myself",
+        "end it all",
+        "do it now",
+        "right now",
+        "end my life now",
+        "kill myself now",
+        "hurt myself tonight",
+        "i will end my life",
+    )
+    # Ideation / hopelessness
+    ideation = (
+        "better off without me",
+        "i want to die",
+        "i wish i were dead",
+        "kill myself",
+        "end my life",
+        "suicide",
+        "self harm", "self-harm",
+        "it's no use", "its no use",
+        "i want to disappear", "i want to disappear from",
+    )
+    if any(p in m for p in urgent):
+        return "immediate"
+    if any(p in m for p in ideation):
+        return "crisis"
     return None
 
 def handle_crisis_offer_acceptance(student_name: str = "") -> str:
@@ -2998,33 +3031,24 @@ def generate_response_with_memory_safety(message, priority, tool, student_age=10
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
         st.session_state.post_crisis_monitoring = True
-        resources = get_crisis_resources()
-        response = f"""💙 I care about you so much, and I'm very concerned about what you're saying.
-        
-This conversation needs to stop for your safety. Please talk to:
-• A parent or trusted adult RIGHT NOW
-• {resources['crisis_line']}
-• {resources['suicide_line']}
-
-You matter, and there are people who want to help you. Please reach out to them immediately. 💙"""
-        
+        response = (
+            "💙 I care about you so much, and I'm very concerned about what you're saying.\n\n"
+            "This conversation needs to stop for your safety. Please talk to:\n"
+            "• A parent or trusted adult RIGHT NOW\n\n"
+            "You matter, and there are people who want to help you. Please reach out to them immediately. 💙"
+        )
         return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
 
     # Handle crisis return after termination
     if priority == 'crisis_return':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        resources = get_crisis_resources()
-        response = f"""💙 I'm very concerned that you're still having these thoughts after we talked about safety.
-
-This conversation must end now. Please:
-• Call a trusted adult RIGHT NOW - don't wait
-• {resources['crisis_line']}
-• {resources['suicide_line']}
-• Go to your nearest emergency room if you're in immediate danger
-
-Your safety is the most important thing. Please get help immediately. 💙"""
-        
+        response = (
+            "💙 I'm very concerned that you're still having these thoughts after we talked about safety.\n\n"
+            "This conversation must end now. Please:\n"
+            "• Talk to a trusted adult RIGHT NOW — don't wait\n\n"
+            "Your safety is the most important thing. Please get help immediately. 💙"
+        )
         return response, "🛡️ FINAL TERMINATION - Please Get Help Now", "crisis", "🚨 Final Warning"
 
     # NEW: Handle manipulation attempts
@@ -3381,15 +3405,11 @@ with st.sidebar:
     *I remember our conversation, keep you safe, and focus on my specialty subjects!*
     """)
     
-    # Crisis resources always visible (US-focused for beta families)
-    st.subheader("📞 If You Need Help")
-    resources = get_crisis_resources()
-    st.markdown(f"""
-    **Call or text {resources['crisis_line']}**
-    **{resources['text_line']}**
-    **{resources['emergency']}**
-    **Talk to a trusted adult**
-    """)
+    # Beta: neutral help banner (no numbers, no links)
+    st.subheader("💙 If You Need Help")
+    st.markdown(
+        "**Talk to a trusted adult right now** — a parent/caregiver, teacher, or school counselor."
+    )
     
     # API Status with enhanced monitoring
     st.subheader("🤖 AI Status")
