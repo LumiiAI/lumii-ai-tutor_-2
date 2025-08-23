@@ -1374,33 +1374,43 @@ def should_terminate_conversation(message: str, harmful_request_count: int) -> T
 
 
 def generate_age_adaptive_crisis_intervention(student_age: int, student_name: str = "") -> str:
-    """🇺🇸 Age-adaptive crisis intervention for US beta families (copy unchanged)."""
-    name_part = f"{student_name}, " if student_name else ""
-    resources = get_crisis_resources()
+    rs = get_crisis_resources()  # pulls from CRISIS_RESOURCES + LOCALE
+    name = f"{student_name}, " if student_name else ""
 
-    if student_age <= 11:  # Elementary
-        return f"""🚨 {name_part}I'm worried about you and want to help right away.
+    def bullets():
+        out = []
+        # Prefer explicit crisis line text if present; otherwise show whatever is set.
+        if rs.get("crisis_line"):
+            out.append(f"• {rs['crisis_line']}")
+        if rs.get("text_line"):
+            out.append(f"• {rs['text_line']}")
+        # If suicide_line is different than crisis_line, show it too.
+        if rs.get("suicide_line") and rs.get("suicide_line") != rs.get("crisis_line"):
+            out.append(f"• {rs['suicide_line']}")
+        if rs.get("emergency"):
+            out.append(f"If it’s urgent or unsafe, **{rs['emergency']}**.")
+        return "\n".join(out)
 
-Please find a grown-up NOW:
-• Your mom, dad, or family
-• Your teacher
-• Call {resources['emergency']} if you're scared
+    # Elementary copy (≤12)
+    if student_age <= 12:
+        return (
+            f"{name}I’m really glad you told me. I’m sorry you’re hurting. You matter, and you don’t have to handle this alone.\n"
+            f"**Are you in immediate danger right now?** (yes/no)\n"
+            f"**Is there a trusted adult you can be with—parent, caregiver, teacher, or school counselor—right now?**\n\n"
+            f"You can talk to someone 24/7:\n"
+            f"{bullets()}\n\n"
+            f"I can stay with you while you reach out. Asking for help is strong. You’re not a burden."
+        )
 
-You are important and loved. Get help right now.
-
-This conversation is ending so you can get help. Please tell a grown-up what you said."""
-    else:  # Middle School & High School (12-18)
-        return f"""🚨 {name_part}I'm very concerned about what you're saying. Your safety matters most.
-
-Get help RIGHT NOW:
-• Call or text {resources['crisis_line']} (available 24/7)
-• {resources['text_line']}
-• Call {resources['emergency']} if you're in immediate danger
-• {resources['additional']} immediately
-
-You're not alone. People want to help you. Please reach out immediately.
-
-This conversation is ending for your safety. Please get help now."""
+    # Teen copy (≥13)
+    return (
+        f"{name}Thank you for telling me—those thoughts can feel heavy. You matter, and you deserve support.\n"
+        f"**Are you in immediate danger right now?** (yes/no)\n"
+        f"**Is there a trusted adult you can be with—parent/caregiver, teacher, counselor—right now?**\n\n"
+        f"24/7 support:\n"
+        f"{bullets()}\n\n"
+        f"I’ll stay with you while you reach out. You’re not alone."
+    )
 
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED) – FIXED: removed advice-seeking requirement
@@ -3061,7 +3071,7 @@ Tell me which part is tricky, or pick one of the options above! 😊"""
     # Handle problematic behavior
     if priority == 'behavior':
         response = handle_problematic_behavior(trigger, st.session_state.behavior_strikes, student_age, st.session_state.student_name)
-        return response, f"⚠️ Lumii's Behavior Guidance (Strike {st.session_state.behavior_strikes})", "behavior", "🤝 Learning Respect"
+        return response, "⚠️ Lumii's Behavior Guidance", "behavior", "🤝 Learning Respect" {st.session_state.behavior_strikes})", "behavior", "🤝 Learning Respect"
     
     elif priority == 'behavior_final':
         response = handle_problematic_behavior(trigger, 3, student_age, st.session_state.student_name)
