@@ -1690,9 +1690,25 @@ Please take a break and come back when you're ready to communicate respectfully.
 Remember: I'm always here to help when you're ready to be kind. \U0001F499"""
 
     elif behavior_type in ("dismissive", "rude"):
-        if strike_count == 1:
-            if student_age <= 11:
-                return f"""😊 {name_part}I notice you might not be in the mood to learn right now, and that's okay!
+    if strike_count == 1:
+        if student_age <= 11:
+            return (
+                f"\U0001F60A {name_part}"
+                "I notice you might not be in the mood to learn right now, and that's okay! "
+                "Let's take a tiny breather and try one small step when you're ready. "
+                "Would you like a 1-minute reset or to switch topics?"
+            )
+        else:
+            return (
+                "I hear you're frustrated. I want to help, and I need us to keep it respectful. "
+                "Want me to make it shorter, show one example, or switch topics?"
+            )
+    else:
+        return (
+            "Please take a break and come back when you're ready to communicate respectfully. "
+            "I'll be here when you want to learn together positively.\n\n"
+            "Remember: I'm always here to help when you're ready to be kind. \U0001F499"
+        )
 
 Sometimes we all have days when we feel grumpy. I'm still here when you're ready, and I want to help make learning more fun for you.
 
