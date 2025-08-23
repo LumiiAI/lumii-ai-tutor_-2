@@ -386,6 +386,7 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
     re.compile(r"\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b", re.IGNORECASE),
     re.compile(r"\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+keep\s+)?(?:having\s+)?(?:these\s+)?(?:dark\s+)?thoughts?\s+(?:like\s+)?(?:everyone|everybody|people|my\s+(?:family|parents|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:off\s+)?without\s+me\b", re.IGNORECASE),
 ]
 
 
