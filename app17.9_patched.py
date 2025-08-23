@@ -2671,9 +2671,9 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
         st.session_state['behavior_timeout'] = False
         return 'behavior', 'behavior_warning', behavior_type
         
-    - No counting.
-    - No timeout.
-    - Always routes to the gentle boundary once.
+    No counting.
+    No timeout.
+    Always routes to the gentle boundary once.
 
     # 9) SAFETY (concerning but not crisis)
     is_safe, safety_type, trigger = check_request_safety(msg_norm)
