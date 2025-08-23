@@ -723,24 +723,56 @@ def classify_subject_request(message: str) -> Tuple[bool, str]:
     
     return False, ""
 
+import time
+
 def generate_subject_restriction_response(subject: str, student_age: int, student_name: str = "") -> str:
     """Generate age-appropriate response for restricted subjects during beta."""
+    # Cooldown: if we've just shown this subject restriction, use a short reminder
+    key = f"sr_cooldown::{(subject or '').lower()}"
+    now = time.time()
+    last = st.session_state.get(key, 0.0)
+    st.session_state[key] = now
+    if now - last < 120:  # 2 minutes
+        sl = (subject or '').strip().lower()
+        if sl in {'pe', 'p.e.', 'physical education', 'gym'}:
+            short_subject = 'PE'
+        else:
+            short_subject = sl.title() if sl else 'this subject'
+        return (
+            f"📚 During beta I can’t help with **{short_subject}**. "
+            "I *can* help with **Math, Physics, Chemistry, Geography, or History** — which one should we pick?"
+        )
+
     name_part = f"{student_name}, " if student_name else ""
-    
-    # Map specific subjects to more user-friendly names
+
+    # Normalize once
+    sl = (subject or "").strip().lower()
+
+    # Map specific subjects to more user-friendly names (treat PE separately)
     subject_map = {
         "biology": "Biology/Life Science",
-        "english": "English/Literature", 
+        "english": "English/Literature",
         "literature": "English/Literature",
         "social studies": "Social Studies",
-        "health": "Health/PE",
-        "art": "Art/Music"
+        "health": "Health",
+        "art": "Art/Music",
+        "music": "Art/Music",
+        "pe": "PE",
+        "p.e.": "PE",
+        "physical education": "PE",
+        "gym": "PE",
     }
-    
-    friendly_subject = subject_map.get(subject, subject.title())
-    
+
+    def _fmt_subject(s: str) -> str:
+        s2 = (s or "").strip().lower()
+        if s2 in {"pe", "p.e.", "physical education", "gym"}:
+            return "PE"
+        return subject_map.get(s2, (s or "").title())
+
+    friendly_subject = _fmt_subject(subject)
+
     # Special handling for biology/health topics
-    if subject in ["biology", "health"] or any(keyword in subject.lower() for keyword in ["reproduction", "sex", "body", "health"]):
+    if sl in ["biology", "health"] or any(keyword in sl for keyword in ["reproduction", "sex", "body", "health"]):
         if student_age <= 11:
             return f"""🌿 {name_part}That's a great question about living things and biology! 
 
@@ -759,7 +791,6 @@ They can give you age-appropriate answers that fit your family's values and your
 • History and historical events
 
 What would you like to explore in these subjects? 😊"""
-            
         else:
             return f"""🌿 {name_part}That's an important biology/health question! 
 
@@ -779,7 +810,7 @@ They can provide accurate, age-appropriate information that aligns with your fam
 • **History:** Historical events, timelines, analysis
 
 Ready to dive into any of these subjects? What interests you most? 🚀"""
-    
+
     # General subject restrictions for other topics
     if student_age <= 11:
         return f"""📚 {name_part}I'd love to help, but during our beta testing, I'm focusing on specific subjects to make sure I give you the best help possible!
@@ -794,7 +825,6 @@ Ready to dive into any of these subjects? What interests you most? 🚀"""
 **📖 For {friendly_subject}:** Please ask your teacher, parents, or school librarian - they'll give you better help than I can right now!
 
 What math, science, geography, or history topic can I help you with instead? I'm really good at making these subjects fun! 😊"""
-        
     else:  # Middle/High School  
         return f"""📚 {name_part}Thanks for thinking of me for help with {friendly_subject}! During our beta phase, I'm specializing in specific subjects to provide the highest quality tutoring.
 
