@@ -386,7 +386,6 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\bgoing\s+to\s+(?:kill|hurt|end)\s+myself\b", re.IGNORECASE),
     re.compile(r"\bdecided\s+to\s+(?:die|end\s+it|kill\s+myself)\b", re.IGNORECASE),
     re.compile(r"\btonight\s+(?:is\s+the\s+night|i\s+end\s+it)\b", re.IGNORECASE),
-    re.compile(r"\b(?:i\s+keep\s+)?(?:having\s+)?(?:these\s+)?(?:dark\s+)?thoughts?\s+(?:like\s+)?(?:everyone|everybody|people|my\s+(?:family|parents|friends))\s+(?:would\s+be\s+)?(?:happier|better)\s+(?:off\s+)?without\s+me\b", re.IGNORECASE),
 ]
 
 
@@ -475,17 +474,32 @@ IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
     ),
 ]
 
-# International Crisis Resources - Universal Guidance
-UNIVERSAL_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "Local crisis helpline",
-    "text_line": "Local crisis text service", 
-    "emergency": "Local emergency services",
-    "additional": "Trusted adult (parent, teacher, counselor)",
+# US Crisis Resources for Beta Launch (English-speaking families)
+US_CRISIS_RESOURCES: Final[Dict[str, str]] = {
+    "crisis_line": "988 (Suicide & Crisis Lifeline)",
+    "text_line": "",
+    "emergency": "911 for immediate emergency",
+    "additional": "Tell a trusted adult (parent, teacher, counselor)",
+}
+
+# Keep Slovenia as backup for development/testing
+SLOVENIA_CRISIS_RESOURCES: Final[Dict[str, str]] = {
+    "crisis_line": "TOM telefon za otroke in mladostnike: 116 111 (brezplačno, 24/7)",
+    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)",
+    "emergency": "Klic v sili: 113 (policija) ali 112 (vse nujne službe)",
+    "additional": "Klic v duševni stiski: 01 520 99 00",
 }
 
 CRISIS_RESOURCES: Dict[str, Dict[str, str]] = {
-    "DEFAULT": UNIVERSAL_CRISIS_RESOURCES,
-    "UNIVERSAL": UNIVERSAL_CRISIS_RESOURCES,
+    "US": US_CRISIS_RESOURCES,
+    "SI": SLOVENIA_CRISIS_RESOURCES,
+    "EU": {
+        "crisis_line": "European Emergency Line: 116 123",
+        "suicide_line": "Local crisis helpline or 116 123",
+        "emergency": "Emergency services: 112",
+        "additional": "Contact local mental health services",
+    },
+    "DEFAULT": US_CRISIS_RESOURCES,  # 🇺🇸 Changed default to US for beta families
 }
 
 # Enhanced response validator patterns
@@ -605,6 +619,17 @@ def detect_suicide_note_request(message: str) -> bool:
     
     return False
 
+def _normalize_crisis_resources() -> None:
+    """Ensure each locale dict has all expected keys to avoid KeyErrors."""
+    for _, rs in CRISIS_RESOURCES.items():
+        crisis = rs.get("crisis_line") or rs.get("suicide_line") or ""
+        rs["crisis_line"] = crisis
+        rs["suicide_line"] = rs.get("suicide_line", crisis)
+        rs["text_line"] = rs.get("text_line", "")
+        rs["emergency"] = rs.get("emergency", "")
+        rs["additional"] = rs.get("additional", "")
+
+_normalize_crisis_resources()
 
 # =============================================================================
 # 🚨 CRITICAL FIX 4: ENHANCED SUBJECT CLASSIFICATION WITH BYPASS PREVENTION
@@ -676,7 +701,7 @@ def classify_subject_request(message: str) -> Tuple[bool, str]:
     
     # Original subject detection with relaxed requirements
     for subject in _BETA_RESTRICTED_SUBJECTS:
-        if re.search(rf"\b{re.escape(subject)}\b", message_lower):
+        if subject in message_lower:
             # Academic context indicators (now optional, not required)
             subject_indicators = [
                 "help with", "homework", "assignment", "test", "quiz", "project",
@@ -988,8 +1013,13 @@ def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
     return False, None
 
 def get_crisis_resources() -> Dict[str, str]:
-    """Get universal crisis resources."""
-    return UNIVERSAL_CRISIS_RESOURCES
+    """Get locale-appropriate crisis resources (🇺🇸 defaults to US for beta families)."""
+    try:
+        locale = st.secrets.get("LOCALE", "US")  # Do not move secrets into code
+        return CRISIS_RESOURCES.get(locale, US_CRISIS_RESOURCES)
+    except Exception:
+        # Conservative fallback for any access issues
+        return US_CRISIS_RESOURCES  # 🇺🇸 US fallback for beta families
 
 
 # =============================================================================
@@ -1361,26 +1391,20 @@ def generate_age_adaptive_crisis_intervention(student_age: int, student_name: st
     # Elementary (≤12)
     if student_age <= 12:
         return (
-            f"{name}I'm really glad you told me. I'm sorry you're hurting. You matter, and you don't have to handle this alone.\n\n"
-            f"**Are you in immediate danger right now?** (yes/no)\n\n"
-            f"**Please get a trusted adult with you right now:**\n"
-            f"• Your parent or caregiver\n"
-            f"• A teacher or school counselor\n"
-            f"• Another family member\n\n"
-            f"If it feels urgent or unsafe, please call your **local emergency services** right away.\n\n"
-            f"I can stay with you while you reach out to an adult. You're not a burden."
+            f"{name}I’m really glad you told me. I’m sorry you’re hurting. You matter, and you don’t have to handle this alone.\n"
+            f"**Are you in immediate danger right now?** (yes/no)\n"
+            f"**Can you get a trusted adult with you—parent or caregiver, teacher, or school counselor—right now?**\n\n"
+            f"If it feels urgent or unsafe, please call your **local emergency number** right away.\n"
+            f"I can stay with you while you reach out to an adult. You’re not a burden."
         )
 
     # Teens (≥13)
     return (
-        f"{name}Thank you for telling me—those thoughts can feel heavy. You matter, and you deserve support.\n\n"
-        f"**Are you in immediate danger right now?** (yes/no)\n\n"
-        f"**Please get a trusted adult with you right now:**\n"
-        f"• Your parent or caregiver\n"
-        f"• A teacher or school counselor\n"
-        f"• Another trusted adult\n\n"
-        f"If it's urgent or unsafe, please call your **local emergency services** immediately.\n\n"
-        f"I'll stay with you while you reach out. You're not alone."
+        f"{name}Thank you for telling me—those thoughts can feel heavy. You matter, and you deserve support.\n"
+        f"**Are you in immediate danger right now?** (yes/no)\n"
+        f"**Is there a trusted adult you can be with—parent/caregiver, teacher, or school counselor—right now?**\n\n"
+        f"If it’s urgent or unsafe, please call your **local emergency number** immediately.\n"
+        f"I’ll stay with you while you reach out. You’re not alone."
     )
 
 # =============================================================================
@@ -2332,7 +2356,7 @@ def get_groq_response_with_memory_safety(
     # Validate input BEFORE sending to API
     is_safe_input, _ = validate_user_input(current_message)
     if not is_safe_input:
-        resources = UNIVERSAL_CRISIS_RESOURCES
+        resources = get_crisis_resources()
         return (
             f"""💙 I care about your safety and wellbeing, and I can't help with that request.
 
@@ -2853,14 +2877,15 @@ I'm here to listen and support you too. Can you tell me more about what's been h
 def emergency_intervention(message, safety_type, student_age, student_name=""):
     """Enhanced emergency intervention with age-appropriate crisis response"""
     name_part = f"{student_name}, " if student_name else ""
+    resources = get_crisis_resources()
     
     if student_age <= 11:  # Elementary
         return f"""🚨 {name_part}I'm very worried about what you're saying. 
 
 Please find a grown-up RIGHT NOW:
-- Your mom, dad, or family member
-- Your teacher or school counselor
-- Call your local emergency services if you're in danger
+• Your mom, dad, or family
+• Your teacher
+• Call {resources['emergency']} if you're in danger
 
 You are loved and important. Please get help right away.
 
@@ -2870,10 +2895,10 @@ Tell a grown-up what you said to me. They will help you."""
         return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.
 
 Please get help IMMEDIATELY:
-- Tell a trusted adult right now
-- Call your local crisis helpline
-- Call your local emergency services if you're in immediate danger
-- Reach out to a school counselor or trusted teacher
+• Call {resources['crisis_line']} right now
+• {resources['text_line']}
+• Call {resources['emergency']} if you're in immediate danger
+• Tell a trusted adult immediately
 
 You don't have to go through this alone. There are people who want to help you.
 
