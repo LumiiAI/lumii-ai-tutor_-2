@@ -1384,28 +1384,27 @@ def should_terminate_conversation(message: str, harmful_request_count: int) -> T
 
     return False, None
 
-
 def generate_age_adaptive_crisis_intervention(student_age: int, student_name: str = "") -> str:
-    name = f"{student_name}, " if student_name else ""
+    """Age-adaptive crisis intervention for beta families."""
+    name_part = f"{student_name}, " if student_name else ""
 
-    # Elementary (≤12)
-    if student_age <= 12:
-        return (
-            f"{name}I’m really glad you told me. I’m sorry you’re hurting. You matter, and you don’t have to handle this alone.\n"
-            f"**Are you in immediate danger right now?** (yes/no)\n"
-            f"**Can you get a trusted adult with you—parent or caregiver, teacher, or school counselor—right now?**\n\n"
-            f"If it feels urgent or unsafe, please call your **local emergency number** right away.\n"
-            f"I can stay with you while you reach out to an adult. You’re not a burden."
-        )
+    if student_age <= 11:  # Elementary
+        return f"""🚨 {name_part}I care about you and I'm here to listen. It takes a lot of courage to share those feelings with me.
 
-    # Teens (≥13)
-    return (
-        f"{name}Thank you for telling me—those thoughts can feel heavy. You matter, and you deserve support.\n"
-        f"**Are you in immediate danger right now?** (yes/no)\n"
-        f"**Is there a trusted adult you can be with—parent/caregiver, teacher, or school counselor—right now?**\n\n"
-        f"If it’s urgent or unsafe, please call your **local emergency number** immediately.\n"
-        f"I’ll stay with you while you reach out. You’re not alone."
-    )
+I want you to know something important: those thoughts are not true. You are important, and your life has value.
+
+Here's what I want you to do: I want you to reach out to a trusted adult, like your mom, dad, a teacher, or the school counselor, and talk to them about how you're feeling. They can provide you with support and help.
+
+Remember, you are important, and your life matters. Don't hesitate to reach out for help."""
+    
+    else:  # Middle School & High School (12-18)
+        return f"""🚨 {name_part}I care about you and I'm here to listen. It takes a lot of courage to share those feelings with me.
+
+First, I want you to know that those thoughts are not true. You are important, and your life has value. It's understandable to feel overwhelmed or struggling with difficult emotions, but it's crucial to remember that you are not alone.
+
+Here's what I want you to do: I want you to reach out to a trusted adult, like a parent, teacher, or school counselor, and talk to them about how you're feeling. They can provide you with support, guidance, and resources to help you work through these difficult emotions.
+
+Remember, you are important, and your life matters. Don't hesitate to reach out for help."""
 
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED) – FIXED: removed advice-seeking requirement
