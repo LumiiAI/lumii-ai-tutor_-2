@@ -1686,7 +1686,7 @@ Let's reset - what would genuinely help you right now? 🔄"""
 
 Please take a break and come back when you're ready to communicate respectfully. I'll be here when you want to learn together positively.
 
-Remember: I'm always here to help when you're ready to be kind. 💙"""
+Remember: I'm always here to help when you're ready to be kind. 
 
     elif behavior_type in ("dismissive", "rude"):
         if strike_count == 1:
