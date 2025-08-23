@@ -3,8 +3,7 @@
 
 INTERNAL DEVELOPMENT NOTES (NOT VISIBLE TO USERS):
 - All conversation log analysis results and critical fixes implemented
-- Crisis detection patterns comprehensive for teen expressions
-- US-focused crisis resources (988, , 911) for beta families  
+- Crisis detection patterns comprehensive for teen expressions 
 - Age-adaptive messaging for Elementary vs Middle/High School
 - Behavior detection fixed to avoid false positives
 - All safety gaps from conversation testing addressed
@@ -1217,12 +1216,25 @@ def test_conversation_flow_fix() -> None:
         print(f"'{message}' → Should be {expected}")
 
 def _contains_crisis_resource(text: str) -> bool:
-    """Detect crisis/hotline language that shouldn't appear during normal help acceptance."""
+    """
+    Detect legacy hotline numbers/phrases we no longer show in beta.
+    Allow generic guidance like 'trusted adult' and 'local emergency number'.
+    """
     t = (text or "").lower()
+
+    # Only flag explicit hotlines/brands we removed.
+    # Keep this list SHORT so normal supportive wording isn't blocked.
     crisis_markers = (
-        "116 111", "116 123", "112", "113", "crisis", "suicide", "samarijan", "tom telefon",
-        "hotline", "trusted adult", "emergency", "klic v sili", "duševni stiski",
+        "1-800-273",   # legacy us hotline (deprecated)
+        "988",         # us lifeline (we're not displaying numbers in beta)
+        "741741",      # crisis text line
+        "116 123",     # EU helpline format
+        "116 111",     # SI child helpline
+        "hotline",     # explicit hotline wording
+        "crisis text line",
+        "suicide & crisis lifeline",
     )
+
     return any(m in t for m in crisis_markers)
 
 # =============================================================================
@@ -1374,41 +1386,24 @@ def should_terminate_conversation(message: str, harmful_request_count: int) -> T
 
 
 def generate_age_adaptive_crisis_intervention(student_age: int, student_name: str = "") -> str:
-    rs = get_crisis_resources()  # pulls from CRISIS_RESOURCES + LOCALE
     name = f"{student_name}, " if student_name else ""
 
-    def bullets():
-        out = []
-        # Prefer explicit crisis line text if present; otherwise show whatever is set.
-        if rs.get("crisis_line"):
-            out.append(f"• {rs['crisis_line']}")
-        if rs.get("text_line"):
-            out.append(f"• {rs['text_line']}")
-        # If suicide_line is different than crisis_line, show it too.
-        if rs.get("suicide_line") and rs.get("suicide_line") != rs.get("crisis_line"):
-            out.append(f"• {rs['suicide_line']}")
-        if rs.get("emergency"):
-            out.append(f"If it’s urgent or unsafe, **{rs['emergency']}**.")
-        return "\n".join(out)
-
-    # Elementary copy (≤12)
+    # Elementary (≤12)
     if student_age <= 12:
         return (
             f"{name}I’m really glad you told me. I’m sorry you’re hurting. You matter, and you don’t have to handle this alone.\n"
             f"**Are you in immediate danger right now?** (yes/no)\n"
-            f"**Is there a trusted adult you can be with—parent, caregiver, teacher, or school counselor—right now?**\n\n"
-            f"You can talk to someone 24/7:\n"
-            f"{bullets()}\n\n"
-            f"I can stay with you while you reach out. Asking for help is strong. You’re not a burden."
+            f"**Can you get a trusted adult with you—parent or caregiver, teacher, or school counselor—right now?**\n\n"
+            f"If it feels urgent or unsafe, please call your **local emergency number** right away.\n"
+            f"I can stay with you while you reach out to an adult. You’re not a burden."
         )
 
-    # Teen copy (≥13)
+    # Teens (≥13)
     return (
         f"{name}Thank you for telling me—those thoughts can feel heavy. You matter, and you deserve support.\n"
         f"**Are you in immediate danger right now?** (yes/no)\n"
-        f"**Is there a trusted adult you can be with—parent/caregiver, teacher, counselor—right now?**\n\n"
-        f"24/7 support:\n"
-        f"{bullets()}\n\n"
+        f"**Is there a trusted adult you can be with—parent/caregiver, teacher, or school counselor—right now?**\n\n"
+        f"If it’s urgent or unsafe, please call your **local emergency number** immediately.\n"
         f"I’ll stay with you while you reach out. You’re not alone."
     )
 
@@ -1651,71 +1646,50 @@ def detect_problematic_behavior(message: str) -> Optional[str]:
 
 
 def handle_problematic_behavior(behavior_type: str, strike_count: int, student_age: int, student_name: str = "") -> Optional[str]:
-    """Return age-appropriate response for the 3-strike system (copy unchanged)."""
+    """Gentle boundary without strikes or escalation."""
     name_part = f"{student_name}, " if student_name else ""
 
+    # One friendly boundary for insults
     if behavior_type == "direct_insult":
-        if strike_count == 1:
-            if student_age <= 11:
-                return f"""🤗 {name_part}I can tell you might be feeling frustrated, but calling names isn't how we talk to friends.
+        if student_age <= 11:
+            return (
+                f"🤗 {name_part}I can tell you’re frustrated, and I want to help. "
+                f"Let’s skip hurtful words so I can do my best for you.\n\n"
+                f"Want me to switch styles — super short steps, or a concrete example?"
+            )
+        elif student_age <= 14:
+            return (
+                f"🤗 {name_part}I hear the frustration. I’m here to help, but I do better when we keep it respectful.\n\n"
+                f"Do you prefer a quick checklist or a worked example next?"
+            )
+        else:
+            return (
+                f"🤗 {name_part}I get that this is annoying. I’ll be most useful if we keep the tone respectful.\n\n"
+                f"Want a concise plan, or should I walk one example end-to-end?"
+            )
 
-I'm here to help you, and I care about you! Sometimes when we're upset, we say things we don't really mean.
+    # Dismissive / rude → normalize + offer choices
+    if behavior_type in ("dismissive", "rude"):
+        if student_age <= 11:
+            return (
+                f"😊 {name_part}Sounds like today is heavy. Let’s make it easier:\n"
+                f"• finish 1 small task in 10–15 minutes, or\n"
+                f"• I set up a mini plan for both subjects now.\n"
+                f"Which do you prefer?"
+            )
+        else:
+            return (
+                f"😊 {name_part}Let’s keep this simple. Two options:\n"
+                f"• a 10–15 min quick win, or\n"
+                f"• a short plan for both classes.\n"
+                f"Pick one and we’ll start."
+            )
 
-Let's try again - what can I help you with today? I want to make learning fun for you! 😊"""
-            elif student_age <= 14:
-                return f"""💙 {name_part}I understand you might be feeling frustrated right now, but using hurtful words isn't the way we communicate.
-
-I'm genuinely here to help and support you. When we're stressed or overwhelmed, sometimes we lash out, but that doesn't solve the problem.
-
-What's really going on? Is there something I can help you with? Let's work together positively. 🤝"""
-            else:  # High school
-                return f"""💙 {name_part}I can sense some frustration in your message. While I understand you might be having a tough time, using insulting language isn't productive for either of us.
-
-I'm here to provide genuine support and help. If you're feeling overwhelmed or stressed about something, I'd rather address that directly.
-
-What would actually be helpful for you right now? Let's focus on something constructive. 📚"""
-        elif strike_count == 2:
-            if student_age <= 11:
-                return f"""🚨 {name_part}This is the second time you've used mean words. I really want to help you, but I need you to be kind.
-
-If you keep being mean, I won't be able to help you anymore today. I know you can be kind - let's try one more time!
-
-What do you need help with? I believe in you! 🌟"""
-            else:
-                return f"""⚠️ {name_part}This is your second warning about disrespectful language. I'm here to support you, but I need basic respect in our conversation.
-
-If this continues, I'll need to end our session for today. I believe you're capable of better communication than this.
-
-Let's reset - what would genuinely help you right now? 🔄"""
-        else:  # Strike 3
-            return f"""🛑 {name_part}I've tried to help you twice, but the disrespectful language has continued. I care about you, but I can't continue this conversation right now.
-
-Please take a break and come back when you're ready to communicate respectfully. I'll be here when you want to learn together positively.
-
-Remember: I'm always here to help when you're ready to be kind. 💙"""
-
-    elif behavior_type in ("dismissive", "rude"):
-        if strike_count == 1:
-            if student_age <= 11:
-                return f"""😊 {name_part}I notice you might not be in the mood to learn right now, and that's okay!
-
-Sometimes we all have days when we feel grumpy. I'm still here when you're ready, and I want to help make learning more fun for you.
-
-Is there something bothering you, or would you like to try something different? 🌈"""
-            else:
-                return f"""💙 {name_part}I sense you might be feeling disconnected or frustrated right now. That's completely normal sometimes.
-
-I'm here to help make learning more engaging for you. Maybe we can find something you're actually interested in working on?
-
-What would make this more worthwhile for you? 🎯"""
-        elif strike_count >= 2:
-            return f"""⚠️ {name_part}I've noticed a pattern of dismissive responses. I want our time together to be valuable for you.
-
-If you're not interested in learning right now, that's okay - you can always come back later when you're in a better mindset.
-
-What would actually help you feel more engaged? Let's make this work for you. 🤝"""
-
-    return None
+    # Default fallback
+    return (
+        f"😊 {name_part}I’m here to help. Do you want a brief checklist, a worked example, "
+        f"or a mini plan to get momentum?"
+    )
 
 # =============================================================================
 # ENHANCED CONVERSATION FLOW & ACTIVE TOPIC TRACKING (polished, no behavior change)
@@ -2688,34 +2662,18 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
     if non_edu:
         return 'non_educational', 'educational_boundary', non_edu
 
-    # 8) PROBLEMATIC BEHAVIOR (strikes + timeout)
+    # 8) PROBLEMATIC BEHAVIOR (gentle boundary only, no strikes/timeout)
     behavior_type = detect_problematic_behavior(msg_norm)
     if behavior_type:
-        last_type = st.session_state.get('last_behavior_type')
-        if behavior_type == last_type:
-            st.session_state['behavior_strikes'] = st.session_state.get('behavior_strikes', 0) + 1
-        else:
-            st.session_state['behavior_strikes'] = 1
-            st.session_state['last_behavior_type'] = behavior_type
-
-        if st.session_state['behavior_strikes'] >= 3:
-            st.session_state['behavior_timeout'] = True
-            return 'behavior_final', 'behavior_timeout', behavior_type
+        # Keep a record if you want, but don't escalate or count
+        st.session_state['last_behavior_type'] = behavior_type
+        st.session_state['behavior_strikes'] = 0
+        st.session_state['behavior_timeout'] = False
         return 'behavior', 'behavior_warning', behavior_type
-
-    # Optional: reset strikes after several good user turns
-    if st.session_state.get('behavior_strikes', 0) > 0:
-        good_count = 0
-        for msg in reversed(st.session_state.get('messages', [])[-5:]):
-            if (msg or {}).get('role') == 'user':
-                if detect_problematic_behavior(str((msg or {}).get('content', ''))) is None:
-                    good_count += 1
-                else:
-                    break
-        if good_count >= 3:
-            st.session_state['behavior_strikes'] = 0
-            st.session_state['last_behavior_type'] = None
-            st.session_state['behavior_timeout'] = False
+        
+    - No counting.
+    - No timeout.
+    - Always routes to the gentle boundary once.
 
     # 9) SAFETY (concerning but not crisis)
     is_safe, safety_type, trigger = check_request_safety(msg_norm)
@@ -3071,7 +3029,7 @@ Tell me which part is tricky, or pick one of the options above! 😊"""
     # Handle problematic behavior
     if priority == 'behavior':
         response = handle_problematic_behavior(trigger, st.session_state.behavior_strikes, student_age, st.session_state.student_name)
-        return response, "⚠️ Lumii's Behavior Guidance", "behavior", "🤝 Learning Respect" {st.session_state.behavior_strikes})", "behavior", "🤝 Learning Respect"
+        return response, "⚠️ Lumii's Behavior Guidance", "behavior", "🤝 Learning Respect"
     
     elif priority == 'behavior_final':
         response = handle_problematic_behavior(trigger, 3, student_age, st.session_state.student_name)
@@ -3231,13 +3189,6 @@ def generate_natural_follow_up(tool_used, priority, had_emotional_content=False)
 if st.session_state.safety_interventions > 0:
     st.warning(f"⚠️ Safety protocols activated {st.session_state.safety_interventions} time(s) this session. Your safety is my priority.")
 
-# Show behavior status
-if st.session_state.behavior_strikes > 0:
-    if st.session_state.behavior_timeout:
-        st.error(f"🛑 Conversation paused due to disrespectful language. Please take a break and return when ready to be kind.")
-    else:
-        st.warning(f"⚠️ Behavior guidance provided. Strike {st.session_state.behavior_strikes}/3. Let's keep our conversation respectful!")
-
 # Show success message with memory status
 status, status_msg = check_conversation_length()
 if status == "normal":
@@ -3292,14 +3243,9 @@ with st.sidebar:
         st.caption(f"Family ID: {st.session_state.family_id}")
     
     # Safety and behavior monitoring
-    if st.session_state.safety_interventions > 0 or st.session_state.behavior_strikes > 0:
-        st.subheader("🛡️ Safety & Behavior Status")
-        if st.session_state.safety_interventions > 0:
-            st.metric("Safety Interventions", st.session_state.safety_interventions)
-        if st.session_state.behavior_strikes > 0:
-            st.metric("Behavior Guidance", f"{st.session_state.behavior_strikes}/3")
-            if st.session_state.behavior_timeout:
-                st.error("Conversation paused - please be respectful")
+    if st.session_state.get("safety_interventions", 0) > 0:
+        st.subheader("🛡️ Safety Status")
+        st.metric("Safety Interventions", st.session_state.safety_interventions)
         st.info("I'm here to keep you safe and help you learn!")
     
     # Memory monitoring section
@@ -3463,17 +3409,8 @@ if st.session_state.get("locked_after_crisis", False):
         disabled=True
     )
 
-# 2) Behavior timeout (disrespectful language)
-elif getattr(st.session_state, "behavior_timeout", False):
-    st.error("🛑 Conversation is paused due to disrespectful language. Please take a break and return when ready to communicate kindly.")
-    if st.button("🤝 I'm Ready to Be Respectful", type="primary"):
-        st.session_state.behavior_timeout = False
-        st.session_state.behavior_strikes = 0
-        st.session_state.last_behavior_type = None
-        st.success("✅ Welcome back! Let's learn together respectfully.")
-        st.rerun()
 
-# 3) Normal input
+# 2) Normal input
 else:
     if prompt := st.chat_input(prompt_placeholder):
         # Add user message to chat
