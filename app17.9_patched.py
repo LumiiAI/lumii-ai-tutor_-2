@@ -111,7 +111,7 @@ _BETA_RESTRICTED_SUBJECTS: Final[Tuple[str, ...]] = (
     # Foreign languages (cultural context, interpretation)
     "spanish", "french", "german", "chinese", "japanese", "foreign language",
     # Health and PE (body topics, safety concerns)
-    "health", "physical education", "pe", "fitness", "nutrition", "wellness"
+    "health", "physical education", "fitness", "nutrition", "wellness"
 )
 
 # =============================================================================
