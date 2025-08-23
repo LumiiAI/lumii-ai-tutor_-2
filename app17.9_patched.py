@@ -34,7 +34,7 @@ SAFETY STATUS: 🇺🇸 PRODUCTION-READY - ALL SYNTAX/RUNTIME/SECURITY ISSUES RE
 from typing import Final, List, Pattern, Tuple, Dict, Optional, Iterable, Any
 
 CHEMISTRY_ACCURACY_CHECK = """\
-CRITICAL: CHEMISTRY ACCURACY RULES\n- ALL chemical equations MUST be balanced (same atoms on both sides)\n- Example: 2H₂ + O₂ → 2H₂O (CORRECT - balanced)\n- NEVER write: 2H₂ + O₂ → 2H₂O (WRONG - unbalanced)\n"""
+CRITICAL: CHEMISTRY ACCURACY RULES\n- ALL chemical equations MUST be balanced (same atoms on both sides)\n- Example: 2H₂ + O₂ → 2H₂O (CORRECT - balanced)\n- NEVER write: H₂ + O₂ → H₂O (WRONG - unbalanced)\n"""
 
 import json
 import os
@@ -482,9 +482,9 @@ IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
 
 # US Crisis Resources for Beta Launch (English-speaking families)
 US_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "Call or text 988 (24/7, U.S.)",
-    "text_line": "Call or text 988 (24/7, U.S.)",
-    "emergency": "Call 911 for immediate danger",
+    "crisis_line": "988 (Suicide & Crisis Lifeline)",
+    "text_line": "Crisis Text Line: Text HOME to 741741",
+    "emergency": "911 for immediate emergency",
     "additional": "Tell a trusted adult (parent, teacher, counselor)",
 }
 
@@ -1682,19 +1682,17 @@ What do you need help with? I believe in you! 🌟"""
 If this continues, I'll need to end our session for today. I believe you're capable of better communication than this.
 
 Let's reset - what would genuinely help you right now? 🔄"""
-        if behavior_type == "abusive":
-    if strike_count == 1:
-        return f"""Let's reset — what would genuinely help you right now? 🔄"""
-    else:
-        return f"""🛑 {name_part}I've tried to help you twice, but the disrespectful language has continued. I care about you, but I can't continue this conversation right now.
+        else:  # Strike 3
+            return f"""🛑 {name_part}I've tried to help you twice, but the disrespectful language has continued. I care about you, but I can't continue this conversation right now.
 
 Please take a break and come back when you're ready to communicate respectfully. I'll be here when you want to learn together positively.
 
-Remember: I'm always here to help when you're ready to be kind."""
-elif behavior_type in ("dismissive", "rude"):
-    if strike_count == 1:
-        if student_age <= 11:
-            return f"""😊 {name_part}I notice you might not be in the mood to learn right n
+Remember: I'm always here to help when you're ready to be kind. 💙"""
+
+    elif behavior_type in ("dismissive", "rude"):
+        if strike_count == 1:
+            if student_age <= 11:
+                return f"""😊 {name_part}I notice you might not be in the mood to learn right now, and that's okay!
 
 Sometimes we all have days when we feel grumpy. I'm still here when you're ready, and I want to help make learning more fun for you.
 
