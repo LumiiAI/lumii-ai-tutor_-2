@@ -988,13 +988,8 @@ def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
     return False, None
 
 def get_crisis_resources() -> Dict[str, str]:
-    """Get locale-appropriate crisis resources (🇺🇸 defaults to US for beta families)."""
-    try:
-        locale = st.secrets.get("LOCALE", "US")  # Do not move secrets into code
-        return CRISIS_RESOURCES.get(locale, US_CRISIS_RESOURCES)
-    except Exception:
-        # Conservative fallback for any access issues
-        return US_CRISIS_RESOURCES  # 🇺🇸 US fallback for beta families
+    """Get universal crisis resources."""
+    return UNIVERSAL_CRISIS_RESOURCES
 
 
 # =============================================================================
@@ -2337,7 +2332,7 @@ def get_groq_response_with_memory_safety(
     # Validate input BEFORE sending to API
     is_safe_input, _ = validate_user_input(current_message)
     if not is_safe_input:
-        resources = get_crisis_resources()
+        resources = UNIVERSAL_CRISIS_RESOURCES
         return (
             f"""💙 I care about your safety and wellbeing, and I can't help with that request.
 
