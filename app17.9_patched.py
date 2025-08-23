@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 🚨 LUMII CRITICAL SAFETY FIXES - US BETA FAMILIES READY
 
