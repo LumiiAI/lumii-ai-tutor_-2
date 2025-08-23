@@ -1168,6 +1168,30 @@ def get_last_offer_context() -> Dict[str, Optional[str]]:
             break
     return {"offered_help": False, "content": None}
 
+def _is_crisis_offer_text(text: str) -> bool:
+    t = (text or "").lower()
+    crisis_markers = (
+        "trusted adult", "talk to someone", "counselor", "therapist",
+        "hotline", "crisis", "reach out", "your safety", "support you right now",
+        "emergency", "call", "text line"
+    )
+    return any(k in t for k in crisis_markers)
+
+def _is_simple_yes(msg: str) -> bool:
+    m = (msg or "").strip().lower()
+    return m in {
+        "yes", "yes please", "sure", "okay", "ok", "yeah", "yep",
+        "please", "definitely", "absolutely", "sounds good", "sounds great"
+    }
+
+def handle_crisis_offer_acceptance(student_name: str = "") -> str:
+    name = f"{student_name}, " if student_name else ""
+    return (
+        f"💙 {name}I'm glad you're open to getting help. "
+        "Would you like help figuring out **what to say** to your mom or school counselor? "
+        "I can draft a quick message with you."
+    )
+
 # 🎯 FIXED: is_accepting_offer() function
 def is_accepting_offer(message: str) -> bool:
     """Check if message is accepting a previous offer - ENHANCED FOR SPECIFIC REQUESTS."""
@@ -1175,6 +1199,10 @@ def is_accepting_offer(message: str) -> bool:
     msg = normalize_message(message or "").strip().lower()
     last_offer = get_last_offer_context()
     if not last_offer["offered_help"]:
+        return False
+
+    # If the last offer was crisis/safety-related, don't treat a simple "yes" as generic acceptance
+    if _is_crisis_offer_text(last_offer.get("content")):
         return False
 
     # 🆕 NEW: Specific help requests matching what was offered
@@ -2964,6 +2992,22 @@ Your safety is the most important thing. Please get help immediately. 💙"""
         student_name = st.session_state.get('student_name', '')
         response = generate_subject_restriction_response(trigger, student_age, student_name)
         return response, "📚 Lumii's Beta Subject Focus", "subject_restricted", "🎯 Beta Scope"
+
+    # If student says they'll talk to a trusted adult, gently close post-crisis mode
+    _agree_patterns = ("i'll talk to", "i will talk to", "i talked to", "i will tell", "i'll tell")
+    if st.session_state.get('post_crisis_monitoring') and any(p in (message or "").lower() for p in _agree_patterns):
+        st.session_state.post_crisis_monitoring = False
+        st.session_state.locked_after_crisis = False
+        name = st.session_state.get('student_name', '')
+        note = f"{name}, " if name else ""
+        resp = f"💙 {note}that's a strong step. If you want, we can draft a few **opening sentences** together."
+        return resp, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
+
+    # If we're in post-crisis monitoring and the student says "yes", keep it in supportive logistics (not study help)
+    if st.session_state.get('post_crisis_monitoring') and _is_simple_yes(message):
+        resp = handle_crisis_offer_acceptance(st.session_state.get('student_name', ''))
+        return resp, "💙 Lumii's Continued Support", "post_crisis_support", "🤗 Supportive Care"
+
     
     # FIX #4: FIXED acceptance check - only for safe priorities and after crisis handling
     if priority in ('general', 'emotional', 'organization', 'confusion'):
