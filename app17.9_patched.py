@@ -1682,16 +1682,19 @@ What do you need help with? I believe in you! 🌟"""
 If this continues, I'll need to end our session for today. I believe you're capable of better communication than this.
 
 Let's reset - what would genuinely help you right now? 🔄"""
-        else:  #return f"""🛑 {name_part}I've tried to help you twice, but the disrespectful language has continued. I care about you, but I can't continue this conversation right now.
+        if behavior_type == "abusive":
+    if strike_count == 1:
+        return f"""Let's reset — what would genuinely help you right now? 🔄"""
+    else:
+        return f"""🛑 {name_part}I've tried to help you twice, but the disrespectful language has continued. I care about you, but I can't continue this conversation right now.
 
 Please take a break and come back when you're ready to communicate respectfully. I'll be here when you want to learn together positively.
 
-Remember: I'm always here to help when you're ready to be kind. 
-
-    elif behavior_type in ("dismissive", "rude"):
-        if strike_count == 1:
-            if student_age <= 11:
-                return f"""😊 {name_part}I notice you might not be in the mood to learn right now, and that's okay!
+Remember: I'm always here to help when you're ready to be kind."""
+elif behavior_type in ("dismissive", "rude"):
+    if strike_count == 1:
+        if student_age <= 11:
+            return f"""😊 {name_part}I notice you might not be in the mood to learn right n
 
 Sometimes we all have days when we feel grumpy. I'm still here when you're ready, and I want to help make learning more fun for you.
 
