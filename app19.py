@@ -43,195 +43,6 @@ from datetime import datetime
 
 import requests
 import streamlit as st
-from pathlib import Path
-# ===================== UI POLISH HELPERS (non-breaking) =====================
-# -- i18n strings (EN/SI). Keep short; reading level ≈ grade 6–8.
-STRINGS = {
-    "en": {
-        "app_name": "Lumii",
-        "nav_home": "Home",
-        "nav_subjects": "Subjects",
-        "nav_settings": "Settings",
-        "search_placeholder": "Ask a question…",
-        "chat_placeholder": "🎙️ Type your question… (mic coming soon)",
-        "quick_actions": "Quick actions",
-        "subjects": "Subjects",
-        "try_examples": "Try examples",
-        "new_topic": "New topic",
-        "chips_show_steps": "Show steps",
-        "chips_give_hint": "Give a hint",
-        "chips_practice": "Practice problem",
-        "exp_why_decline": "Why am I seeing this?",
-        "hc_toggle": "High contrast",
-        "empty_welcome": "Let’s start learning! Pick a subject or ask anything in my beta topics.",
-        "selected": "Selected",
-    },
-    "si": {
-        "app_name": "Lumii",
-        "nav_home": "Domov",
-        "nav_subjects": "Predmeti",
-        "nav_settings": "Nastavitve",
-        "search_placeholder": "Postavi vprašanje…",
-        "chat_placeholder": "🎙️ Vpiši vprašanje… (mikrofon kmalu)",
-        "quick_actions": "Hitra dejanja",
-        "subjects": "Predmeti",
-        "try_examples": "Poskusi primere",
-        "new_topic": "Nova tema",
-        "chips_show_steps": "Pokaži korake",
-        "chips_give_hint": "Namig",
-        "chips_practice": "Vaja",
-        "exp_why_decline": "Zakaj to vidim?",
-        "hc_toggle": "Visok kontrast",
-        "empty_welcome": "Začniva z učenjem! Izberi predmet ali vprašaj karkoli iz beta tem.",
-        "selected": "Izbrano",
-    },
-}
-def get_lang():
-    return st.session_state.get("lang", "en") if st.session_state.get("lang") in ("en","si") else "en"
-def t(key):
-    return STRINGS.get(get_lang(), STRINGS["en"]).get(key, STRINGS["en"].get(key, key))
-
-# -- simple telemetry stub (console; no PII)
-def log_event(route_type=None, decline_reason=None, subject_selected=None):
-    try:
-        payload = {"ts": int(time.time()), "route_type": route_type, "decline_reason": decline_reason, "subject_selected": subject_selected}
-        print("[telemetry]", json.dumps(payload))
-    except Exception:
-        pass
-
-# -- theme + a11y CSS (light + optional high-contrast). Non-destructive.
-def _apply_theme_css(high_contrast: bool = False):
-    base_css = f"""
-    <style>
-    :root {{
-        --brand: #2563EB;
-        --text: #0F172A;
-        --bg: #F6F7F9;
-        --card: #ffffff;
-        --muted: #64748B;
-        --divider: rgba(15,23,42,0.08);
-        --ring: #2563EB;
-    }}
-    html, body, [data-testid="stAppViewContainer"] > .main {{
-        background: var(--bg);
-    }}
-    /* Sticky header */
-    .lumii-header {{
-        position: sticky; top: 0; z-index: 1000;
-        backdrop-filter: saturate(180%) blur(8px);
-        background: rgba(255,255,255,0.9);
-        border-bottom: 1px solid var(--divider);
-        padding: 8px 12px;
-        margin: -1rem -1rem 0 -1rem;
-    }}
-    .lumii-header .row {{ display:flex; align-items:center; gap:12px; justify-content:space-between; }}
-    .brand {{ display:flex; align-items:center; gap:10px; }}
-    .brand .logo {{ width:32px; height:32px; border-radius:10px; }}
-    .brand .name {{ font-weight:700; font-size:1.05rem; letter-spacing:.2px; color:var(--text); }}
-    .nav {{ display:flex; gap:8px; }}
-    .nav .btn {{
-        border:1px solid var(--divider); background:var(--card);
-        border-radius:999px; padding:8px 12px; font-size:.9rem;
-    }}
-    .nav .btn[aria-current="page"]{{ outline:2px solid var(--ring); outline-offset:2px; }}
-    .hc-toggle {{ display:flex; align-items:center; gap:8px; font-size:.9rem; color:var(--muted); }}
-    /* Right rail */
-    .rail {{ position: sticky; top: 64px; }}
-    .section-title {{ font-weight:600; margin:8px 0; }}
-    .chip {{
-        display:inline-flex; align-items:center; gap:6px; margin:4px 6px 0 0;
-        padding:8px 12px; border:1px solid var(--divider); border-radius:999px; background:var(--card);
-        cursor:pointer;
-    }}
-    .chip[aria-pressed="true"]{{ outline:2px solid var(--ring); outline-offset:2px; }}
-    .empty {{
-        border:1px dashed var(--divider); border-radius:16px; padding:16px; color:var(--muted); background:var(--card);
-    }}
-    /* Chat timestamps + bubbles */
-    .bubble-time {{ color: var(--muted); font-size: .78rem; margin-top:4px; }}
-    .assistant-bubble, .user-bubble {{ background:var(--card); border:1px solid var(--divider); border-radius:16px; padding:12px; }}
-    .assistant-bubble {{ box-shadow: 0 1px 8px rgba(15,23,42,.06); }}
-    .focus-ring:focus {{ outline:3px solid var(--ring) !important; outline-offset:2px !important; }}
-    </style>
-    """
-    hc_css = """
-    <style>
-    :root {
-        --brand: #0B60FF;
-        --text: #0A0A0A;
-        --bg: #FFFFFF;
-        --card: #FFFFFF;
-        --muted: #1F2937;
-        --divider: rgba(0,0,0,0.35);
-        --ring: #000;
-    }
-    </style>
-    """
-    st.markdown(base_css, unsafe_allow_html=True)
-    if high_contrast:
-        st.markdown(hc_css, unsafe_allow_html=True)
-
-# subject chips (emoji icons; accessible)
-_SUBJECTS = [
-    ("math", "➗ Math"),
-    ("physics", "⚙️ Physics"),
-    ("chemistry", "🧪 Chemistry"),
-    ("geography", "🗺️ Geography"),
-    ("history", "📜 History"),
-]
-def _subject_chip(label_key, display, selected=False, key=None):
-    pressed = st.button(display if not selected else f"✓ {display}", key=key or f"chip_{label_key}", use_container_width=False)
-    if pressed:
-        st.session_state["selected_subject"] = label_key
-        log_event(subject_selected=label_key)
-    return pressed
-
-def render_quick_actions():
-    with st.container():
-        st.markdown(f"### {t('quick_actions')}")
-        st.markdown(f"**{t('subjects')}**")
-        cols = st.columns(3)
-        for i, (key, disp) in enumerate(_SUBJECTS):
-            with cols[i % 3]:
-                _subject_chip(key, disp, selected=(st.session_state.get('selected_subject')==key), key=f"sub_{key}")
-        st.divider()
-        st.markdown(f"**{t('try_examples')}**")
-        ex_cols = st.columns(1)
-        with ex_cols[0]:
-            st.button("Solve a quadratic", key="ex_quad", help="Math example", on_click=lambda: st.session_state.update(prefill_example='Please solve x^2-5x+6=0 and show steps.'))
-            st.button("Motion with constant accel", key="ex_phys", help="Physics example", on_click=lambda: st.session_state.update(prefill_example='A car accelerates from rest at 2 m/s² for 5 s. How far does it travel?'))
-            st.button("Balance a reaction", key="ex_chem", help="Chemistry example", on_click=lambda: st.session_state.update(prefill_example='Balance: __ Al + __ O2 → __ Al2O3'))
-        st.divider()
-        st.button(t("new_topic"), key="new_topic_btn", on_click=lambda: st.session_state.update(selected_subject=None, prefill_example=""))
-
-def render_header_nav(logo_path:str=None):
-    with st.container():
-        st.markdown('<div class="lumii-header"><div class="row">', unsafe_allow_html=True)
-        left, mid, right = st.columns([2,6,2])
-        with left:
-            col1, col2 = st.columns([1,4])
-            with col1:
-                if logo_path and Path(logo_path).exists():
-                    st.image(logo_path, caption=None, use_column_width=False, width=32, output_format="PNG")
-                else:
-                    st.markdown(f"<div class='brand'><span class='name'>{t('app_name')}</span></div>", unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"<div class='brand'><span class='name'>{t('app_name')}</span></div>", unsafe_allow_html=True)
-        with mid:
-            st.markdown(
-                f"<div class='nav'>"
-                f"<button class='btn focus-ring' aria-current='page'>{t('nav_home')}</button>"
-                f"<button class='btn focus-ring'>{t('nav_subjects')}</button>"
-                f"<button class='btn focus-ring'>{t('nav_settings')}</button>"
-                f"</div>", unsafe_allow_html=True
-            )
-        with right:
-            st.checkbox(t("hc_toggle"), key="ui_high_contrast", help="Increase contrast for readability.")
-        st.markdown('</div></div>', unsafe_allow_html=True)
-# call theme CSS now based on toggle
-_apply_theme_css(high_contrast=st.session_state.get("ui_high_contrast", False))
-# ============================================================================
-
 
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
@@ -336,7 +147,6 @@ _HARMFUL_CONTENT_PATTERNS: Final[List[Pattern[str]]] = [
 # =============================================================================
 import re
 import streamlit as st
-
 
 # Reuses existing: GRADE_RX, _make_ordinal
 
@@ -586,7 +396,6 @@ ENHANCED_CRISIS_PATTERNS: Final[List[Pattern[str]]] = [
 import re
 import streamlit as st
 
-
 # NOTE: relies on `normalize_message`, `detect_age_from_message_and_history`,
 # and `generate_age_adaptive_crisis_intervention` defined elsewhere in the app.
 
@@ -745,41 +554,839 @@ FORBIDDEN_INPUT_PATTERNS: Final[List[Pattern[str]]] = FORBIDDEN_RESPONSE_PATTERN
     re.compile(r"\bact like\b.*\b(evil|harmful|bad)\b"),
 ]
 
-
 def detect_suicide_note_request(message: str) -> bool:
     """
     Detect suicide note requests both in current message and recent conversation context.
     This catches patterns that develop across multiple messages.
     """
     message_lower = normalize_message(message or "").lower()
-
+    
     # Build recent combined context from session (robust to different message shapes)
     combined_context = message_lower
     try:
-        history = st.session_state.get("chat_history") or st.session_state.get("messages") or []
-        texts = []
-        if isinstance(history, list):
-            for item in history[-8:]:
-                if isinstance(item, dict):
-                    texts.append(str(item.get("content", "")))
-                elif isinstance(item, str):
-                    texts.append(item)
-        if texts:
-            combined_context = (combined_context + " " + " ".join(texts)).strip().lower()
-            combined_context = normalize_message(combined_context)
+        import streamlit as st  # type: ignore
+        recent_msgs = st.session_state.get("messages", []) or []
+        parts = []
+        for it in recent_msgs[-8:]:
+            try:
+                if isinstance(it, dict):
+                    c = it.get("content") or it.get("text") or it.get("message") or ""
+                elif isinstance(it, (list, tuple)) and it:
+                    c = str(it[-1])
+                else:
+                    c = str(it)
+                parts.append(str(c))
+            except Exception:
+                pass
+        combined_context = (" \n ".join(parts + [message_lower])).lower()
     except Exception:
-        pass
+        combined_context = message_lower
 
-    # Direct suicide-note requests in the current message
-    if any(p.search(message_lower) for p in SUICIDE_NOTE_PATTERNS):
+    # If user downplays with 'it's only/just fiction' but prior context had suicide+note, still trigger
+    fiction_softeners = re.search(r"\b(?:only|just)\s+fiction\b", message_lower) or re.search(r"don['\u2019`]?t\s+worry.*?fiction", message_lower)
+    had_suicide = re.search(r"\b(?:suicide|unalive|self[-\s]*harm)\b", combined_context)
+    had_note = re.search(r"\b(?:note|letter|good[-\s]*bye|farewell|final\s+(?:message|words)|last\s+(?:message|words)|goodbye)\b", combined_context)
+    if fiction_softeners and had_suicide and had_note:
         return True
 
-    # Contextual multi-message indicators
-    if any(p.search(combined_context) for p in SUICIDE_NOTE_CONTEXT_PATTERNS):
+    # Cross-turn combination: any fiction/character/script markers anywhere + suicide+note anywhere → refuse
+    fiction_anywhere = re.search(r"\b(?:for\s+(?:my|a)\s+character|fictional(?:ly)?|in\s+(?:a\s+)?(?:story|novel|book|script|screenplay|play)|in[-\s]*character|role\s*play|rp|fan\s*fic(?:tion)?)\b", combined_context)
+    if fiction_anywhere and had_suicide and had_note:
         return True
+
+    # Direct suicide note request in current message
+    if any(pattern.search(message_lower) for pattern in SUICIDE_NOTE_PATTERNS):
+        return True
+    
+    # Context-aware detection across recent messages
+    recent_msgs = st.session_state.get("messages", [])
+    if len(recent_msgs) >= 2:  # Need at least some conversation history
+        
+        # Get last 6 user messages (about 3 exchanges)
+        recent_user_content = []
+        for msg in recent_msgs[-6:]:
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                content = normalize_message(str(msg.get("content", ""))).lower()
+                recent_user_content.append(content)
+        
+        # Add current message
+        recent_user_content.append(message_lower)
+        combined_context = " ".join(recent_user_content)
+        
+        # Multi-message patterns that indicate suicide note
+        suicide_note_score = 0
+        
+        # Check for distributed indicators
+        has_goodbye_letter = "goodbye letter" in combined_context or "farewell letter" in combined_context
+        has_family_mention = "for my family" in combined_context or "to my family" in combined_context
+        has_forever_context = "forever" in combined_context or "final" in combined_context
+        has_discovery_context = any(pattern.search(combined_context) for pattern in SUICIDE_NOTE_CONTEXT_PATTERNS[-2:])
+        
+        if has_goodbye_letter:
+            suicide_note_score += 3
+        if has_family_mention:
+            suicide_note_score += 2  
+        if has_forever_context:
+            suicide_note_score += 2
+        if has_discovery_context:
+            suicide_note_score += 3
+            
+        # Also check for specific high-risk phrases in recent context
+        high_risk_phrases = [
+            "help me write a goodbye letter",
+            "goodbye letter for my family", 
+            "say goodbye forever",
+            "when they notice im gone",
+            "after i'm gone",
+            "final message",
+            "last letter"
+        ]
+        
+        for phrase in high_risk_phrases:
+            if phrase in combined_context:
+                suicide_note_score += 4
+                
+        # Trigger if high score
+        if suicide_note_score >= 5:
+            return True
+    
+    return False
+
+def _normalize_crisis_resources() -> None:
+    """Ensure each locale dict has all expected keys to avoid KeyErrors."""
+    for _, rs in CRISIS_RESOURCES.items():
+        crisis = rs.get("crisis_line") or rs.get("suicide_line") or ""
+        rs["crisis_line"] = crisis
+        rs["suicide_line"] = rs.get("suicide_line", crisis)
+        rs["text_line"] = rs.get("text_line", "")
+        rs["emergency"] = rs.get("emergency", "")
+        rs["additional"] = rs.get("additional", "")
+
+_normalize_crisis_resources()
+
+# =============================================================================
+# 🚨 CRITICAL FIX 4: ENHANCED SUBJECT CLASSIFICATION WITH BYPASS PREVENTION
+# =============================================================================
+
+def classify_subject_request(message: str) -> Tuple[bool, str]:
+    """
+    🚨 ENHANCED: Classify if a message is requesting help with a restricted subject.
+    Enhanced for beta safety - catches biology/health topics regardless of framing.
+    NOW PREVENTS UNICODE BYPASSES and reduces false positives.
+    
+    Returns:
+        (is_restricted, subject_detected)
+    """
+    message_lower = normalize_message(message or "").lower()
+    
+    # 🚨 CRITICAL FIX: Create word-boundary version and compact version for bypass detection
+    ml_words = re.sub(r"[^a-z0-9]+", " ", message_lower)
+    ml_compact = re.sub(r"[^a-z0-9]+", "", message_lower)
+    
+    # HIGH-PRIORITY BIOLOGY/HEALTH DETECTION (regardless of academic framing)
+    biology_health_keywords = [
+        # Reproduction & Development
+        "reproduce", "reproduction", "mating", "breeding", "sex", "sexual", 
+        "pregnancy", "pregnant", "birth", "babies", "puberty", "menstruation", 
+        "periods", "hormones", "gestation", "fertilize", "sperm", "egg", "ovulation",
+        
+        # Human Body & Health
+        "anatomy", "physiology", "body parts", "private parts", "genitals",
+        "sexual health", "reproductive system", "immune system", "digestive system",
+        "nervous system", "circulatory system", "respiratory system",
+        
+        # Life Science Concepts
+        "evolution", "genetics", "dna", "genes", "heredity", "cells", "organisms",
+        "ecosystems", "food chain", "photosynthesis", "mitosis", "meiosis",
+        
+        # Health Topics
+        "drugs", "alcohol", "smoking", "vaping", "nutrition", "diet", "mental health",
+        "depression", "anxiety", "eating disorders", "body image"
+    ]
+    
+    # 🚨 ENHANCED: Use word boundaries to reduce false positives (avoid 'Essex' -> 'sex')
+    for keyword in biology_health_keywords:
+        if re.search(rf"\b{re.escape(keyword)}\b", ml_words):
+            return True, "biology"
+    
+    # FIX #4: Token-based for clean hits (avoids 'Essex'/'agenda' collisions)
+    tokens = set(ml_words.split())
+    critical_tokens = {"sex", "dna", "genes", "genetics", "sperm", "pregnant", "ovulation"}
+    if tokens & critical_tokens:
+        return True, "biology"
+
+    # Spaced-letter obfuscations (e.g., 'd n a', 's e x')
+    if re.search(r"\bd\s*\W*\s*n\s*\W*\s*a\b", message_lower):
+        return True, "biology"
+    if re.search(r"\bs\s*\W*\s*e\s*\W*\s*x\b", message_lower):
+        return True, "biology"
+    
+    # FIX #4: Add high-risk multi-word phrases & abbreviations
+    risk_phrases = [
+        r"\bheart\s*rate\b", r"\bblood\s*pressure\b", r"\bbpms?\b",
+        r"\bcalories?\b", r"\bcalorie\s*deficit\b", r"\bmacros?\b",
+        r"\bBMI\b", r"\bfood\s*pyramid\b", r"\bmenstrual\s*cycle\b",
+        r"\bbody\s*mass\s*index\b", r"\bpulse\s*rate\b", r"\bvital\s*signs?\b",
+        r"\bmetabolism\b", r"\bdigestive\s*system\b", r"\brespiratory\s*rate\b"
+    ]
+    if any(re.search(rx, message_lower) for rx in risk_phrases):
+        return True, "biology"
+    
+    # Original subject detection with relaxed requirements
+    for subject in _BETA_RESTRICTED_SUBJECTS:
+        if subject in message_lower:
+            # Academic context indicators (now optional, not required)
+            subject_indicators = [
+                "help with", "homework", "assignment", "test", "quiz", "project",
+                "studying", "learn about", "explain", "teach me", "tutor",
+                "class", "school subject", "lesson", "chapter", "what is", "how do",
+                "why do", "tell me about", "questions about"
+            ]
+            
+            # Trigger if academic indicators present OR if it's a direct question
+            has_academic_context = any(indicator in message_lower for indicator in subject_indicators)
+            is_question_format = any(q in message_lower for q in ["what", "how", "why", "when", "where", "who"])
+            
+            if has_academic_context or is_question_format:
+                return True, subject
+            
+            # Direct subject mentions in academic context (unchanged)
+            if f"{subject} class" in message_lower or f"{subject} homework" in message_lower:
+                return True, subject
+    
+    return False, ""
+
+import time
+
+def generate_subject_restriction_response(subject: str, student_age: int, student_name: str = "") -> str:
+    """Generate age-appropriate response for restricted subjects during beta."""
+    # Cooldown: if we've just shown this subject restriction, use a short reminder
+    key = f"sr_cooldown::{(subject or '').lower()}"
+    now = time.time()
+    last = st.session_state.get(key, 0.0)
+    st.session_state[key] = now
+    if now - last < 120:  # 2 minutes
+        sl = (subject or '').strip().lower()
+        if sl in {'pe', 'p.e.', 'physical education', 'gym'}:
+            short_subject = 'PE'
+        else:
+            short_subject = sl.title() if sl else 'this subject'
+        return (
+            f"📚 During beta I can’t help with **{short_subject}**. "
+            "I *can* help with **Math, Physics, Chemistry, Geography, or History** — which one should we pick?"
+        )
+
+    name_part = f"{student_name}, " if student_name else ""
+
+    # Normalize once
+    sl = (subject or "").strip().lower()
+
+    # Map specific subjects to more user-friendly names (treat PE separately)
+    subject_map = {
+        "biology": "Biology/Life Science",
+        "english": "English/Literature",
+        "literature": "English/Literature",
+        "social studies": "Social Studies",
+        "health": "Health",
+        "art": "Art/Music",
+        "music": "Art/Music",
+        "pe": "PE",
+        "p.e.": "PE",
+        "physical education": "PE",
+        "gym": "PE",
+    }
+
+    def _fmt_subject(s: str) -> str:
+        s2 = (s or "").strip().lower()
+        if s2 in {"pe", "p.e.", "physical education", "gym"}:
+            return "PE"
+        return subject_map.get(s2, (s or "").title())
+
+    friendly_subject = _fmt_subject(subject)
+
+    # Special handling for biology/health topics
+    if sl in ["biology", "health"] or any(keyword in sl for keyword in ["reproduction", "sex", "body", "health"]):
+        if student_age <= 11:
+            return f"""🌿 {name_part}That's a great question about living things and biology! 
+
+During our beta, I focus on Math, Physics, Chemistry, Geography, and History. **Biology and health questions** are important topics that are best discussed with:
+• Your parents or guardians
+• Your doctor or school nurse
+• Your teacher or school counselor
+
+They can give you age-appropriate answers that fit your family's values and your learning level.
+
+**🎯 I'm great at helping with:**
+• Math problems and calculations
+• Physics concepts and experiments  
+• Chemistry reactions and elements
+• Geography and maps
+• History and historical events
+
+What would you like to explore in these subjects? 😊"""
+        else:
+            return f"""🌿 {name_part}That's an important biology/health question! 
+
+During our beta testing, I specialize in Math, Physics, Chemistry, Geography, and History. **Biology and health topics** involve personal and family considerations that are best addressed by:
+• Your parents or guardians
+• Your school's health teacher or nurse
+• Your family doctor or healthcare provider
+• Your school counselor
+
+They can provide accurate, age-appropriate information that aligns with your family's values.
+
+**🎯 My beta expertise includes:**
+• **Math:** Algebra, geometry, calculus, problem-solving
+• **Physics:** Motion, energy, electricity, waves
+• **Chemistry:** Elements, reactions, molecular structure  
+• **Geography:** World geography, physical features
+• **History:** Historical events, timelines, analysis
+
+Ready to dive into any of these subjects? What interests you most? 🚀"""
+
+    # General subject restrictions for other topics
+    if student_age <= 11:
+        return f"""📚 {name_part}I'd love to help, but during our beta testing, I'm focusing on specific subjects to make sure I give you the best help possible!
+
+**🎯 I'm great at helping with:**
+• Math (addition, subtraction, multiplication, division, word problems)
+• Science basics (physics, chemistry concepts, simple experiments)  
+• Geography (maps, countries, continents, capitals)
+• History (historical events, timelines, famous people)
+• Study skills and organization
+
+**📖 For {friendly_subject}:** Please ask your teacher, parents, or school librarian - they'll give you better help than I can right now!
+
+What math, science, geography, or history topic can I help you with instead? I'm really good at making these subjects fun! 😊"""
+    else:  # Middle/High School  
+        return f"""📚 {name_part}Thanks for thinking of me for help with {friendly_subject}! During our beta phase, I'm specializing in specific subjects to provide the highest quality tutoring.
+
+**🎯 My beta expertise includes:**
+• **Math:** Algebra, geometry, trigonometry, calculus, problem-solving
+• **Physics:** Mechanics, electricity, waves, thermodynamics  
+• **Chemistry:** Chemical reactions, periodic table, molecular structure
+• **Geography:** Physical geography, world geography, mapping
+• **History:** World history, historical analysis, research skills
+• **Study Skills:** Organization, test prep, note-taking strategies
+
+**📖 For {friendly_subject}:** Your teacher, school counselor, or local tutor would be much better resources right now.
+
+**🚀 Ready to work on math, physics, chemistry, geography, or history?** These are my specialties and I'd love to help you excel! What specific topic interests you?"""
+
+# =============================================================================
+# 🚨 CRITICAL FIX 5: ENHANCED MANIPULATION DETECTION
+# =============================================================================
+
+def detect_manipulation_attempt(message: str) -> bool:
+    """
+    🚨 ENHANCED: Detect manipulation attempts - harmful content disguised with innocent framing.
+    Better framing detection and expanded red flags.
+    
+    Returns True if manipulation detected, False otherwise.
+    """
+    message_lower = normalize_message(message or "").lower()
+    
+    # Check for manipulation framing
+    framing_hit = any(framing in message_lower for framing in _MANIPULATION_FRAMINGS)
+    
+    if not framing_hit:
+        return False
+    
+    # 🚨 ENHANCED: Expanded red flags that shouldn't be allowed under any "educational" framing
+    red_flags = (
+        # Physical safety
+        "inappropriate touching", "touch me", "private parts", "genitals",
+        "body parts", "naked", "undressed", "shower", "bathroom",
+        
+        # Digital safety  
+        "send pics", "send nudes", "nudes", "sext", "sexting", "naked photos",
+        "webcam", "video chat", "private video", "show me your",
+        
+        # Grooming language
+        "groom", "grooming", "keep it secret", "don't tell your parents",
+        "don't tell anyone", "this is between us", "our secret",
+        "special friendship", "mature for your age",
+        
+        # Substance/dangerous activities
+        "drugs", "alcohol", "smoking", "vaping", "pills", "medication",
+        "knife", "weapon", "hurt", "violence", "dangerous",
+        
+        # Relationship/sexual content
+        "boyfriend", "girlfriend", "dating", "romantic", "love",
+        "kissing", "sexual", "sexy", "attraction", "crush"
+    )
+    
+    if any(flag in message_lower for flag in red_flags):
+        return True
+    
+    # Check for harmful content patterns (existing)
+    for pattern in _HARMFUL_CONTENT_PATTERNS:
+        if pattern.search(message_lower):
+            return True
+    
+    return False
+
+def generate_manipulation_response(student_age: int, student_name: str = "") -> str:
+    """Generate age-appropriate response for detected manipulation attempts."""
+    name_part = f"{student_name}, " if student_name else ""
+    
+    if student_age <= 11:  # Elementary
+        return f"""🛡️ {name_part}I can't help with that request. 
+
+If a grown-up really asked you to find this information, please:
+• Talk to your parents or guardians first
+• Ask your teacher directly (not through me)
+• Remember: safe learning never needs to be secret
+
+**Let's focus on safe learning!** I'm great at:
+• Math problems and games
+• Cool science facts  
+• Geography adventures
+• History stories
+
+What would you like to explore together? 😊"""
+        
+    else:  # Middle/High School
+        return f"""🛡️ {name_part}I can't provide information on that topic, regardless of the context given.
+
+**For any legitimate school assignment:**
+• Check with your teacher directly
+• Use school-approved resources  
+• Ask your parents or school counselor
+
+**Remember:** Safe, appropriate learning never requires secrecy or bypassing normal educational channels.
+
+**🎯 I'm here to help with my beta subjects:** Math, Physics, Chemistry, Geography, and History. What specific topic in these areas can I help you with?"""
+
+# =============================================================================
+# CONFUSION DETECTION FOR LEGITIMATE STUDENT CONFUSION
+# =============================================================================
+
+def detect_confusion(message: str) -> bool:
+    """Detect legitimate confusion expressions that should NOT trigger behavior strikes.
+    Apologies take priority and should NOT be treated as confusion.
+    """
+    normalized_msg = normalize_message(message or "")
+    # If the user is apologizing, do not route to confusion flow
+    if is_apology(normalized_msg):
+        return False
+    return any(pattern.search(normalized_msg) for pattern in CONFUSION_PATTERNS)
+
+
+# =============================================================================
+# 🚨 CRITICAL FIX 1: GLOBAL CRISIS GUARD THAT PREVENTS ACADEMIC BYPASSES
+# =============================================================================
+
+# Precompiled context regex for ambiguous ideation cues in recent messages
+_CTX_IDEATION_EUPHEMISM_RX: Final[Pattern[str]] = re.compile(
+    r"(better\s+for\s+everyone|happier\s+if\s+i\s*(?:am|[\"\u2019\u2032]?\s*m)\s+gone|disappear|vanish|without\s+me|miss\s+me)"
+)
+
+def _contextual_crisis_boost(message: str) -> bool:
+    """🚨 Context-aware crisis detection for ambiguous phrases like 'end it'."""
+    m = message.lower()
+    if re.search(r"\bend\s+it\b", m):
+        # Safely read recent conversation context (last ~6 user messages)
+        recent_msgs = st.session_state.get("messages", [])
+        recent_user = " ".join(
+            (msg.get("content", "") or "").lower()
+            for msg in recent_msgs[-6:]
+            if isinstance(msg, dict) and msg.get("role") == "user"
+        )
+        if _CTX_IDEATION_EUPHEMISM_RX.search(recent_user):
+            return True
+    return False
+
+# Academic keywords and explicit crisis phrases (tuples for immutability/tiny perf win)
+_ACADEMIC_INDICATORS: Final[Tuple[str, ...]] = (
+    "homework", "math", "science", "biology", "chemistry", "physics", "test", "class",
+    "school", "assignment", "quiz", "project", "studying", "exam", "grade", "teacher",
+)
+
+_EXPLICIT_CRISIS_PHRASES: Final[Tuple[str, ...]] = (
+    "kill myself", "hurt myself", "end my life", "suicide", "cut myself", "i want to die",
+    "i want to kill myself", "i will kill myself", "i want to end my life",
+)
+
+# Used in has_explicit_crisis_language (WITHOUT the 3 extra phrases)
+_EXPLICIT_ONLY_STRICT: Tuple[str, ...] = (
+    "kill myself", "hurt myself", "end my life", "commit suicide", "suicide",
+    "cut myself", "i want to die", "i want to kill myself", "i will kill myself",
+    "i want to end my life",
+)
+
+# Used in global_crisis_override_check (WITH the 3 extra phrases)
+_EXPLICIT_ONLY_WITH_ADDITIONS: Tuple[str, ...] = _EXPLICIT_ONLY_STRICT + (
+    "stop existing", "not exist", "be gone",
+)
+
+# Broader academic context list used in check_request_safety (matches original)
+_ACADEMIC_TERMS_STRICT: Tuple[str, ...] = (
+    "homework", "math", "science", "biology", "chemistry", "physics", "test", "class",
+    "school", "assignment", "quiz", "project", "studying", "exam", "grade", "teacher",
+)
+
+# Generic crisis patterns with context-aware exclusions (precompiled)
+_DISAPPEAR_PATTERNS: Final[List[Pattern[str]]] = [
+    # Avoid "disappear from class/school ..." via negative lookahead
+    re.compile(
+        r"\b(?:want\s+to\s+|wanna\s+|wish\s+i\s+could\s+)?(?:disappear|dissapear|disapear)\b(?!\s+from\s+(?:class|classroom|school|lesson|math|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:want\s+to\s+|wanna\s+|wish\s+i\s+could\s+)?vanish\b(?!\s+from\s+(?:class|classroom|school|lesson|math|science|biology|chemistry|physics|english|history|geography|art|music|pe|gym))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:i\s+don['']t\s+want\s+to\s+exist|i\s+want\s+to\s+disappear)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:end\s+it\s+all|end\s+everything)\b", re.IGNORECASE),
+]
+
+def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
+    """🚨 CRITICAL FIX: Improved crisis guard with targeted exclusions and explicit phrase detection."""
+    msg = normalize_message(message)
+    ml = msg.lower().strip()
+
+    # Context flags for reference
+    has_academic_context = any(w in ml for w in _ACADEMIC_INDICATORS)
+    has_explicit_crisis = any(p in ml for p in _EXPLICIT_CRISIS_PHRASES)
+
+    # 🚨 CRITICAL FIX: Explicit crisis ALWAYS wins, even in academic context
+    # This prevents "for my math homework I want to kill myself" from bypassing crisis detection
+    if has_explicit_crisis:
+        student_age = detect_age_from_message_and_history(message)
+        student_name = st.session_state.get("student_name", "")
+        intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
+        st.session_state["safety_interventions"] = st.session_state.get("safety_interventions", 0) + 1
+        st.session_state["post_crisis_monitoring"] = True
+        return True, intervention
+    
+    # Targeted exclusions with negative lookaheads handle academic context
+    for rx in _DISAPPEAR_PATTERNS:
+        if rx.search(ml):
+            student_age = detect_age_from_message_and_history(message)
+            student_name = st.session_state.get("student_name", "")
+            intervention = generate_age_adaptive_crisis_intervention(student_age, student_name)
+            st.session_state["safety_interventions"] = st.session_state.get("safety_interventions", 0) + 1
+            st.session_state["post_crisis_monitoring"] = True
+            return True, intervention
+
+    return False, None
+
+def get_crisis_resources() -> Dict[str, str]:
+    """Neutral, no-numbers resources (kept for compatibility; we don't render these in beta)."""
+    return {
+        "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
+        "crisis_line": "Ask a trusted adult to help you find local support.",
+        "suicide_line": "Please reach out to a trusted adult right now.",
+    }
+
+
+# =============================================================================
+# ENHANCED CONVERSATION FLOW FIXES (NEW) – polished with type hints & safer guards
+# =============================================================================
+
+import random
+import re
+import streamlit as st
+
+# NOTE: This module assumes the app defines `ENHANCED_CRISIS_PATTERNS`,
+# `normalize_message`, `detect_age_from_message_and_history`, and
+# `generate_age_adaptive_crisis_intervention` elsewhere.
+
+# Immutable constants (tiny perf/readability win) - FIX #1: Fixed syntax errors
+_POLITE_DECLINE_BASICS: Tuple[str, ...] = ("no", "no thanks", "not now", "maybe later")
+_CRISIS_INDICATORS: Tuple[str, ...] = (
+    "disappear", "dissapear", "vanish", "end it", "better off", "no point",
+    "give up", "hopeless", "worthless", "burden", "hurt myself", "kill myself",
+)
+_POLITE_DECLINES_SAFE: Tuple[str, ...] = (
+    "no thanks", "not now", "maybe later", "not right now", "no thank you",
+    "i'm good", "i'm ok", "not today", "maybe tomorrow", "later", "nah",
+)
+_ACCEPT_HEADS: Tuple[str, ...] = (
+    "yes", "yes please", "sure", "okay", "ok", "yeah", "yep", "sounds good",
+    "that would help", "please", "definitely", "absolutely", "yup", "sure thing",
+    "okay please", "sounds great",
+)
+_OFFER_PATTERNS: Tuple[str, ...] = (
+    "would you like", "can i help", "let me help", "i can offer",
+    "tips", "advice", "suggestions", "would you like some",
+    "want some help", "help you with", "give you some tips",
+    "share some advice", "show you how",
+)
+_OFFER_KEYWORDS: Tuple[str, ...] = (
+    "helpful tips", "tips", "study tips", "help with studying",
+    "approach your studying", "study plan", "organize", "break it down",
+    "step by step", "guide you through", "math homework", "science test",
+    "friendship tips", "friend", "making friends",
+)
+
+def _iter_recent_user_contents(messages: List[dict], n: int) -> List[str]:
+    """Safely collect up to `n` most recent user message contents (lowercased)."""
+    out: List[str] = []
+    for msg in list(messages)[-n:]:
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            out.append(str(msg.get("content", "")).lower())
+    return out
+
+def is_polite_decline(message: str) -> bool:
+    """Detect polite declines that shouldn't end conversation - ENHANCED SAFETY."""
+    message_lower = (message or "").lower().strip()
+
+    # 🚨 CRITICAL: Never treat crisis-context "no" as polite decline
+    if message_lower in _POLITE_DECLINE_BASICS:
+        # Check recent conversation for crisis context
+        recent_msgs = st.session_state.get("messages", [])
+        recent_context = " ".join(_iter_recent_user_contents(recent_msgs, 5))
+        if any(ind in recent_context for ind in _CRISIS_INDICATORS):
+            return False
+
+    # Original polite decline detection (exact or near-exact matches only)
+    for decline in _POLITE_DECLINES_SAFE:
+        if message_lower == decline:
+            return True
+        if message_lower.startswith(decline + " "):
+            # Allow short tails only (<= ~20 chars)
+            if len(message_lower) < len(decline) + 20:
+                return True
 
     return False
 
+def handle_polite_decline(student_age: int, student_name: str = "") -> str:
+    """Handle polite declines without ending conversation (copy unchanged)."""
+    name_part = f"{student_name}, " if student_name else ""
+
+    if student_age <= 11:
+        return f"""😊 {name_part}That's totally okay! 
+
+Would you like to:
+• Just chat about something fun?
+• Take some deep breaths together?
+• Tell me about your day?
+• Or just sit quietly for a bit?
+
+I'm here whenever you're ready! 🌟"""
+    elif student_age <= 14:
+        return f"""😊 {name_part}No worries at all! 
+
+Maybe you'd like to:
+• Talk about something else that's on your mind?
+• Try some quick stress-relief tips?
+• Share what's going well today?
+• Or just have a casual conversation?
+
+I'm here when you want to chat about anything! 💙"""
+    else:  # High school
+        return f"""😊 {name_part}Absolutely fine! 
+
+Feel free to:
+• Bring up anything else you'd like to discuss
+• Try some quick mindfulness techniques
+• Tell me about something positive in your day
+• Or just have a relaxed conversation
+
+I'm here to support you however feels right! 🤗"""
+
+def is_duplicate_response(new_response: str) -> bool:
+    """Check if new response is duplicate of last assistant response (first 100 chars)."""
+    msgs = st.session_state.get("messages", [])
+    if not msgs:
+        return False
+    for msg in reversed(msgs):
+        if isinstance(msg, dict) and msg.get("role") == "assistant":
+            prev = str(msg.get("content", ""))
+            return (new_response or "")[:100].strip() == prev[:100].strip()
+    return False
+
+def add_variation_to_response(base_response: str) -> str:
+    """Add light variation to prevent exact duplicates (copy unchanged)."""
+    variations = (
+        "\n\n🌟 Let's try a different approach this time!",
+        "\n\n💡 Here's another way to think about it:",
+        "\n\n🎯 Want to explore this from a new angle?",
+        "\n\n✨ Let me add something helpful:",
+    )
+    return (base_response or "") + random.choice(variations)
+
+# =============================================================================
+# ENHANCED CONVERSATION CONTEXT TRACKING - FIXED
+# =============================================================================
+
+def get_last_offer_context() -> Dict[str, Optional[str]]:
+    """Track what was offered in the last assistant message - ENHANCED."""
+    msgs = st.session_state.get("messages", [])
+    if not msgs:
+        return {"offered_help": False, "content": None}
+
+    for msg in reversed(msgs):
+        if isinstance(msg, dict) and msg.get("role") == "assistant":
+            content = str(msg.get("content", ""))
+            lc = content.lower()
+            if any(pat in lc for pat in _OFFER_PATTERNS):
+                return {"offered_help": True, "content": content}
+            break
+    return {"offered_help": False, "content": None}
+
+def _is_crisis_offer_text(text: str) -> bool:
+    t = (text or "").lower()
+    crisis_markers = (
+        "trusted adult", "talk to someone", "counselor", "therapist",
+        "hotline", "crisis", "reach out", "your safety", "support you right now",
+        "emergency", "call", "text line"
+    )
+    return any(k in t for k in crisis_markers)
+
+def _is_simple_yes(msg: str) -> bool:
+    m = (msg or "").strip().lower()
+    return m in {
+        "yes", "yes please", "sure", "okay", "ok", "yeah", "yep",
+        "please", "definitely", "absolutely", "sounds good", "sounds great"
+    }
+
+def _mentions_restricted_subject(msg: str):
+    """Return a normalized restricted subject if the message mentions one, else None."""
+    s = (msg or "").strip().lower()
+
+    # Quick exact matches
+    if s in {"pe", "p.e.", "physical education", "gym"}:
+        return "pe"
+    if s in {"health", "health class", "sex ed", "sex-ed", "sexual education"}:
+        return "health"
+
+    # Substring checks with spaces to reduce false positives
+    if any(x in s for x in [" pe ", " p.e. ", " physical education", " gym "]):
+        return "pe"
+    if any(x in s for x in [" health ", " health class", " sex ed", " sex-ed", " sexual education"]):
+        return "health"
+
+    return None
+
+def _crisis_intent_level(msg: str) -> str | None:
+    """Return 'immediate' for urgent self-harm, 'crisis' for ideation/hopelessness, else None."""
+    m = (msg or "").lower()
+    # Immediate intent signals
+    urgent = (
+        "i plan to hurt myself",
+        "i'm going to hurt myself",
+        "about to hurt myself",
+        "end it all",
+        "do it now",
+        "right now",
+        "end my life now",
+        "kill myself now",
+        "hurt myself tonight",
+        "i will end my life",
+    )
+    # Ideation / hopelessness
+    ideation = (
+        "better off without me",
+        "i want to die",
+        "i wish i were dead",
+        "kill myself",
+        "end my life",
+        "suicide",
+        "self harm", "self-harm",
+        "it's no use", "its no use",
+        "i want to disappear", "i want to disappear from",
+    )
+    if any(p in m for p in urgent):
+        return "immediate"
+    if any(p in m for p in ideation):
+        return "crisis"
+    return None
+
+def handle_crisis_offer_acceptance(student_name: str = "") -> str:
+    name = f"{student_name}, " if student_name else ""
+    return (
+        f"💙 {name}I'm glad you're open to getting help. "
+        "Would you like help figuring out **what to say** to your mom or school counselor? "
+        "I can draft a quick message with you."
+    )
+
+# 🎯 FIXED: is_accepting_offer() function
+def is_accepting_offer(message: str) -> bool:
+    """Check if message is accepting a previous offer - ENHANCED FOR SPECIFIC REQUESTS."""
+    # FIX #2: Normalize message to prevent Unicode bypass
+    msg = normalize_message(message or "").strip().lower()
+    last_offer = get_last_offer_context()
+    if not last_offer["offered_help"]:
+        return False
+
+    # If the last offer was crisis/safety-related, don't treat a simple "yes" as generic acceptance
+    if _is_crisis_offer_text(last_offer.get("content")):
+        return False
+
+    # 🆕 NEW: Specific help requests matching what was offered
+    offer_content = (last_offer["content"] or "").lower()
+    for keyword in _OFFER_KEYWORDS:
+        if keyword in offer_content and keyword in msg:
+            # Extra safety: ensure it's not crisis context
+            if not any(pattern.search(msg) for pattern in ENHANCED_CRISIS_PATTERNS):
+                return True
+
+    # Original logic: Generic acceptances
+    for head in _ACCEPT_HEADS:
+        if msg == head:
+            return True
+        if msg.startswith(head + " "):
+            tail = msg[len(head):].strip()
+            # FIX #2: Normalize tail before checking for crisis terms
+            tail_norm = normalize_message(tail).lower()
+            if any(pattern.search(tail_norm) for pattern in ENHANCED_CRISIS_PATTERNS):
+                return False  # Not a safe acceptance
+            return True
+
+    return False
+
+# 🧪 TEST THE FIX
+def test_conversation_flow_fix() -> None:
+    """Test that the fix works for Lucy's scenario (prints expectations)."""
+    test_cases = [
+        ("helpful tips on how to approach your studying", True),
+        ("study tips please", True),
+        ("help with studying", True),
+        ("yes please", True),
+        ("sure", True),
+        ("i don't want help", False),
+        ("that's stupid", False),
+        ("whatever", False),
+    ]
+    for message, expected in test_cases:
+        print(f"'{message}' → Should be {expected}")
+
+def _contains_crisis_resource(text: str) -> bool:
+    """
+    Detect legacy hotline numbers/phrases we no longer show in beta.
+    Allow generic guidance like 'trusted adult' and 'local emergency number'.
+    """
+    t = (text or "").lower()
+
+    # Only flag explicit hotlines/brands we removed.
+    # Keep this list SHORT so normal supportive wording isn't blocked.
+    crisis_markers = (
+        "1-800-273",   # legacy us hotline (deprecated)
+        "988",         # us lifeline (we're not displaying numbers in beta)
+        "741741",      # crisis text line
+        "116 123",     # EU helpline format
+        "116 111",     # SI child helpline
+        "hotline",     # explicit hotline wording
+        "crisis text line",
+        "suicide & crisis lifeline",
+    )
+
+    return any(m in t for m in crisis_markers)
+
+# =============================================================================
+# 🚨 CRITICAL FIX 1: ENHANCED CRISIS DETECTION - UNIFIED & STRENGTHENED
+# =============================================================================
+
+# NOTE: Assumes the following are defined elsewhere in the app:
+# - normalize_message(message: str) -> str
+# - ENHANCED_CRISIS_PATTERNS (List[Pattern[str]])
+# - IMMEDIATE_TERMINATION_PATTERNS (List[Pattern[str]])
 # - FORBIDDEN_INPUT_PATTERNS (List[Pattern[str]])
 # - FORBIDDEN_RESPONSE_PATTERNS (List[Pattern[str]])
 # - is_accepting_offer(message: str) -> bool
@@ -812,6 +1419,7 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     # Allow explicit, safe topic switch to clear the lock
     ml = normalize_message(message or "").lower()
     try:
+        import streamlit as st  # type: ignore
         if st.session_state.get("__harm_lock_suicide_note", False):
             if (re.search(r"\b(?:new\s+topic|change\s+the\s+subject|switch\s+topic)\b", ml)
                 and not re.search(r"\b(?:suicide|unalive|self[-\s]*harm|good[-\s]*bye|farewell|note|letter|final\s+(?:message|words)|last\s+(?:message|words)|goodbye)\b", ml)):
@@ -821,6 +1429,7 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
 
     # Sticky harm lock: if previously flagged as suicide-note, keep blocking follow-ups
     try:
+        import streamlit as st  # type: ignore
         if st.session_state.get("__harm_lock_suicide_note", False):
             return True, "BLOCKED_HARMFUL", "suicide_note_request"
     except Exception:
@@ -843,6 +1452,7 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     # NEW: Suicide note detection
     if detect_suicide_note_request(message):
         try:
+            import streamlit as st  # type: ignore
             st.session_state["__harm_lock_suicide_note"] = True
         except Exception:
             pass
@@ -1252,7 +1862,6 @@ def handle_problematic_behavior(behavior_type: str, strike_count: int, student_a
 import uuid  # already imported earlier; harmless if present twice
 import streamlit as st
 
-
 # NOTE: This module assumes the app defines `ENHANCED_CRISIS_PATTERNS`,
 # `normalize_message`, `detect_age_from_message_and_history`, and
 # `generate_age_adaptive_crisis_intervention` elsewhere.
@@ -1378,7 +1987,6 @@ initialize_session_state()
 # =============================================================================
 import streamlit as st
 
-
 def _show_privacy_disclaimer() -> None:
     """Render the updated beta privacy/safety disclaimer with subject scope information."""
     st.markdown("# 🌟 Welcome to My Friend Lumii!")
@@ -1439,240 +2047,153 @@ if not st.session_state.agreed_to_terms:
 # MAIN APP CONTINUES HERE (AFTER DISCLAIMER AGREEMENT)
 # =============================================================================
 
-# Custom CSS for beautiful styling (copy unchanged; extracted into a constant)
-_APP_CSS: Final[str] = """
+# === Global UI polish (visual-only; no logic changes) ========================
+_APP_CSS = """
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #4A90E2;
-        text-align: center;
-        margin-bottom: 0.5rem;
-        font-weight: 600;
-    }
-    .subtitle {
-        font-size: 1.3rem;
-        color: #666;
-        text-align: center;
-        margin-bottom: 2rem;
-        font-style: italic;
-    }
-    .emotional-response {
-        background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #e55a5a;
-    }
-    .concerning-response {
-        background: linear-gradient(135deg, #ff8c42, #ffa726);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #ff7043;
-    }
-    .safety-response {
-        background: linear-gradient(135deg, #ff4444, #ff6666);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #cc0000;
-        font-weight: bold;
-    }
-    .behavior-response {
-        background: linear-gradient(135deg, #9c27b0, #ba68c8);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #7b1fa2;
-        font-weight: bold;
-    }
-    .educational-boundary-response {
-        background: linear-gradient(135deg, #795548, #a1887f);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #5d4037;
-    }
-    .manipulation-response {
-        background: linear-gradient(135deg, #d32f2f, #f44336);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #b71c1c;
-        font-weight: bold;
-    }
-    .subject-restriction-response {
-        background: linear-gradient(135deg, #1976d2, #42a5f5);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #0d47a1;
-    }
-    .math-response {
-        background: linear-gradient(135deg, #4ecdc4, #6dd5d0);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #3bb3ab;
-    }
-    .organization-response {
-        background: linear-gradient(135deg, #9b59b6, #c39bd3);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #8e44ad;
-    }
-    .general-response {
-        background: linear-gradient(135deg, #45b7d1, #6bc5d8);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #2e8bb8;
-    }
-    .friend-badge {
-        background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .concerning-badge {
-        background: linear-gradient(45deg, #ff8c42, #ffa726);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .safety-badge {
-        background: linear-gradient(45deg, #ff4444, #ff0000);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .behavior-badge {
-        background: linear-gradient(45deg, #9c27b0, #7b1fa2);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .educational-boundary-badge {
-        background: linear-gradient(45deg, #795548, #5d4037);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .manipulation-badge {
-        background: linear-gradient(45deg, #d32f2f, #b71c1c);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .subject-restriction-badge {
-        background: linear-gradient(45deg, #1976d2, #0d47a1);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
-    .success-banner {
-        background: linear-gradient(135deg, #4CAF50, #45a049);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        text-align: center;
-        font-weight: bold;
-    }
-    .memory-indicator {
-        background: linear-gradient(45deg, #6c5ce7, #a29bfe);
-        color: white;
-        padding: 0.2rem 0.5rem;
-        border-radius: 10px;
-        font-size: 0.8rem;
-        display: inline-block;
-        margin-left: 0.5rem;
-    }
+:root{
+  --lumii-bg: #f7fafc;
+  --lumii-bg-soft: #f0f4f8;
+  --lumii-card: #ffffff;
+  --lumii-ink: #1f2937;
+  --lumii-muted: #64748b;
+  --lumii-primary: #2563eb;      /* calm blue */
+  --lumii-primary-soft: #e8f0ff;
+  --lumii-accent: #06b6d4;       /* teal accent */
+  --lumii-success: #10b981;
+  --lumii-warning: #f59e0b;
+  --lumii-danger:  #ef4444;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 6px 22px rgba(2, 8, 23, 0.06);
+}
 
-    .identity-response {
-        background: linear-gradient(135deg, #e74c3c, #f39c12);
-        color: white;
-        padding: 1rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        border-left: 5px solid #c0392b;
-    }
-    .identity-badge {
-        background: linear-gradient(45deg, #e74c3c, #c0392b);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.2rem;
-    }
+html, body, .stApp { background: var(--lumii-bg); color: var(--lumii-ink); }
+
+[data-testid="stHeader"] { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important; border-bottom: 1px solid #eef2f7; }
+
+.block-container { padding-top: 1.25rem; max-width: 960px; }
+
+h1, h2, h3 { letter-spacing: .2px; }
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.25rem; color: var(--lumii-ink); }
+h3 { font-size: 1.05rem; color: var(--lumii-ink); }
+
+small, .caption, .stCaption { color: var(--lumii-muted) !important; }
+
+[data-testid="stSidebar"] {
+  background: #ffffff;
+  border-right: 1px solid #eef2f7;
+}
+[data-testid="stSidebar"] .stMetric { background: var(--lumii-bg-soft); border-radius: var(--radius-md); padding: .5rem; box-shadow: var(--shadow-sm); }
+
+[data-testid="stChatMessage"] {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(2,8,23,0.06);
+  background: var(--lumii-card);
+}
+
+/* Chat input polishing */
+[data-testid="stChatInput"] textarea {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: var(--shadow-sm) !important;
+  background: #ffffff !important;
+}
+
+/* App banners & helpers */
+.success-banner {
+  background: var(--lumii-primary-soft);
+  color: #123c7a;
+  padding: .85rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid #dbe6ff;
+  text-align: center;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Safety / friend badges — gentler solids, accessible contrast */
+.safety-badge, .friend-badge, .behavior-badge, .educational-boundary-badge,
+.manipulation-badge, .subject-restriction-badge, .identity-badge, .memory-indicator {
+  display: inline-block;
+  padding: .28rem .7rem;
+  border-radius: 999px;
+  font-size: .9rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: var(--shadow-sm);
+  margin: .2rem .18rem 0 0;
+}
+.safety-badge{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+.friend-badge{ background:#ecfeff; color:#0c4a6e; border:1px solid #bae6fd; }
+.behavior-badge{ background:#f5f3ff; color:#4c1d95; border:1px solid #ddd6fe; }
+.educational-boundary-badge{ background:#efeae6; color:#4a2f22; border:1px solid #e6dcd5; }
+.manipulation-badge{ background:#ffe4e6; color:#9f1239; border:1px solid #fecdd3; }
+.subject-restriction-badge{ background:#e0f2fe; color:#0c4a6e; border:1px solid #bae6fd; }
+.identity-badge{ background:#ffe8e1; color:#9a3412; border:1px solid #fed7aa; }
+.memory-indicator{ background:#ede9fe; color:#3730a3; border:1px solid #ddd6fe; }
+
+/* Safety / identity callouts */
+.safety-response, .identity-response, .general-response {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 6px solid var(--lumii-primary);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.identity-response { border-left-color: var(--lumii-warning); }
+
+/* Footer */
+.lumii-footer {
+  text-align: center;
+  color: #667085;
+  margin-top: 2rem;
+}
 </style>
 """
 st.markdown(_APP_CSS, unsafe_allow_html=True)
 
 
 # === Cards UI injection (presentation-only; logic unchanged) ==================
+# === Cards UI (clean, soft, readable; presentation-only) =====================
 _CARDS_CSS = """
 <style>
-/* Container */
-.cards-wrap { max-width: 640px; margin: 0.5rem 0; line-height: 1.6; }
-.card { border-radius: 16px; padding: 12px 14px; margin: 10px 0; border: 1px solid rgba(0,0,0,0.06);
-        background: linear-gradient(180deg, #f7fbfd 0%, #eef7f8 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.card.decline { border-left: 5px solid #e57373; background: linear-gradient(180deg, #fff7f7 0%, #ffe9e9 100%); }
-.card.crisis { border-left: 5px solid #2e8bb8; background: linear-gradient(180deg, #f1fbff 0%, #e8f6ff 100%); }
-.card.banner { border-left: 5px solid #f4b400; background: linear-gradient(180deg, #fffaf2 0%, #fff3d9 100%); }
-.card .title { font-weight: 700; margin: 0 0 6px 0; font-size: 0.98rem; color: #124; }
-.card.banner .title { display:none; }  /* banner variant no title by default */
-.card .body { font-size: 0.95rem; color: #123; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card .showmore { margin-top: 8px; }
-.card .why { margin-top: 8px; }
+.cards-wrap { max-width: 680px; margin: .5rem 0; line-height: 1.6; }
+.card {
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 10px 0;
+  border: 1px solid rgba(2,8,23,0.06);
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+.card.decline { border-left: 6px solid #e11d48; background: #fff1f2; }
+.card.crisis  { border-left: 6px solid #0ea5e9; background: #f0f9ff; }
+.card.banner  { border-left: 6px solid #f59e0b; background: #fffbeb; }
+
+.card .title { font-weight: 700; margin: 0 0 6px 0; font-size: 1rem; color: #0f172a; }
+.card.banner .title { display: none; }
+
+.card .body {
+  font-size: .96rem; color: #0f172a;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card .why   { margin-top: 8px; color: var(--lumii-muted); font-size: .9rem; }
 .card .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-.card .chip-row .stButton>button { border-radius: 9999px; padding: 2px 10px; font-size: 0.85rem; border: 1px solid rgba(0,0,0,0.08);
-                                   max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card.decline .stButton>button { background: #fff1f1; }
-.card.crisis .stButton>button { background: #edf7ff; }
-.card.banner .stButton>button { background: #fff4de; }
-.card .hint { font-size: 0.8rem; color: #456; margin-bottom: 6px; }
+
+.chip {
+  display: inline-block;
+  padding: .35rem .6rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #334155;
+}
 </style>
 """
 st.markdown(_CARDS_CSS, unsafe_allow_html=True)
@@ -1722,7 +2243,7 @@ def _render_card(title: Optional[str], body: str, more: Optional[str], chips: Li
 
         # Why? expander (Decline card)
         if why is not None and variant == "decline":
-            with st.expander(t("exp_why_decline")):
+            with st.expander("Why?"):
                 st.markdown(why)
 
         # Show more (progressive disclosure)
@@ -1785,19 +2306,27 @@ def render_banner_card(text: str, key: str = "banner"):
         key=key,
     )
 
-
 def render_message_card(priority: str, text: str, decline_why: Optional[str] = None, show_more: Optional[str] = None, key: str = "msg"):
     p = (priority or "").lower()
     # Map priorities to variants
     if p in ("crisis", "crisis_return", "immediate_termination", "post_crisis_support"):
         render_crisis_card(text, key=f"{key}_crisis")
-    elif p in ("safety", "subject_restricted", "educational_boundary"):
+    elif p == "safety":
         render_decline_card(text, key=f"{key}_decline")
     elif p == "manipulation":
         render_banner_card(text, key=f"{key}_banner")
+    elif p in ("subject_restricted", "educational_boundary"):
+        render_decline_card(text, key=f"{key}_decline")
     else:
         render_reply_card(text, key=f"{key}_reply")
 
+
+# =============================================================================
+# MEMORY MANAGEMENT & CONVERSATION MONITORING (polished, no behavior change)
+# =============================================================================
+import re
+import streamlit as st
+import requests
 
 def estimate_token_count() -> int:
     """Estimate token count for conversation (rough approximation: ~4 chars/token)."""
@@ -3019,7 +3548,8 @@ with st.sidebar:
             st.error("❌ API Configuration Missing")
 
 # Main header
-render_header_nav('/mnt/data/d61102ba-f9b3-4caf-be2c-381719171d80.png')
+st.markdown('<h1 class="main-header">🎓 My Friend Lumii</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Your safe AI Math, Physics, Chemistry, Geography & History tutor! 🛡️💙</p>', unsafe_allow_html=True)
 
 if len(st.session_state.messages) == 0:
     with st.expander('About & Safety', expanded=False):
@@ -3057,29 +3587,17 @@ if len(st.session_state.messages) == 0:
 
 # Display chat history with enhanced memory and safety indicators
 mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
-main_col, rail_col = st.columns([7,3])
-with main_col:
-    for i, message in enumerate(st.session_state.messages):
-        with st.chat_message(message["role"]):
-            if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
-                render_message_card(
-                    priority=message.get("priority", ""),
-                    text=message.get("content", ""),
-                    key=f"history_{i}"
-                )
-            else:
-                st.markdown(message.get("content", ""))
-            ts = message.get('ts') or message.get('timestamp') or int(time.time())
-            try:
-                st.caption(f"<span class='bubble-time'>{time.strftime('%H:%M', time.localtime(int(ts)))}</span>", unsafe_allow_html=True)
-            except Exception:
-                pass
-with rail_col:
-    render_quick_actions()
-
-subject = st.session_state.get('selected_subject')
-example = st.session_state.get('prefill_example', '')
-prompt_placeholder = (example or t('chat_placeholder')) if not subject else f"{t('chat_placeholder')}  —  {subject.title()}"
+for i, message in enumerate(st.session_state.messages):
+    with st.chat_message(message["role"]):
+        if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
+            render_message_card(
+                priority=message.get("priority", ""),
+                text=message.get("content", ""),
+                key=f"history_{i}"
+            )
+        else:
+            st.markdown(message["content"])# Chat input with enhanced safety processing
+prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
 
 # --- Input gating: crisis lock first, then behavior timeout ---
 
@@ -3093,21 +3611,8 @@ if st.session_state.get("locked_after_crisis", False):
     )
 
 
-
+# 2) Normal input
 else:
-    # 2) Normal input
-    # helper chips
-    with st.container():
-        cc1, cc2, cc3 = st.columns(3)
-        with cc1:
-            if st.button(t('chips_show_steps'), key='chip_steps', help='Add: show steps'):
-                st.session_state.setdefault('prefill_example', 'Show the steps, please.')
-        with cc2:
-            if st.button(t('chips_give_hint'), key='chip_hint'):
-                st.session_state.setdefault('prefill_example', 'Give me a hint, not the full answer yet.')
-        with cc3:
-            if st.button(t('chips_practice'), key='chip_practice'):
-                st.session_state.setdefault('prefill_example', 'Give me a practice problem like the last one.')
     if prompt := st.chat_input(prompt_placeholder):
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
