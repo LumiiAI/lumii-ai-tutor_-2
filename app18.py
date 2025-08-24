@@ -3134,34 +3134,28 @@ Please consider talking to:
 I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
 def emergency_intervention(message, safety_type, student_age, student_name=""):
-    """Enhanced emergency intervention with age-appropriate crisis response"""
+    """Enhanced emergency intervention with age-appropriate crisis response (no hotlines in beta)."""
     name_part = f"{student_name}, " if student_name else ""
-    resources = get_crisis_resources()
-    
+
     if student_age <= 11:  # Elementary
-        return f"""🚨 {name_part}I'm very worried about what you're saying. 
+        return f"""🚨 {name_part}I'm very worried about what you're saying.
 
 Please find a grown-up RIGHT NOW:
-• Your mom, dad, or family
-• Your teacher
-• Call {resources['emergency']} if you're in danger
+• Your mom, dad, or a caregiver
+• Your teacher or the school counselor
 
 You are loved and important. Please get help right away.
 
-Tell a grown-up what you said to me. They will help you."""
-    
+Tell a grown-up exactly what you told me so they can help you."""
     else:  # Middle & High School
         return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.
 
 Please get help IMMEDIATELY:
-• Call {resources['crisis_line']} right now
-• {resources['text_line']}
-• Call {resources['emergency']} if you're in immediate danger
-• Tell a trusted adult immediately
+• Tell a trusted adult right now — don’t wait
+• If you’re at school: counselor, teacher, or another staff member
+• If you’re at home: a parent, caregiver, or another trusted adult
 
-You don't have to go through this alone. There are people who want to help you.
-
-Please reach out for help right now."""
+You don’t have to go through this alone. Please reach out for help right now."""
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with ALL fixes applied including beta subject restrictions"""
