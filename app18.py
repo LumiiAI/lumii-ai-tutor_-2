@@ -44,6 +44,13 @@ from datetime import datetime
 import requests
 import streamlit as st
 
+# Hide Streamlit's default chat avatar so only our custom one shows
+st.markdown("""
+<style>
+[data-testid="stChatMessageAvatar"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
 GRADE_RX: Final[Pattern[str]] = re.compile(
