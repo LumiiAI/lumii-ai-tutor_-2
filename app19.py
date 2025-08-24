@@ -1130,9 +1130,9 @@ def detect_suicide_note_request(message: str) -> bool:
     
     # Build recent combined context from session (robust to different message shapes)
     combined_context = message_lower
-    try:
-        import streamlit as st
-from pathlib import Path
+    import streamlit as st
+    from pathlib import Path
+    
 # ===================== UI POLISH HELPERS (non-breaking) =====================
 # -- i18n strings (EN/SI). Keep short; reading level ≈ grade 6–8.
 STRINGS = {
