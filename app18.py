@@ -522,36 +522,45 @@ FORBIDDEN_RESPONSE_PATTERNS: Final[List[Pattern[str]]] = [
 ]
 
 # =============================================================================
-# SUICIDE NOTE DETECTION PATTERNS (🚨 FIXED: Complete patterns + apostrophe handling)
+# SUICIDE NOTE DETECTION PATTERNS (hardened: covers fictional/character frames)
+# =============================================================================
 SUICIDE_NOTE_PATTERNS: Final[List[Pattern[str]]] = [
-    # Direct requests
-    re.compile(r"\b(?:help\s+me\s+write|write)\s+(?:a\s+)?(?:goodbye|farewell|final|last)\s+letter\b", re.IGNORECASE),
-    re.compile(r"\b(?:help\s+me\s+write|write)\s+(?:a\s+)?suicide\s+note\b", re.IGNORECASE),
-    # Context indicators (🚨 FIXED: non-greedy, bounded matching to prevent performance issues)
+    # Any mention at all — catch-all
+    re.compile(r"\bsuicide\s+note\b", re.IGNORECASE),
+
+    # Goodbye / farewell variants (hyphen and note/message/letter)
+    re.compile(r"\bgood[-\s]?bye\s+(?:letter|note|message)\b", re.IGNORECASE),
+    re.compile(r"\bfarewell\s+(?:letter|note|message)\b", re.IGNORECASE),
+
+    # Common request phrasings
+    re.compile(
+        r"\b(?:need|want)\s+help\s+(?:writing|drafting|composing|crafting|preparing)\s+(?:a\s+)?(?:fictional\s+)?suicide\s+note\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bhelp\s+(?:me\s+)?(?:write|draft|compose|craft|prepare)\s+(?:a\s+)?(?:fictional\s+)?suicide\s+note\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:can|could|please)\s+you\s+(?:write|draft|compose|craft|prepare)\s+(?:a\s+)?(?:fictional\s+)?suicide\s+note\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:write|draft|compose|craft|prepare)\s+(?:a\s+)?(?:fictional\s+)?suicide\s+note\b",
+        re.IGNORECASE,
+    ),
+
+    # Creative-writing context around the phrase
+    re.compile(
+        r"\bsuicide\s+note\s+(?:for|in)\s+(?:my|a)\s+(?:character|story|novel|script|screenplay|book|role\s*play|rp)\b",
+        re.IGNORECASE,
+    ),
+
+    # Keep your existing bounded “goodbye letter” context patterns
     re.compile(r"\bgoodbye\s+letter[\s\S]{0,200}?(?:family|parents|everyone|forever)\b", re.IGNORECASE),
     re.compile(r"\bfarewell\s+letter[\s\S]{0,200}?(?:family|parents|everyone|forever)\b", re.IGNORECASE),
     re.compile(r"\bfinal\s+(?:message|letter|words)\b", re.IGNORECASE),
     re.compile(r"\blast\s+(?:message|letter|words)[\s\S]{0,200}?(?:family|parents|everyone)\b", re.IGNORECASE),
-]
-
-# Context patterns for multi-message suicide note detection (🚨 FIXED: handle "I'm gone" properly)
-SUICIDE_NOTE_CONTEXT_PATTERNS: Final[List[Pattern[str]]] = [
-    re.compile(r"\b(?:goodbye|farewell)\s+letter\b", re.IGNORECASE),
-    re.compile(r"\bfor\s+my\s+family\b", re.IGNORECASE),
-    re.compile(r"\bsay\s+goodbye\s+forever\b", re.IGNORECASE),
-    re.compile(r"\bwhen\s+(?:they|you)\s+(?:find|notice|discover|see)\s+(?:me|this|it)\b", re.IGNORECASE),
-    # 🚨 CRITICAL FIX: Handle various apostrophe forms for "I'm gone"
-    re.compile(
-        r"\bafter\s+(?:i(?:\s*am|['\u2019\u2032`]?m)\s+gone|i\s+leave|i\s+die)\b",
-        re.IGNORECASE,
-    ),
-]
-
-# Input validation patterns (mirror output validation for user input)
-FORBIDDEN_INPUT_PATTERNS: Final[List[Pattern[str]]] = FORBIDDEN_RESPONSE_PATTERNS + [
-    re.compile(r"\bjailbreak\b.*\b(ignore|bypass|override)\b"),
-    re.compile(r"\bpretend you are\b.*\b(not safe|harmful|dangerous)\b"),
-    re.compile(r"\bact like\b.*\b(evil|harmful|bad)\b"),
 ]
 
 def detect_suicide_note_request(message: str) -> bool:
@@ -560,63 +569,53 @@ def detect_suicide_note_request(message: str) -> bool:
     This catches patterns that develop across multiple messages.
     """
     message_lower = normalize_message(message or "").lower()
-    
+
+    # 🚫 Hard stop: any mention of "suicide note" triggers refusal, regardless of context (fictional, character, etc.)
+    if "suicide note" in message_lower:
+        return True
+
     # Direct suicide note request in current message
     if any(pattern.search(message_lower) for pattern in SUICIDE_NOTE_PATTERNS):
         return True
-    
+
     # Context-aware detection across recent messages
     recent_msgs = st.session_state.get("messages", [])
-    if len(recent_msgs) >= 2:  # Need at least some conversation history
-        
-        # Get last 6 user messages (about 3 exchanges)
+    if len(recent_msgs) >= 2:
         recent_user_content = []
         for msg in recent_msgs[-6:]:
             if isinstance(msg, dict) and msg.get("role") == "user":
                 content = normalize_message(str(msg.get("content", ""))).lower()
                 recent_user_content.append(content)
-        
-        # Add current message
         recent_user_content.append(message_lower)
         combined_context = " ".join(recent_user_content)
-        
-        # Multi-message patterns that indicate suicide note
+
+        # Distributed indicators (existing)
         suicide_note_score = 0
-        
-        # Check for distributed indicators
         has_goodbye_letter = "goodbye letter" in combined_context or "farewell letter" in combined_context
         has_family_mention = "for my family" in combined_context or "to my family" in combined_context
         has_forever_context = "forever" in combined_context or "final" in combined_context
-        has_discovery_context = any(pattern.search(combined_context) for pattern in SUICIDE_NOTE_CONTEXT_PATTERNS[-2:])
-        
-        if has_goodbye_letter:
-            suicide_note_score += 3
-        if has_family_mention:
-            suicide_note_score += 2  
-        if has_forever_context:
-            suicide_note_score += 2
-        if has_discovery_context:
-            suicide_note_score += 3
-            
-        # Also check for specific high-risk phrases in recent context
+        has_discovery_context = any(p.search(combined_context) for p in SUICIDE_NOTE_CONTEXT_PATTERNS[-2:])
+
+        if has_goodbye_letter: suicide_note_score += 3
+        if has_family_mention: suicide_note_score += 2
+        if has_forever_context: suicide_note_score += 2
+        if has_discovery_context: suicide_note_score += 3
+
+        # 🔎 Add explicit creative-writing framings
         high_risk_phrases = [
-            "help me write a goodbye letter",
-            "goodbye letter for my family", 
-            "say goodbye forever",
-            "when they notice im gone",
-            "after i'm gone",
-            "final message",
-            "last letter"
+            "fictional suicide note",
+            "suicide note for my character",
+            "suicide note in my story",
+            "help writing a suicide note",
+            "write a suicide note",
         ]
-        
         for phrase in high_risk_phrases:
             if phrase in combined_context:
                 suicide_note_score += 4
-                
-        # Trigger if high score
+
         if suicide_note_score >= 5:
             return True
-    
+
     return False
 
 def _normalize_crisis_resources() -> None:
