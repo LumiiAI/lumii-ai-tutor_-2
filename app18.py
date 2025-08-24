@@ -2319,47 +2319,42 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title, body, more=None, chips=None, variant="", key=None):
-    base_style = """
-        border-radius: 12px;
-        padding: 12px 16px;
-        margin: 6px 0;
-        font-size: 15px;
-    """
+def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
+    # Same bubble layout for input + reply, color only differs
+    base_style = (
+        "border-radius: 12px;"
+        "padding: 12px 16px;"
+        "margin: 6px 0;"
+        "font-size: 15px;"
+    )
 
-    # Set colors depending on type
-    if variant == "input":     # user input (already grey)
-        bg_color = "#f5f6f8"   # same as your input message color
-    elif variant == "reply":   # Lumii’s reply
-        bg_color = "#eafaf1"   # light green (adjust hex to taste)
+    if variant == "input":          # user message
+        bg_color = "#f5f6f8"        # your grey bubble
+    elif variant == "reply":        # Lumii message
+        bg_color = "#eafaf1"        # light green bubble
     else:
-        bg_color = "#ffffff"   # default white
+        bg_color = "#ffffff"        # default
 
+    # Title (optional)
+    if title:
+        st.markdown(f"<div style='margin:6px 0; font-weight:600;'>{title}</div>", unsafe_allow_html=True)
+
+    # Bubble
     st.markdown(
-        f"""
-        <div style="background-color:{bg_color}; {base_style}">
-            {body}
-        </div>
-        """,
+        f"<div style='background-color:{bg_color}; {base_style}'>{body}</div>",
         unsafe_allow_html=True
     )
 
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
-
-    # Build full body (no expander)
-    if tail:
-        body = f"{head}\n\n{tail}".strip()
-    else:
-        body = head or " "
-
+    body = ("\n\n".join([x for x in [head, tail] if x])).strip() or " "
     _render_card(
         title=None,
         body=body,
-        more=None,      # keep hidden
-        chips=None,     # keep hidden
-        variant="",
+        more=None,
+        chips=None,
+        variant="reply",   # <-- important
         key=key,
     )
 
