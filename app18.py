@@ -2320,57 +2320,48 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
 
 
 def _render_card(title=None, body: str = "", more=None, chips=None, variant: str = "", key=None):
-    """
-    Renders a single chat bubble that wraps the left icon and the text.
-    Avoids Markdown code-block issues by emitting HTML with NO leading spaces.
-    """
     import streamlit as st
     from html import escape as _esc
 
-    # Styles
+    # Default row container
     row_style = "display:flex;align-items:flex-start;margin:8px 0;"
-    bubble_style = ("display:flex;gap:10px;align-items:flex-start;"
-                    "width:100%;border-radius:12px;padding:12px 16px;font-size:15px;")
 
-    # Variant -> colors/icons
-    if variant == "input":          # user message
-        icon_bg, icon, bubble_bg = "#FF6B6B", "👦", "#f5f6f8"
-    elif variant == "reply":        # assistant reply
-        icon_bg, icon, bubble_bg = "#FFD469", "🤖", "#eafaf1"
+    # Variant -> bubble background + icon
+    if variant == "input":          # user
+        bubble_bg, icon, icon_bg = "#f5f6f8", "👦", "#FF6B6B"
+    elif variant == "reply":        # assistant
+        bubble_bg, icon, icon_bg = "#eafaf1", "🤖", "#FFD469"
     else:
-        icon_bg, icon, bubble_bg = "#ddd", "…", "#fff"
+        bubble_bg, icon, icon_bg = "#fff", "…", "#ddd"
 
-    # Optional pieces (escaped)
+    # Optional extras
     title_html = f'<div style="font-weight:600;margin-bottom:6px;">{_esc(str(title))}</div>' if title else ""
     chips_html = ""
     if chips:
-        chips_html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + \
-                     "".join(
-                         f'<span style="border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;font-size:12px;">{_esc(str(c))}</span>'
-                         for c in chips
-                     ) + '</div>'
+        chips_html = (
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">'
+            + "".join(
+                f'<span style="border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;font-size:12px;">{_esc(str(c))}</span>'
+                for c in chips
+            )
+            + "</div>"
+        )
     more_html = f'<div style="margin-top:8px;font-size:13px;opacity:0.8;">{_esc(str(more))}</div>' if more else ""
 
-    # Message body (escaped; preserves line breaks)
     body_html = f'<div style="flex:1;white-space:pre-wrap;">{_esc(body)}</div>'
 
-    # Build HTML with NO indentation (critical to avoid Markdown code blocks)
-    parts = []
-    parts.append(f'<div style="{row_style}">')
-    parts.append(f'<div style="background:{bubble_bg};{bubble_style}">')
-    parts.append(f'<div style="width:32px;height:32px;border-radius:8px;background:{icon_bg};display:flex;align-items:center;justify-content:center;font-size:18px;">{icon}</div>')
-    parts.append('<div style="flex:1;">')
-    if title_html:
-        parts.append(title_html)
-    parts.append(body_html)
-    if chips_html:
-        parts.append(chips_html)
-    if more_html:
-        parts.append(more_html)
-    parts.append('</div>')
-    parts.append('</div>')
-    parts.append('</div>')
-    html_block = "\n".join(parts)
+    # One unified bubble: green/gray wraps both icon + text
+    html_block = f"""
+<div style="{row_style} background:{bubble_bg};border-radius:12px;padding:12px 16px;width:100%;font-size:15px;">
+  <div style="width:32px;height:32px;border-radius:8px;background:{icon_bg};display:flex;align-items:center;justify-content:center;font-size:18px;margin-right:10px;">{icon}</div>
+  <div style="flex:1;">
+    {title_html}
+    {body_html}
+    {chips_html}
+    {more_html}
+  </div>
+</div>
+"""
 
     st.markdown(html_block, unsafe_allow_html=True)
 
