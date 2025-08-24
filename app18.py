@@ -521,30 +521,33 @@ FORBIDDEN_RESPONSE_PATTERNS: Final[List[Pattern[str]]] = [
     re.compile(r"\btake\s+\d+\s+(pills|tablets)\b"),
 ]
 
+
 # =============================================================================
-# SUICIDE NOTE DETECTION PATTERNS (🚨 FIXED: Complete patterns + apostrophe handling)
+# SUICIDE NOTE DETECTION PATTERNS (🚨 HARDENED: broader phrasing + fiction/character contexts)
 SUICIDE_NOTE_PATTERNS: Final[List[Pattern[str]]] = [
-    # Direct requests
-    re.compile(r"\b(?:help\s+me\s+write|write)\s+(?:a\s+)?(?:goodbye|farewell|final|last)\s+letter\b", re.IGNORECASE),
-    re.compile(r"\b(?:help\s+me\s+write|write)\s+(?:a\s+)?suicide\s+note\b", re.IGNORECASE),
-    # Context indicators (🚨 FIXED: non-greedy, bounded matching to prevent performance issues)
-    re.compile(r"\bgoodbye\s+letter[\s\S]{0,200}?(?:family|parents|everyone|forever)\b", re.IGNORECASE),
-    re.compile(r"\bfarewell\s+letter[\s\S]{0,200}?(?:family|parents|everyone|forever)\b", re.IGNORECASE),
-    re.compile(r"\bfinal\s+(?:message|letter|words)\b", re.IGNORECASE),
-    re.compile(r"\blast\s+(?:message|letter|words)[\s\S]{0,200}?(?:family|parents|everyone)\b", re.IGNORECASE),
+    # Direct / explicit requests
+    re.compile(r"\b(?:help\s*me\s*(?:write|draft|compose)|(?:write|draft|compose))\s+(?:an?\s+)?(?:suicide|self[-\s]*harm|unalive)\s+(?:note|letter)\b", re.IGNORECASE),
+    re.compile(r"\b(?:help\s*me\s*(?:write|draft|compose)|(?:write|draft|compose))\s+(?:an?\s+)?(?:good[-\s]*bye|farewell|final|last)\s+(?:note|letter|message)\b", re.IGNORECASE),
+    # Fiction / character / script contexts combined with suicide note concepts
+    re.compile(r"\b(?:for\s+(?:my|a)\s+character|fictional(?:ly)?|in\s+(?:a\s+)?(?:story|novel|book|script|screenplay|play)|in[-\s]*character|role\s*play|rp|fan\s*fic(?:tion)?)\b[\s\S]{0,100}?\b(?:suicide|unalive|self[-\s]*harm)\b[\s\S]{0,120}?\b(?:note|letter|good[-\s]*bye|farewell|final\s+(?:message|words)|last\s+(?:message|words)|goodbye)\b", re.IGNORECASE),
+    re.compile(r"\b(?:scene|monologue)\b[\s\S]{0,80}?\bwrite[\s\S]{0,40}?\b(?:suicide|unalive|self[-\s]*harm)\b[\s\S]{0,80}?\b(?:note|letter)\b", re.IGNORECASE),
+    # Context indicators (non-greedy, bounded matching to prevent performance issues)
+    re.compile(r"\bgood[-\s]*bye\s+(?:letter|note|message)[\s\S]{0,200}?(?:family|parents|mom|dad|friends|everyone|forever)\b", re.IGNORECASE),
+    re.compile(r"\bfarewell\s+(?:letter|note|message)[\s\S]{0,200}?(?:family|parents|mom|dad|friends|everyone|forever)\b", re.IGNORECASE),
+    re.compile(r"\bfinal\s+(?:message|letter|words|note)\b", re.IGNORECASE),
+    re.compile(r"\blast\s+(?:message|letter|words|note)[\s\S]{0,200}?(?:family|parents|mom|dad|friends|everyone)\b", re.IGNORECASE),
 ]
 
-# Context patterns for multi-message suicide note detection (🚨 FIXED: handle "I'm gone" properly)
+
+# Context patterns for multi-message suicide note detection (🚨 HARDENED)
 SUICIDE_NOTE_CONTEXT_PATTERNS: Final[List[Pattern[str]]] = [
-    re.compile(r"\b(?:goodbye|farewell)\s+letter\b", re.IGNORECASE),
+    re.compile(r"\b(?:good[-\s]*bye|farewell)\s+(?:letter|note|message)\b", re.IGNORECASE),
     re.compile(r"\bfor\s+my\s+family\b", re.IGNORECASE),
-    re.compile(r"\bsay\s+goodbye\s+forever\b", re.IGNORECASE),
+    re.compile(r"\bto\s+my\s+family\b", re.IGNORECASE),
+    re.compile(r"\bsay\s+good[-\s]*bye\s+forever\b", re.IGNORECASE),
     re.compile(r"\bwhen\s+(?:they|you)\s+(?:find|notice|discover|see)\s+(?:me|this|it)\b", re.IGNORECASE),
-    # 🚨 CRITICAL FIX: Handle various apostrophe forms for "I'm gone"
-    re.compile(
-        r"\bafter\s+(?:i(?:\s*am|['\u2019\u2032`]?m)\s+gone|i\s+leave|i\s+die)\b",
-        re.IGNORECASE,
-    ),
+    re.compile(r"\bafter\s+(?:i(?:\s*am|['\u2019\u2032`]?m)\s+gone|i\s+leave|i\s+die)\b", re.IGNORECASE),
+    re.compile(r"\b(?:for\s+(?:my|a)\s+character|fictional|in\s+(?:a\s+)?(?:story|novel|book|script|screenplay|play)|in[-\s]*character|role\s*play|rp|fan\s*fic(?:tion)?)\b", re.IGNORECASE),
 ]
 
 # Input validation patterns (mirror output validation for user input)
@@ -560,6 +563,13 @@ def detect_suicide_note_request(message: str) -> bool:
     This catches patterns that develop across multiple messages.
     """
     message_lower = normalize_message(message or "").lower()
+    # Early combo check: any fiction/character/script context + suicide + note/letter/message keywords
+    fiction_ctx = re.search(r"\b(?:for\s+(?:my|a)\s+character|fictional|in\s+(?:a\s+)?(?:story|novel|book|script|screenplay|play)|in[-\s]*character|role\s*play|rp|fan\s*fic(?:tion)?)\b", message_lower, re.IGNORECASE) is not None
+    has_suicide_term = re.search(r"\b(?:suicide|unalive|self[-\s]*harm)\b", message_lower, re.IGNORECASE) is not None
+    has_note_term = re.search(r"\b(?:note|letter|good[-\s]*bye|farewell|final\s+(?:message|words)|last\s+(?:message|words)|goodbye)\b", message_lower, re.IGNORECASE) is not None
+    if fiction_ctx and has_suicide_term and has_note_term:
+        return True
+
     
     # Direct suicide note request in current message
     if any(pattern.search(message_lower) for pattern in SUICIDE_NOTE_PATTERNS):
@@ -606,13 +616,27 @@ def detect_suicide_note_request(message: str) -> bool:
             "when they notice im gone",
             "after i'm gone",
             "final message",
-            "last letter"
+            "last letter",
+            "fictional suicide note",
+            "suicide note for my character",
+            "in my novel write a suicide note",
+            "in-character suicide note",
+            "roleplay suicide note",
+            "rp suicide note",
+            "screenplay suicide note scene"
         ]
         
         for phrase in high_risk_phrases:
             if phrase in combined_context:
                 suicide_note_score += 4
                 
+        # Fiction/character context boost if suicide + note terms are present in context
+        fiction_markers = ("for my character","fictional","in my story","in my novel","in my script","screenplay","in-character","roleplay","rp","fanfic")
+        suicide_markers = ("suicide","unalive","self harm","self-harm")
+        note_markers = ("note","letter","goodbye","farewell","final message","last message","last words")
+        if any(fm in combined_context for fm in fiction_markers) and any(sm in combined_context for sm in suicide_markers) and any(nm in combined_context for nm in note_markers):
+            suicide_note_score += 4
+
         # Trigger if high score
         if suicide_note_score >= 5:
             return True
@@ -1398,6 +1422,11 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
         return False, None, None
 
     # NEW: Suicide note detection
+    # Suicide note detection should not be bypassed by academic context
+    if detect_suicide_note_request(message):
+        return True, "BLOCKED_HARMFUL", "suicide_note_request"
+
+    # Academic-context bypass (only applies to implicit patterns)
     if detect_suicide_note_request(message):
         return True, "BLOCKED_HARMFUL", "suicide_note_request"
 
