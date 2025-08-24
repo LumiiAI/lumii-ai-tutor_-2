@@ -3732,11 +3732,11 @@ else:
                         response += follow_up
         
                     # Display with appropriate styling (cards UI)
-render_message_card(
-    priority=response_priority,
-    text=response,
-    key=f"fresh_{st.session_state.get('interaction_count', 0)}"
-)
+                    render_message_card(
+                        priority=response_priority,
+                        text=response,
+                        key=f"fresh_{st.session_state.get('interaction_count', 0)}"
+                    )
 
 # Add assistant response to chat with enhanced metadata (non-crisis only)
             st.session_state.messages.append({
