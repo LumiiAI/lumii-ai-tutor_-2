@@ -2332,34 +2332,57 @@ def _render_card(title=None, body:str="", more=None, chips=None, variant:str="",
 
     if variant == "input":   # user message
         icon_bg = "#FF6B6B"  # red square
-        icon = "👦"          # or your current kid head emoji / svg
+        icon = "👦"          # boy avatar
         bubble_bg = "#f5f6f8"
     elif variant == "reply": # Lumii reply
         icon_bg = "#FFD469"  # yellow square
-        icon = "🤖"          # robot emoji (or your robot svg)
+        icon = "🤖"          # robot avatar (or your robot image)
         bubble_bg = "#eafaf1"
     else:                   # default/fallback
         icon_bg = "#ddd"
         icon = "…"
         bubble_bg = "#fff"
 
-    st.markdown(
-        f"""
-        <div style="{row_style}">
-            <div style="width:32px;height:32px;
-                        border-radius:8px;
-                        background:{icon_bg};
-                        display:flex;
-                        align-items:center;
-                        justify-content:center;
-                        font-size:18px;">{icon}</div>
-            <div style="background:{bubble_bg}; {bubble_style}">
-                {body}
+    # For reply and input → avatar inside the bubble
+    if variant in ("reply", "input"):
+        st.markdown(
+            f"""
+            <div style="{row_style}">
+                <div style="background:{bubble_bg}; {bubble_style}">
+                    <div style="display:flex; align-items:flex-start; gap:10px;">
+                        <div style="width:32px;height:32px;
+                                    border-radius:8px;
+                                    background:{icon_bg};
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:center;
+                                    font-size:18px;">{icon}</div>
+                        <div style="flex:1;">{body}</div>
+                    </div>
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        # Fallback layout → avatar outside the bubble
+        st.markdown(
+            f"""
+            <div style="{row_style}">
+                <div style="width:32px;height:32px;
+                            border-radius:8px;
+                            background:{icon_bg};
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:18px;">{icon}</div>
+                <div style="background:{bubble_bg}; {bubble_style}">
+                    {body}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 
 def render_reply_card(text: str, key: str = "reply"):
