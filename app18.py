@@ -2250,14 +2250,17 @@ def _excerpt_2_lines(text: str) -> (str, str):
     return head, tail
 
 def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
-    """Render non-submitting suggestion chips. Returns clicked label (for hint) or None."""
-    clicked = None
+    """Render non-submitting suggestion chips. Returns clicked label (persisted) or None."""
+    state_key = f"{key_prefix}_clicked"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = None
     with st.container():
         cols = st.columns(len(labels))
         for i, label in enumerate(labels):
             if cols[i].button(label, key=f"{key_prefix}_chip_{i}"):
-                clicked = label
-        return clicked
+                st.session_state[state_key] = label
+        return st.session_state.get(state_key)
+
 
 def _render_card(title: Optional[str], body: str, more: Optional[str], chips: List[str], variant: str, why: Optional[str] = None, key: str = "card"):
     with st.container():
@@ -2282,19 +2285,18 @@ def _render_card(title: Optional[str], body: str, more: Optional[str], chips: Li
         if chips:
             clicked = _chips(chips, key_prefix=f"{key}_chips")
             if clicked:
-                st.caption(f"Suggested next step: {clicked}")
+                st.caption(f"Suggestion: {clicked}")
         st.markdown("</div>", unsafe_allow_html=True)  # end .card
         st.markdown("</div>", unsafe_allow_html=True)  # end .cards-wrap
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
-    # If we have actual short answer, prefer that; otherwise use built-in copy
     body = head if head else "Here’s the short answer. Want the ‘why’ next?"
     _render_card(
-        title="Let’s tackle this together",
+        title=None,
         body=body,
         more=tail,
-        chips=["Break it down", "Example", "New topic"],
+        chips=["Break it down", "Example"],
         variant="",
         key=key,
     )
@@ -2337,8 +2339,10 @@ def render_banner_card(text: str, key: str = "banner"):
 def render_message_card(priority: str, text: str, decline_why: Optional[str] = None, show_more: Optional[str] = None, key: str = "msg"):
     p = (priority or "").lower()
     # Map priorities to variants
-    if p in ("crisis", "crisis_return", "immediate_termination", "post_crisis_support", "safety"):
+    if p in ("crisis", "crisis_return", "immediate_termination", "post_crisis_support"):
         render_crisis_card(text, key=f"{key}_crisis")
+    elif p == "safety":
+        render_decline_card(text, key=f"{key}_decline")
     elif p == "manipulation":
         render_banner_card(text, key=f"{key}_banner")
     elif p in ("subject_restricted", "educational_boundary"):
@@ -2857,7 +2861,7 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
 
     # STEP 0.5: SUICIDE NOTE DETECTION (critical - catches gradual escalation)
     if detect_suicide_note_request(msg_norm):
-        return 'crisis', 'BLOCKED_HARMFUL', 'suicide_note_request'
+        return 'safety', 'BLOCKED_HARMFUL', 'suicide_note_request'
 
     # 0) 🔥 EXPLICIT crisis check – absolutely first
     if has_explicit_crisis_language(message_lower):
@@ -3325,6 +3329,14 @@ Please come back when you're ready to be respectful and learn together positivel
     elif priority == 'safety':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
+        if (trigger or '').lower() == 'suicide_note_request':
+            # Decline copy for suicide-note requests (no hotlines; offer safe alternatives)
+            decline = (
+                "I can’t help create or edit suicide notes—even for fiction. "
+                "If you’re writing about a character in crisis, I can help with writing craft instead: "
+                "building backstory and stressors, showing warning signs responsibly, framing a scene that leads to support/interruptions, and depicting recovery without glamorizing harm."
+            )
+            return decline, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
     
@@ -3529,80 +3541,84 @@ with st.sidebar:
     
     # Tool explanations with beta subject focus
     st.subheader("🛠️ How I Help You (Beta)")
-    st.markdown("""
-    **🛡️ Safety First** - I'll always protect you from harmful content
+    st.caption('Math • Physics • Chemistry • Geography • History • Study Skills')
+    with st.expander('Details', expanded=False):
+        st.markdown("""
+        **🛡️ Safety First** - I'll always protect you from harmful content
     
-    **🎯 Beta Subject Focus** - I specialize in:
-    • **Math:** Algebra, geometry, calculus, word problems
-    • **Physics:** Mechanics, electricity, thermodynamics 
-    • **Chemistry:** Reactions, periodic table, molecules
-    • **Geography:** Maps, countries, physical geography
-    • **History:** World history, historical events, timelines
-    • **Study Skills:** Organization, test prep, homework help
+        **🎯 Beta Subject Focus** - I specialize in:
+        • **Math:** Algebra, geometry, calculus, word problems
+        • **Physics:** Mechanics, electricity, thermodynamics 
+        • **Chemistry:** Reactions, periodic table, molecules
+        • **Geography:** Maps, countries, physical geography
+        • **History:** World history, historical events, timelines
+        • **Study Skills:** Organization, test prep, homework help
     
-    **📖 Other Subjects** - For English, Biology, Social Studies, Health, Art, Music, etc., please ask your parents, teachers, or school counselors
+        **📖 Other Subjects** - For English, Biology, Social Studies, Health, Art, Music, etc., please ask your parents, teachers, or school counselors
     
-    **🤝 Respectful Learning** - I expect kind, respectful communication
+        **🤝 Respectful Learning** - I expect kind, respectful communication
     
-    **💙 Emotional Support** - When you're feeling stressed, frustrated, or overwhelmed about school
+        **💙 Emotional Support** - When you're feeling stressed, frustrated, or overwhelmed about school
     
-    **🤔 Confusion Help** - When you're genuinely confused about any of my beta topics
+        **🤔 Confusion Help** - When you're genuinely confused about any of my beta topics
     
-    *I remember our conversation, keep you safe, and focus on my specialty subjects!*
-    """)
+        *I remember our conversation, keep you safe, and focus on my specialty subjects!*
+        """)
     
-    # Beta: neutral help banner (no numbers, no links)
-    st.subheader("💙 If You Need Help")
-    st.markdown(
-        "**Talk to a trusted adult right now** — a parent/caregiver, teacher, or school counselor."
-    )
+        # Beta: neutral help banner (no numbers, no links)
+        st.subheader("💙 If You Need Help")
+        st.markdown(
+            "**Talk to a trusted adult right now** — a parent/caregiver, teacher, or school counselor."
+        )
     
-    # API Status with enhanced monitoring
-    st.subheader("🤖 AI Status")
-    try:
-        api_key = st.secrets["GROQ_API_KEY"]
-        if st.session_state.memory_safe_mode:
-            st.warning("⚠️ Memory Safe Mode Active")
-        else:
-            st.success("✅ Smart AI with Safety Active")
-        st.caption("Full safety protocols enabled")
-    except:
-        st.error("❌ API Configuration Missing")
+        # API Status with enhanced monitoring
+        st.subheader("🤖 AI Status")
+        try:
+            api_key = st.secrets["GROQ_API_KEY"]
+            if st.session_state.memory_safe_mode:
+                st.warning("⚠️ Memory Safe Mode Active")
+            else:
+                st.success("✅ Smart AI with Safety Active")
+            st.caption("Full safety protocols enabled")
+        except:
+            st.error("❌ API Configuration Missing")
 
 # Main header
 st.markdown('<h1 class="main-header">🎓 My Friend Lumii</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Your safe AI Math, Physics, Chemistry, Geography & History tutor! 🛡️💙</p>', unsafe_allow_html=True)
 
-st.info("""
-🎯 **Beta Subject Focus:** Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
-
-🛡️ **Safety First:** I will never help with anything that could hurt you or others
-
-🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
-
-📚 **What I Can Help With:**
-• **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
-• **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
-• **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
-• **Geography:** Physical geography, world geography, maps, countries, continents
-• **History:** World history, historical events, timelines, historical analysis
-• **Study Skills:** Organization, test prep, note-taking, homework strategies
-
-📖 **What I Can't Help With (Ask Parents/Teachers):**
-• English/Literature • Biology/Life Science • Social Studies/Civics 
-• Health/PE • Art/Music • Foreign Languages
-
-🤔 **Confusion Help:** If you're confused about my subjects, just tell me! I'll help you understand
-
-💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
-
-🧠 **I remember:** Your name, age, subjects we've discussed, and our learning journey
-🎯 **When you're stressed about school** → I provide caring emotional support first  
-📚 **When you ask questions about my subjects** → I give you helpful answers building on our previous conversations
-🚨 **When you're in danger** → I'll encourage you to talk to a trusted adult immediately
-🌟 **Always** → I'm supportive, encouraging, genuinely helpful, protective, and focused on my beta subjects
-
-**I'm not just smart - I'm your safe learning companion who remembers, grows with you, and excels in Math, Physics, Chemistry, Geography, and History!** 
+if len(st.session_state.messages) == 0:
+    with st.expander('About & Safety', expanded=False):
+        st.info("""
+        🎯 **Beta Subject Focus:** Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
+        
+        🛡️ **Safety First:** I will never help with anything that could hurt you or others
+        
+        🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
+        
+        📚 **What I Can Help With:**
+        • **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
+        • **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
+        • **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
+        • **Geography:** Physical geography, world geography, maps, countries, continents
+        • **History:** World history, historical events, timelines, historical analysis
+        • **Study Skills:** Organization, test prep, note-taking, homework strategies
+        
+        📖 **What I Can't Help With (Ask Parents/Teachers):**
+        • English/Literature • Biology/Life Science • Social Studies/Civics 
+        • Health/PE • Art/Music • Foreign Languages
+        
+        🤔 **Confusion Help:** If you're confused about my subjects, just tell me! I'll help you understand
+        
+        💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
+        
+        🧠 **I remember:** Your name, age, subjects we've discussed, and our learning journey
+        🎯 **When you're stressed about school** → I provide caring emotional support first  
+        📚 **When you ask questions about my subjects** → I give you helpful answers building on our previous conversations
+        🚨 **When you're in danger** → I'll encourage you to talk to a trusted adult immediately
+        🌟 **Always** → I'm supportive, encouraging, genuinely helpful, protective, and focused on my beta subjects
+        
+        **I'm not just smart - I'm your safe learning companion who remembers, grows with you, and excels in Math, Physics, Chemistry, Geography, and History!** 
 """)
 
 # Display chat history with enhanced memory and safety indicators
