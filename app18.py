@@ -2348,12 +2348,18 @@ def _render_card(title: Optional[str], body: str, more: Optional[str], chips: Li
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
-    body = head if head else "Here’s the short answer."
+
+    # Build full body (no expander)
+    if tail:
+        body = f"{head}\n\n{tail}".strip()
+    else:
+        body = head or " "
+
     _render_card(
         title=None,
         body=body,
-        more=None,
-        chips=None,
+        more=None,      # keep hidden
+        chips=None,     # keep hidden
         variant="",
         key=key,
     )
