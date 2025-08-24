@@ -1435,7 +1435,7 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     except Exception:
         pass
 
-    # 🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering.
+    """🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering."""
     ml = normalize_message(message).lower().strip()
 
     # 🚨 CRITICAL FIX: Check explicit crisis FIRST, before any academic bypass
@@ -2319,106 +2319,76 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
-    # Shared bubble style
-    bubble_style = (
-        "display:flex; align-items:flex-start; gap:12px; "
-        "border-radius:12px; padding:12px 16px; font-size:15px;"
-    )
+def _render_card(title: Optional[str], body: str, more: Optional[str], chips: List[str], variant: str, why: Optional[str] = None, key: str = "card"):
+    with st.container():
+        st.markdown('<div class="cards-wrap">', unsafe_allow_html=True)
+        # Title + body
+        st.markdown(f'<div class="card {variant}">', unsafe_allow_html=True)
+        if title:
+            st.markdown(f'<div class="title">{title}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="body">{body}</div>', unsafe_allow_html=True)
 
-    if variant == "input":   # user message
-        icon_bg = "#FF6B6B"  # red square
-        icon = "👦"
-        bubble_bg = "#f5f6f8"
-    elif variant == "reply": # Lumii reply
-        icon_bg = "#FFD469"  # yellow square
-        icon = "🤖"
-        bubble_bg = "#eafaf1"
-    else:
-        icon_bg = "#ddd"
-        icon = "…"
-        bubble_bg = "#fff"
+        # Why? expander (Decline card)
+        if why is not None and variant == "decline":
+            with st.expander("Why?"):
+                st.markdown(why)
 
-    st.markdown(
-        f"""
-        <div style="margin:8px 0;">
-            <div style="background:{bubble_bg}; {bubble_style}">
-                <div style="width:32px;height:32px;
-                            border-radius:8px;
-                            background:{icon_bg};
-                            display:flex;
-                            align-items:center;
-                            justify-content:center;
-                            font-size:18px;
-                            flex-shrink:0;">{icon}</div>
-                <div style="flex:1;">
-                    {body}
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        # Show more (progressive disclosure)
+        if more:
+            with st.expander("Show more"):
+                st.markdown(more)
 
+        # Chips + hint (non-submitting)
+        if chips:
+            clicked = _chips(chips, key_prefix=f"{key}_chips")
+            if clicked:
+                st.caption(f"Suggestion: {clicked}")
+        st.markdown("</div>", unsafe_allow_html=True)  # end .card
+        st.markdown("</div>", unsafe_allow_html=True)  # end .cards-wrap
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
-    body = ("\n\n".join([x for x in [head, tail] if x])).strip() or " "
+    body = head if head else "Here’s the short answer. Want the ‘why’ next?"
     _render_card(
         title=None,
         body=body,
-        more=None,
-        chips=None,
-        variant="reply",   # <-- important
+        more=tail,
+        chips=["Break it down", "Example"],
+        variant="",
         key=key,
     )
 
 def render_decline_card(text: str, key: str = "decline"):
+    head, tail = _excerpt_2_lines(text)
     _render_card(
-        title="I don’t teach that subject (yet)",
-        body=(
-            "I’m still in beta, so I don’t cover that subject right now.\n\n"
-            "But I *can* help you with **study skills** (like how to plan research or revise effectively) "
-            "or with one of my core subjects: Math, Physics, Chemistry, Geography, or History.\n\n"
-            "If the topic feels sensitive or personal, it’s best to also talk it over with a **parent/guardian** "
-            "or a **teacher** — they can guide you safely and clearly."
-        ),
-        chips=["Study skills", "Research planning", "Switch subject"],
+        title="I can’t help with that topic",
+        body="I can help with study skills or another subject.",
+        more=tail,
+        chips=["Study skills", "Switch subject", "Why?"],
         variant="decline",
+        why=head or text.split("\n")[0][:200],
         key=key,
     )
 
-def render_crisis_card(user_text: str, key: str = "crisis"):
-    """
-    UI wrapper for the crisis state. Uses crisis text above; no hotlines, no numbers.
-    """
-    body = generate_age_adaptive_crisis_intervention(user_text=user_text)
-    try:
-        chips = ["Talk to a parent/guardian", "Talk to a teacher", "Plan what to say"]
-    except Exception:
-        chips = None
-
+def render_crisis_card(text: str, key: str = "crisis"):
+    head, tail = _excerpt_2_lines(text)
     _render_card(
-        title="You’re not alone 💙",
-        body=body,
-        more=None,
-        chips=chips,
+        title="I’m really sorry you’re going through this",
+        body=head or text.split("\n")[0][:200],
+        more=tail,
+        chips=["Grounding exercise", "Talk about it"],
         variant="crisis",
         key=key,
     )
 
 def render_banner_card(text: str, key: str = "banner"):
+    # short banner; keep details under show more
+    head, tail = _excerpt_2_lines(text)
     _render_card(
-        title="I can’t help with that request",
-        body=(
-            "I can’t provide that type of content.\n\n"
-            "If this is part of your school work or you’re unsure how to handle it, "
-            "please talk with a **parent/guardian** or your **teacher** — "
-            "they can give you the right guidance for your situation.\n\n"
-            "If you’d like, I can still support you with **study skills** "
-            "or one of my core subjects."
-        ),
-        chips=["Study skills", "Talk to a parent/guardian", "Talk to a teacher"],
+        title=None,
+        body="I can’t help with unsafe content—even for homework.",
+        more=tail or (head if head else None),
+        chips=["Writing craft tips", "Research ethics", "New topic"],
         variant="banner",
         key=key,
     )
@@ -3705,26 +3675,15 @@ if len(st.session_state.messages) == 0:
 # Display chat history with enhanced memory and safety indicators
 mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
 for i, message in enumerate(st.session_state.messages):
-    if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
-        render_message_card(
-            priority=message.get("priority", ""),
-            text=message.get("content", ""),
-            key=f"history_{i}"
-        )
-    elif message["role"] == "user":
-        # Render user messages with custom card
-        _render_card(
-            body=message.get("content", ""),
-            variant="input",
-            key=f"user_{i}"
-        )
-    else:
-        # For other messages, use default chat display
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-# Chat input with enhanced safety processing
-            
+    with st.chat_message(message["role"]):
+        if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
+            render_message_card(
+                priority=message.get("priority", ""),
+                text=message.get("content", ""),
+                key=f"history_{i}"
+            )
+        else:
+            st.markdown(message["content"])# Chat input with enhanced safety processing
 prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
 
 # --- Input gating: crisis lock first, then behavior timeout ---
