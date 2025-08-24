@@ -1435,7 +1435,7 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     except Exception:
         pass
 
-    """🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering."""
+    # 🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering.
     ml = normalize_message(message).lower().strip()
 
     # 🚨 CRITICAL FIX: Check explicit crisis FIRST, before any academic bypass
