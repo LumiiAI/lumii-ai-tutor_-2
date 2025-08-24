@@ -2374,36 +2374,51 @@ def render_reply_card(text: str, key: str = "reply"):
     )
 
 def render_decline_card(text: str, key: str = "decline"):
-    head, tail = _excerpt_2_lines(text)
     _render_card(
-        title="I can’t help with that topic",
-        body="I can help with study skills or another subject.",
-        more=tail,
-        chips=["Study skills", "Switch subject", "Why?"],
+        title="I don’t teach that subject (yet)",
+        body=(
+            "I’m still in beta, so I don’t cover that subject right now.\n\n"
+            "But I *can* help you with **study skills** (like how to plan research or revise effectively) "
+            "or with one of my core subjects: Math, Physics, Chemistry, Geography, or History.\n\n"
+            "If the topic feels sensitive or personal, it’s best to also talk it over with a **parent/guardian** "
+            "or a **teacher** — they can guide you safely and clearly."
+        ),
+        chips=["Study skills", "Research planning", "Switch subject"],
         variant="decline",
-        why=head or text.split("\n")[0][:200],
         key=key,
     )
 
-def render_crisis_card(text: str, key: str = "crisis"):
-    head, tail = _excerpt_2_lines(text)
+def render_crisis_card(user_text: str, key: str = "crisis"):
+    """
+    UI wrapper for the crisis state. Uses crisis text above; no hotlines, no numbers.
+    """
+    body = generate_age_adaptive_crisis_intervention(user_text=user_text)
+    try:
+        chips = ["Talk to a parent/guardian", "Talk to a teacher", "Plan what to say"]
+    except Exception:
+        chips = None
+
     _render_card(
-        title="I’m really sorry you’re going through this",
-        body=head or text.split("\n")[0][:200],
-        more=tail,
-        chips=["Grounding exercise", "Talk about it"],
+        title="You’re not alone 💙",
+        body=body,
+        more=None,
+        chips=chips,
         variant="crisis",
         key=key,
     )
 
 def render_banner_card(text: str, key: str = "banner"):
-    # short banner; keep details under show more
-    head, tail = _excerpt_2_lines(text)
     _render_card(
-        title=None,
-        body="I can’t help with unsafe content—even for homework.",
-        more=tail or (head if head else None),
-        chips=["Writing craft tips", "Research ethics", "New topic"],
+        title="I can’t help with that request",
+        body=(
+            "I can’t provide that type of content.\n\n"
+            "If this is part of your school work or you’re unsure how to handle it, "
+            "please talk with a **parent/guardian** or your **teacher** — "
+            "they can give you the right guidance for your situation.\n\n"
+            "If you’d like, I can still support you with **study skills** "
+            "or one of my core subjects."
+        ),
+        chips=["Study skills", "Talk to a parent/guardian", "Talk to a teacher"],
         variant="banner",
         key=key,
     )
