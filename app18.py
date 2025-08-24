@@ -36,18 +36,6 @@ import json
 import os
 import unicodedata
 import re
-
-# === Fallback safety pattern set to avoid NameError in detect_non_educational_topics ===
-try:
-    _HEALTH_PATTERNS
-except NameError:
-    import re as _re_fallback
-    _HEALTH_PATTERNS = [
-        _re_fallback.compile(r"\b(therapy|therapist|counselor|psychiatrist|psychologist)\b", _re_fallback.IGNORECASE),
-        _re_fallback.compile(r"\b(antidepressant|ssri|prozac|sertraline|fluoxetine)\b", _re_fallback.IGNORECASE),
-        _re_fallback.compile(r"\b(diagnos(e|is)|symptom|treatment|medication|side\s*effect)\b", _re_fallback.IGNORECASE),
-        _re_fallback.compile(r"\b(mental\s*health|depression|anxiety|ptsd|bipolar|schizophrenia)\b", _re_fallback.IGNORECASE),
-    ]
 import time
 import uuid
 import unicodedata  # FIX #3: Added for Unicode normalization
@@ -55,22 +43,6 @@ from datetime import datetime
 
 import requests
 import streamlit as st
-
-# === Safety taxonomy fallbacks (prevent NameError if constants are missing) ===
-# Place this right after imports.
-for _name in [
-    "_FAMILY_PATTERNS",
-    "_HEALTH_PATTERNS",
-    "_SEXUAL_PATTERNS",
-    "_DRUGS_PATTERNS",
-    "_WEAPONS_PATTERNS",
-    "_GAMBLING_PATTERNS",
-    "_POLITICS_PATTERNS",
-    "_RELIGION_PATTERNS",
-]:
-    if _name not in globals():
-        globals()[_name] = []  # empty list fallback → avoids NameError without altering routing logic
-
 
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
@@ -591,7 +563,6 @@ def detect_suicide_note_request(message: str) -> bool:
     
     # Direct suicide note request in current message
     if any(pattern.search(message_lower) for pattern in SUICIDE_NOTE_PATTERNS):
-        st.session_state['block_suicide_note_mode'] = True
         return True
     
     # Context-aware detection across recent messages
@@ -644,8 +615,7 @@ def detect_suicide_note_request(message: str) -> bool:
                 
         # Trigger if high score
         if suicide_note_score >= 5:
-            st.session_state['block_suicide_note_mode'] = True
-        return True
+            return True
     
     return False
 
@@ -807,37 +777,37 @@ def generate_subject_restriction_response(subject: str, student_age: int, studen
             return f"""🌿 {name_part}That's a great question about living things and biology! 
 
 During our beta, I focus on Math, Physics, Chemistry, Geography, and History. **Biology and health questions** are important topics that are best discussed with:
-- Your parents or guardians
-- Your doctor or school nurse
-- Your teacher or school counselor
+• Your parents or guardians
+• Your doctor or school nurse
+• Your teacher or school counselor
 
 They can give you age-appropriate answers that fit your family's values and your learning level.
 
 **🎯 I'm great at helping with:**
-- Math problems and calculations
-- Physics concepts and experiments  
-- Chemistry reactions and elements
-- Geography and maps
-- History and historical events
+• Math problems and calculations
+• Physics concepts and experiments  
+• Chemistry reactions and elements
+• Geography and maps
+• History and historical events
 
 What would you like to explore in these subjects? 😊"""
         else:
             return f"""🌿 {name_part}That's an important biology/health question! 
 
 During our beta testing, I specialize in Math, Physics, Chemistry, Geography, and History. **Biology and health topics** involve personal and family considerations that are best addressed by:
-- Your parents or guardians
-- Your school's health teacher or nurse
-- Your family doctor or healthcare provider
-- Your school counselor
+• Your parents or guardians
+• Your school's health teacher or nurse
+• Your family doctor or healthcare provider
+• Your school counselor
 
 They can provide accurate, age-appropriate information that aligns with your family's values.
 
 **🎯 My beta expertise includes:**
-- **Math:** Algebra, geometry, calculus, problem-solving
-- **Physics:** Motion, energy, electricity, waves
-- **Chemistry:** Elements, reactions, molecular structure  
-- **Geography:** World geography, physical features
-- **History:** Historical events, timelines, analysis
+• **Math:** Algebra, geometry, calculus, problem-solving
+• **Physics:** Motion, energy, electricity, waves
+• **Chemistry:** Elements, reactions, molecular structure  
+• **Geography:** World geography, physical features
+• **History:** Historical events, timelines, analysis
 
 Ready to dive into any of these subjects? What interests you most? 🚀"""
 
@@ -846,11 +816,11 @@ Ready to dive into any of these subjects? What interests you most? 🚀"""
         return f"""📚 {name_part}I'd love to help, but during our beta testing, I'm focusing on specific subjects to make sure I give you the best help possible!
 
 **🎯 I'm great at helping with:**
-- Math (addition, subtraction, multiplication, division, word problems)
-- Science basics (physics, chemistry concepts, simple experiments)  
-- Geography (maps, countries, continents, capitals)
-- History (historical events, timelines, famous people)
-- Study skills and organization
+• Math (addition, subtraction, multiplication, division, word problems)
+• Science basics (physics, chemistry concepts, simple experiments)  
+• Geography (maps, countries, continents, capitals)
+• History (historical events, timelines, famous people)
+• Study skills and organization
 
 **📖 For {friendly_subject}:** Please ask your teacher, parents, or school librarian - they'll give you better help than I can right now!
 
@@ -859,12 +829,12 @@ What math, science, geography, or history topic can I help you with instead? I'm
         return f"""📚 {name_part}Thanks for thinking of me for help with {friendly_subject}! During our beta phase, I'm specializing in specific subjects to provide the highest quality tutoring.
 
 **🎯 My beta expertise includes:**
-- **Math:** Algebra, geometry, trigonometry, calculus, problem-solving
-- **Physics:** Mechanics, electricity, waves, thermodynamics  
-- **Chemistry:** Chemical reactions, periodic table, molecular structure
-- **Geography:** Physical geography, world geography, mapping
-- **History:** World history, historical analysis, research skills
-- **Study Skills:** Organization, test prep, note-taking strategies
+• **Math:** Algebra, geometry, trigonometry, calculus, problem-solving
+• **Physics:** Mechanics, electricity, waves, thermodynamics  
+• **Chemistry:** Chemical reactions, periodic table, molecular structure
+• **Geography:** Physical geography, world geography, mapping
+• **History:** World history, historical analysis, research skills
+• **Study Skills:** Organization, test prep, note-taking strategies
 
 **📖 For {friendly_subject}:** Your teacher, school counselor, or local tutor would be much better resources right now.
 
@@ -931,15 +901,15 @@ def generate_manipulation_response(student_age: int, student_name: str = "") -> 
         return f"""🛡️ {name_part}I can't help with that request. 
 
 If a grown-up really asked you to find this information, please:
-- Talk to your parents or guardians first
-- Ask your teacher directly (not through me)
-- Remember: safe learning never needs to be secret
+• Talk to your parents or guardians first
+• Ask your teacher directly (not through me)
+• Remember: safe learning never needs to be secret
 
 **Let's focus on safe learning!** I'm great at:
-- Math problems and games
-- Cool science facts  
-- Geography adventures
-- History stories
+• Math problems and games
+• Cool science facts  
+• Geography adventures
+• History stories
 
 What would you like to explore together? 😊"""
         
@@ -947,9 +917,9 @@ What would you like to explore together? 😊"""
         return f"""🛡️ {name_part}I can't provide information on that topic, regardless of the context given.
 
 **For any legitimate school assignment:**
-- Check with your teacher directly
-- Use school-approved resources  
-- Ask your parents or school counselor
+• Check with your teacher directly
+• Use school-approved resources  
+• Ask your parents or school counselor
 
 **Remember:** Safe, appropriate learning never requires secrecy or bypassing normal educational channels.
 
@@ -1045,13 +1015,6 @@ def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
     """🚨 CRITICAL FIX: Improved crisis guard with targeted exclusions and explicit phrase detection."""
     msg = normalize_message(message)
     ml = msg.lower().strip()
-
-    # Option A: suicide-note requests are handled as SAFETY (decline) downstream
-    if detect_suicide_note_request(message):
-        # Sticky block so follow-ups like 'it's just fiction' are still declined
-        st.session_state['block_suicide_note_mode'] = True
-        return False, None
-
 
     # Context flags for reference
     has_academic_context = any(w in ml for w in _ACADEMIC_INDICATORS)
@@ -1167,30 +1130,30 @@ def handle_polite_decline(student_age: int, student_name: str = "") -> str:
         return f"""😊 {name_part}That's totally okay! 
 
 Would you like to:
-- Just chat about something fun?
-- Take some deep breaths together?
-- Tell me about your day?
-- Or just sit quietly for a bit?
+• Just chat about something fun?
+• Take some deep breaths together?
+• Tell me about your day?
+• Or just sit quietly for a bit?
 
 I'm here whenever you're ready! 🌟"""
     elif student_age <= 14:
         return f"""😊 {name_part}No worries at all! 
 
 Maybe you'd like to:
-- Talk about something else that's on your mind?
-- Try some quick stress-relief tips?
-- Share what's going well today?
-- Or just have a casual conversation?
+• Talk about something else that's on your mind?
+• Try some quick stress-relief tips?
+• Share what's going well today?
+• Or just have a casual conversation?
 
 I'm here when you want to chat about anything! 💙"""
     else:  # High school
         return f"""😊 {name_part}Absolutely fine! 
 
 Feel free to:
-- Bring up anything else you'd like to discuss
-- Try some quick mindfulness techniques
-- Tell me about something positive in your day
-- Or just have a relaxed conversation
+• Bring up anything else you'd like to discuss
+• Try some quick mindfulness techniques
+• Tell me about something positive in your day
+• Or just have a relaxed conversation
 
 I'm here to support you however feels right! 🤗"""
 
@@ -1423,11 +1386,6 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     """🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering."""
     ml = normalize_message(message).lower().strip()
 
-    # Option A: suicide-note format requests should route to SAFETY decline, not crisis
-    if detect_suicide_note_request(message):
-        st.session_state['block_suicide_note_mode'] = True
-        return False, None, 'suicide_note_request'
-
     # 🚨 CRITICAL FIX: Check explicit crisis FIRST, before any academic bypass
     # This prevents "for my math homework I want to kill myself" from bypassing crisis detection
     if any(p in ml for p in _EXPLICIT_ONLY_STRICT):
@@ -1536,20 +1494,100 @@ def should_terminate_conversation(message: str, harmful_request_count: int) -> T
     return False, None
 
 def generate_age_adaptive_crisis_intervention(student_age: int, student_name: str = "") -> str:
-    """Return a supportive crisis message without phone numbers (beta)."""
+    """Age-adaptive crisis intervention for beta families."""
     name_part = f"{student_name}, " if student_name else ""
-    if student_age <= 11:
-        return (
-            f"🚨 {name_part}I care about you and I'm here to listen. It takes courage to share how you feel. "
-            "Please find a trusted grown-up right now — a parent or caregiver, a teacher, or a school counselor. "
-            "Tell them exactly what you told me so they can help you immediately."
-        )
-    else:
-        return (
-            f"🚨 {name_part}I'm really concerned about what you said. Your safety matters most. "
-            "Please talk to a trusted adult right away — a parent or caregiver, a teacher, or a school counselor. "
-            "You don't have to handle this alone; please reach out now so someone can support you."
-        )
+
+    if student_age <= 11:  # Elementary
+        return f"""🚨 {name_part}I care about you and I'm here to listen. It takes a lot of courage to share those feelings with me.
+
+I want you to know something important: those thoughts are not true. You are important, and your life has value.
+
+Here's what I want you to do: I want you to reach out to a trusted adult, like your mom, dad, a teacher, or the school counselor, and talk to them about how you're feeling. They can provide you with support and help.
+
+Remember, you are important, and your life matters. Don't hesitate to reach out for help."""
+    
+    else:  # Middle School & High School (12-18)
+        return f"""🚨 {name_part}I care about you and I'm here to listen. It takes a lot of courage to share those feelings with me.
+
+First, I want you to know that those thoughts are not true. You are important, and your life has value. It's understandable to feel overwhelmed or struggling with difficult emotions, but it's crucial to remember that you are not alone.
+
+Here's what I want you to do: I want you to reach out to a trusted adult, like a parent, teacher, or school counselor, and talk to them about how you're feeling. They can provide you with support, guidance, and resources to help you work through these difficult emotions.
+
+Remember, you are important, and your life matters. Don't hesitate to reach out for help."""
+
+# =============================================================================
+# NON-EDUCATIONAL TOPICS DETECTION (ENHANCED) – FIXED: removed advice-seeking requirement
+# =============================================================================
+
+# NOTE: relies on `detect_confusion(message: str) -> bool` defined elsewhere.
+
+# ---- Precompiled regexes (perf/readability; patterns unchanged) --------------
+
+_ADVICE_SEEKING_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bhow\s+(do i|should i|can i)\b"),
+    re.compile(r"\bshould i\b"),
+    re.compile(r"\bwhat\s+(do i do|should i do)\b"),
+    re.compile(r"\bcan you help me with\b"),
+    re.compile(r"\bi need\s+(help|advice)\s+with\b"),
+    re.compile(r"\btell me about\b"),
+    re.compile(r"\b(?:is|s)\s+it\s+(good|bad|healthy|safe)\b"),
+]
+
+# Health/Medical/Wellness
+_HEALTH_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\b(diet|nutrition|weight loss|exercise routine|medicine|drugs|medical|doctor|sick|symptoms|diagnosis)\b"),
+    re.compile(r"\bmental health\s+(treatment|therapy|counseling)\b"),
+    re.compile(r"\beating disorder\b"),
+    re.compile(r"\bmuscle building\b"),
+]
+
+# Family/Personal Life
+_FAMILY_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bfamily money\b"),
+    re.compile(r"\bparents divorce\b"),
+    re.compile(r"\bfamily problems\b"),
+    re.compile(r"\breligion\b"),
+    re.compile(r"\bpolitical\b"),
+    re.compile(r"\bpolitics\b"),
+    re.compile(r"\bvote\b"),
+    re.compile(r"\bchurch\b"),
+    re.compile(r"\bwhat religion\b"),
+    re.compile(r"\bwhich political party\b"),
+    re.compile(r"\brepublican or democrat\b"),
+]
+
+# Substance/Legal
+_SUBSTANCE_LEGAL_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\balcohol\b"),
+    re.compile(r"\bdrinking\b.*\b(beer|wine|vodka)\b"),
+    re.compile(r"\bmarijuana\b"),
+    re.compile(r"\blegal advice\b"),
+    re.compile(r"\billegal\b"),
+    re.compile(r"\bsue\b"),
+    re.compile(r"\blawyer\b"),
+    re.compile(r"\bcourt\b"),
+    re.compile(r"\bsmoke\b"),
+    re.compile(r"\bvap(?:e|es|ing)\b"),          # NEW: matches vape / vapes / vaping
+    re.compile(r"\be-?cig(?:arette)?s?\b"),      # NEW: e-cig, e-cigs, e-cigarette(s)
+    re.compile(r"\bjuul\b"),                     # NEW: common brand mention
+    re.compile(r"\bweed\b"),
+]
+
+
+# Life decisions beyond school
+_LIFE_DECISIONS_PATTERNS: Final[List[Pattern[str]]] = [
+    re.compile(r"\bcareer choice\b"),
+    re.compile(r"\bmajor in college\b"),
+    re.compile(r"\bdrop out\b"),
+    re.compile(r"\blife path\b"),
+    re.compile(r"\bmoney advice\b"),
+    re.compile(r"\binvesting\b"),
+    re.compile(r"\bget a job\b"),
+    re.compile(r"\bfinancial\b"),
+    re.compile(r"\bstocks\b"),
+    re.compile(r"\bcryptocurrency\b"),
+]
+
 
 def detect_non_educational_topics(message: str) -> Optional[str]:
     """Detect topics outside K-12 scope; return a topic key or None.
@@ -1582,18 +1620,18 @@ def generate_educational_boundary_response(topic_type: str, student_age: int, st
             return f"""🌟 {name_part}That's a great question about health! 
 
 I'm your school learning buddy, so health questions are best for:
-- Your mom, dad, or family
-- Your doctor or school nurse  
-- Your teacher for school PE questions
+• Your mom, dad, or family
+• Your doctor or school nurse  
+• Your teacher for school PE questions
 
 I love helping with schoolwork and making learning fun! What subject should we work on? 📚😊"""
         else:
             return f"""🌟 {name_part}That's a great question about health and wellness! 
 
 I'm your learning and school companion, so health questions are best answered by the right people:
-- Your parents or guardians
-- Your doctor or school nurse  
-- Your PE teacher for school-related fitness questions
+• Your parents or guardians
+• Your doctor or school nurse  
+• Your PE teacher for school-related fitness questions
 
 I'm here to help with your schoolwork, studying, and learning strategies! What subject can I help you with today? 📚"""
 
@@ -1602,17 +1640,17 @@ I'm here to help with your schoolwork, studying, and learning strategies! What s
             return f"""🌟 {name_part}That's a really important question! 
 
 I'm your learning friend who helps with school stuff. For big questions like this, the best people to talk to are:
-- Your mom, dad, or family
-- Your teacher or school counselor
+• Your mom, dad, or family
+• Your teacher or school counselor
 
 I'm great at helping with homework and making school fun! What would you like to learn about? 😊"""
         else:
             return f"""🌟 {name_part}That's an important question about personal and family matters! 
 
 I'm your learning companion focused on school subjects and studying. For questions like this, the best people to talk to are:
-- Your parents or guardians
-- Your school counselor
-- Other trusted adults in your life
+• Your parents or guardians
+• Your school counselor
+• Other trusted adults in your life
 
 I'm here to help make your schoolwork easier and less stressful! What subject can we work on? 📖"""
 
@@ -1621,17 +1659,17 @@ I'm here to help make your schoolwork easier and less stressful! What subject ca
             return f"""🌟 {name_part}That's a grown-up question! 
 
 I'm your school learning helper, so questions like this are best for:
-- Your parents or family
-- Your teacher or another trusted grown-up
+• Your parents or family
+• Your teacher or another trusted grown-up
 
 I love helping with school subjects and homework! What can we learn together today? 🌟📚"""
         else:
             return f"""🌟 {name_part}That's an important question that needs guidance from the right people! 
 
 I'm your learning companion focused on helping with school subjects and studying. For questions like this, please talk to:
-- Your parents or guardians
-- Your school counselor  
-- Other trusted adults who can give you proper guidance
+• Your parents or guardians
+• Your school counselor  
+• Other trusted adults who can give you proper guidance
 
 I'm excellent at helping with homework, test prep, and study strategies! What academic subject can I help you with? 😊"""
 
@@ -1743,15 +1781,15 @@ def handle_problematic_behavior(behavior_type: str, strike_count: int, student_a
         if student_age <= 11:
             return (
                 f"😊 {name_part}Sounds like today is heavy. Let’s make it easier:\n"
-                f"- finish 1 small task in 10–15 minutes, or\n"
-                f"- I set up a mini plan for both subjects now.\n"
+                f"• finish 1 small task in 10–15 minutes, or\n"
+                f"• I set up a mini plan for both subjects now.\n"
                 f"Which do you prefer?"
             )
         else:
             return (
                 f"😊 {name_part}Let’s keep this simple. Two options:\n"
-                f"- a 10–15 min quick win, or\n"
-                f"- a short plan for both classes.\n"
+                f"• a 10–15 min quick win, or\n"
+                f"• a short plan for both classes.\n"
                 f"Pick one and we’ll start."
             )
 
@@ -1907,19 +1945,19 @@ def _show_privacy_disclaimer() -> None:
     👨‍👩‍👧‍👦 **Ask Your Parents First:** If you're under 16, make sure your parents say it's okay to chat with Lumii
     
     📚 **What I Can Help With:**
-    - Math (algebra, geometry, calculus, word problems)
-    - Physics (mechanics, electricity, motion, energy)  
-    - Chemistry (reactions, periodic table, molecules)
-    - Geography (maps, countries, physical geography)
-    - History (world history, historical events, timelines)
-    - Study skills and organization
+    • Math (algebra, geometry, calculus, word problems)
+    • Physics (mechanics, electricity, motion, energy)  
+    • Chemistry (reactions, periodic table, molecules)
+    • Geography (maps, countries, physical geography)
+    • History (world history, historical events, timelines)
+    • Study skills and organization
     
     📖 **What I Can't Help With During Beta:**
-    - English/Literature (ask your teacher or parents)
-    - Biology/Life Science (ask your parents or school nurse)
-    - Social Studies/Civics (ask your parents or teacher)
-    - Health/PE topics (ask your parents or school nurse)
-    - Art/Music interpretation (ask your teacher or parents)
+    • English/Literature (ask your teacher or parents)
+    • Biology/Life Science (ask your parents or school nurse)
+    • Social Studies/Civics (ask your parents or teacher)
+    • Health/PE topics (ask your parents or school nurse)
+    • Art/Music interpretation (ask your teacher or parents)
     
     🔒 **Safety First:** I will never help with anything that could hurt you or others
     
@@ -2464,19 +2502,19 @@ PROVIDE THE SPECIFIC HELP YOU OFFERED. Do NOT redirect to crisis resources unles
 {recent_context}
 
 BETA SUBJECT SCOPE - I ONLY HELP WITH:
-- Math: Algebra, geometry, trigonometry, calculus, arithmetic, word problems
-- Physics: Mechanics, electricity, waves, thermodynamics, motion, energy
-- Chemistry: Chemical reactions, periodic table, molecular structure, equations
+• Math: Algebra, geometry, trigonometry, calculus, arithmetic, word problems
+• Physics: Mechanics, electricity, waves, thermodynamics, motion, energy
+• Chemistry: Chemical reactions, periodic table, molecular structure, equations
 **CRITICAL: ALL chemical equations MUST be balanced (e.g., 2H₂ + O₂ → 2H₂O, NOT H₂ + O₂ → H₂O)**
-- Geography: Physical geography, world geography, maps, countries, continents
-- History: World history, historical events, timelines, historical analysis
-- Study Skills: Organization, test prep, note-taking, homework strategies
+• Geography: Physical geography, world geography, maps, countries, continents
+• History: World history, historical events, timelines, historical analysis
+• Study Skills: Organization, test prep, note-taking, homework strategies
 
 SUBJECTS I DON'T COVER (refer to parents/teachers):
-- English/Literature - Biology/Life Science - Social Studies/Civics 
-- Health/PE - Art/Music - Foreign Languages
-- Human reproduction, sexuality, anatomy topics
-- Personal health, medical, or body-related questions
+• English/Literature • Biology/Life Science • Social Studies/Civics 
+• Health/PE • Art/Music • Foreign Languages
+• Human reproduction, sexuality, anatomy topics
+• Personal health, medical, or body-related questions
 
 CRITICAL: If asked about reproduction, sex, anatomy, health, or biology topics - IMMEDIATELY redirect to parents/teachers. Do not provide any information on these topics.
 
@@ -2583,9 +2621,9 @@ def get_groq_response_with_memory_safety(
 
 If you're going through something difficult, I'm here to listen and support you in healthy ways. 
 If you're having difficult thoughts, please talk to:
-- A trusted adult
-- {resources['crisis_line']}
-- {resources['suicide_line']}
+• A trusted adult
+• {resources['crisis_line']}
+• {resources['suicide_line']}
 
 Let's focus on something positive we can work on together. How can I help you with my beta subjects (Math, Physics, Chemistry, Geography, History) today?""",
             None,
@@ -2653,11 +2691,11 @@ Let's focus on something positive we can work on together. How can I help you wi
                 if last_offer.get("offered_help") and "friend" in (last_offer.get("content") or "").lower():
                     ai_content = (
                         "💙 Great! Here are some friendly ideas to try:\n"
-                        "- Join one club/activity you like this week\n"
-                        "- Say hi to someone you sit near and ask a small question\n"
-                        "- Invite a classmate to play at recess or sit together at lunch\n"
-                        "- Notice who enjoys similar things (games, drawing, sports) and chat about it\n"
-                        "- Keep it gentle and patient — friendships grow with time 🌱"
+                        "• Join one club/activity you like this week\n"
+                        "• Say hi to someone you sit near and ask a small question\n"
+                        "• Invite a classmate to play at recess or sit together at lunch\n"
+                        "• Notice who enjoys similar things (games, drawing, sports) and chat about it\n"
+                        "• Keep it gentle and patient — friendships grow with time 🌱"
                     )
                 else:
                     ai_content = (
@@ -2673,9 +2711,9 @@ Let's focus on something positive we can work on together. How can I help you wi
                     
 I care about your safety and wellbeing, and I want to help in healthy ways. 
 If you're having difficult thoughts, please talk to:
-- A trusted adult
-- {resources['crisis_line']}
-- {resources['suicide_line']}
+• A trusted adult
+• {resources['crisis_line']}
+• {resources['suicide_line']}
 
 Let's focus on something positive we can work on together. How can I help you with my beta subjects (Math, Physics, Chemistry, Geography, History) today?""",
                     None,
@@ -2820,15 +2858,6 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
     # FIX #5: Single source of truth for normalization
     msg_norm = normalize_message(message or "")
     message_lower = msg_norm.lower().strip()
-
-    # Sticky decline for suicide-note attempts (Option A)
-    if st.session_state.get('block_suicide_note_mode', False):
-        # If the user continues with fiction/character disclaimers or related terms, keep declining
-        if any(k in message_lower for k in ['fiction','novel','character','story','scene','roleplay','letter','note','message','goodbye','farewell','final','last']):
-            return 'safety', 'BLOCKED_HARMFUL', 'suicide_note_request'
-        # Even without those keywords, within sticky phase treat follow-ups conservatively
-        return 'safety', 'BLOCKED_HARMFUL', 'suicide_note_request'
-
 
     # STEP 0.5: SUICIDE NOTE DETECTION (critical - catches gradual escalation)
     if detect_suicide_note_request(msg_norm):
@@ -3099,33 +3128,40 @@ What's been happening in your life that's brought you to this point? I'm here to
 These feelings you're having are valid, but I want you to know that you don't have to face them alone. There are people who care about you and want to help.
 
 Please consider talking to:
-- A trusted adult like a parent, teacher, or counselor
-- Your school's guidance counselor
+• A trusted adult like a parent, teacher, or counselor
+• Your school's guidance counselor
 
 I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
 def emergency_intervention(message, safety_type, student_age, student_name=""):
-    """Enhanced emergency intervention without phone numbers (beta)"""
+    """Enhanced emergency intervention with age-appropriate crisis response"""
     name_part = f"{student_name}, " if student_name else ""
-    # In beta, we avoid listing phone numbers or hotlines. Refer to trusted adults and local support only.
+    resources = get_crisis_resources()
+    
     if student_age <= 11:  # Elementary
-        return f"""🚨 {name_part}I'm very worried about what you're saying.
+        return f"""🚨 {name_part}I'm very worried about what you're saying. 
 
-Please find a trusted grown-up **right now**:
-- A parent or caregiver
-- A teacher
-- A school counselor
+Please find a grown-up RIGHT NOW:
+• Your mom, dad, or family
+• Your teacher
+• Call {resources['emergency']} if you're in danger
 
-You are loved and important. Tell them exactly what you told me so they can help you immediately."""
+You are loved and important. Please get help right away.
+
+Tell a grown-up what you said to me. They will help you."""
+    
     else:  # Middle & High School
-        return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety matters most.
+        return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.
 
-Please get help **immediately** by talking to a trusted adult:
-- A parent or caregiver
-- A teacher
-- A school counselor or another responsible adult
+Please get help IMMEDIATELY:
+• Call {resources['crisis_line']} right now
+• {resources['text_line']}
+• Call {resources['emergency']} if you're in immediate danger
+• Tell a trusted adult immediately
 
-You don't have to go through this alone. There are people around you who want to help. Please reach out right now."""
+You don't have to go through this alone. There are people who want to help you.
+
+Please reach out for help right now."""
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with ALL fixes applied including beta subject restrictions"""
@@ -3148,7 +3184,7 @@ def generate_response_with_memory_safety(message, priority, tool, student_age=10
         response = (
             "💙 I care about you so much, and I'm very concerned about what you're saying.\n\n"
             "This conversation needs to stop for your safety. Please talk to:\n"
-            "- A parent or trusted adult RIGHT NOW\n\n"
+            "• A parent or trusted adult RIGHT NOW\n\n"
             "You matter, and there are people who want to help you. Please reach out to them immediately. 💙"
         )
         return response, "🛡️ EMERGENCY - Conversation Ended for Safety", "crisis", "🚨 Critical Safety"
@@ -3160,7 +3196,7 @@ def generate_response_with_memory_safety(message, priority, tool, student_age=10
         response = (
             "💙 I'm very concerned that you're still having these thoughts after we talked about safety.\n\n"
             "This conversation must end now. Please:\n"
-            "- Talk to a trusted adult RIGHT NOW — don't wait\n\n"
+            "• Talk to a trusted adult RIGHT NOW — don't wait\n\n"
             "Your safety is the most important thing. Please get help immediately. 💙"
         )
         return response, "🛡️ FINAL TERMINATION - Please Get Help Now", "crisis", "🚨 Final Warning"
@@ -3303,15 +3339,6 @@ Please come back when you're ready to be respectful and learn together positivel
             return decline, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
-        # Fallback: if detection lost the trigger, still decline if pattern/sticky flag present
-        if detect_suicide_note_request(message) or st.session_state.get('block_suicide_note_mode', False):
-            decline = (
-                "I can’t help create or edit suicide notes—even for fiction. "
-                "If you’re writing about a character in crisis, I can help with writing craft instead: "
-                "building backstory and stressors, showing warning signs responsibly, framing a scene that leads to support/interruptions, and depicting recovery without glamorizing harm."
-            )
-            return decline, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
-
     
     # Reset harmful request count for safe messages
     if priority not in ['crisis', 'crisis_return', 'safety', 'concerning', 'immediate_termination']:
@@ -3514,18 +3541,18 @@ with st.sidebar:
     
     # Tool explanations with beta subject focus
     st.subheader("🛠️ How I Help You (Beta)")
-    st.caption('Math - Physics - Chemistry - Geography - History - Study Skills')
+    st.caption('Math • Physics • Chemistry • Geography • History • Study Skills')
     with st.expander('Details', expanded=False):
         st.markdown("""
         **🛡️ Safety First** - I'll always protect you from harmful content
     
         **🎯 Beta Subject Focus** - I specialize in:
-        - **Math:** Algebra, geometry, calculus, word problems
-        - **Physics:** Mechanics, electricity, thermodynamics 
-        - **Chemistry:** Reactions, periodic table, molecules
-        - **Geography:** Maps, countries, physical geography
-        - **History:** World history, historical events, timelines
-        - **Study Skills:** Organization, test prep, homework help
+        • **Math:** Algebra, geometry, calculus, word problems
+        • **Physics:** Mechanics, electricity, thermodynamics 
+        • **Chemistry:** Reactions, periodic table, molecules
+        • **Geography:** Maps, countries, physical geography
+        • **History:** World history, historical events, timelines
+        • **Study Skills:** Organization, test prep, homework help
     
         **📖 Other Subjects** - For English, Biology, Social Studies, Health, Art, Music, etc., please ask your parents, teachers, or school counselors
     
@@ -3570,16 +3597,16 @@ if len(st.session_state.messages) == 0:
         🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
         
         📚 **What I Can Help With:**
-        - **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
-        - **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
-        - **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
-        - **Geography:** Physical geography, world geography, maps, countries, continents
-        - **History:** World history, historical events, timelines, historical analysis
-        - **Study Skills:** Organization, test prep, note-taking, homework strategies
+        • **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
+        • **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
+        • **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
+        • **Geography:** Physical geography, world geography, maps, countries, continents
+        • **History:** World history, historical events, timelines, historical analysis
+        • **Study Skills:** Organization, test prep, note-taking, homework strategies
         
         📖 **What I Can't Help With (Ask Parents/Teachers):**
-        - English/Literature - Biology/Life Science - Social Studies/Civics 
-        - Health/PE - Art/Music - Foreign Languages
+        • English/Literature • Biology/Life Science • Social Studies/Civics 
+        • Health/PE • Art/Music • Foreign Languages
         
         🤔 **Confusion Help:** If you're confused about my subjects, just tell me! I'll help you understand
         
@@ -3749,9 +3776,9 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #667; margin-top: 2rem;'>
     <p><strong>My Friend Lumii</strong> - Your safe AI Math, Physics, Chemistry, Geography & History tutor 🛡️💙</p>
-    <p>🎯 Beta subjects: Math - Physics - Chemistry - Geography - History - Study Skills</p>
-    <p>🛡️ Safety first - 🧠 Remembers conversations - 🎯 Smart emotional support - 📚 Natural conversation flow - 🌟 Always protective</p>
-    <p>🤝 Respectful learning - 👨‍👩‍👧‍👦 Family guidance for other subjects - 🔒 Multi-layer safety - 📞 Crisis resources - ⚡ Error recovery - 💪 Always helpful, never harmful</p>
+    <p>🎯 Beta subjects: Math • Physics • Chemistry • Geography • History • Study Skills</p>
+    <p>🛡️ Safety first • 🧠 Remembers conversations • 🎯 Smart emotional support • 📚 Natural conversation flow • 🌟 Always protective</p>
+    <p>🤝 Respectful learning • 👨‍👩‍👧‍👦 Family guidance for other subjects • 🔒 Multi-layer safety • 📞 Crisis resources • ⚡ Error recovery • 💪 Always helpful, never harmful</p>
     <p>🤔 <strong>NEW:</strong> Confusion help - If you're confused about my subjects, just tell me! I'll help you understand without judgment.</p>
     <p>🚨 <strong>ALL CRITICAL ISSUES RESOLVED:</strong> Syntax errors eliminated, regex patterns complete, safety ordering fixed, Unicode bypasses closed, acceptance flow secured - PRODUCTION-READY for safe deployment.</p>
     <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe while excelling in core STEM and History subjects</em></p>
