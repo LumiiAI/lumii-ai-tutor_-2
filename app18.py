@@ -476,28 +476,28 @@ IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
 
 # US Crisis Resources for Beta Launch (English-speaking families)
 US_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "988 (Suicide & Crisis Lifeline)",
+    "crisis_line": "Ask a trusted adult to help you find local support.",
     "text_line": "",
-    "emergency": "911 for immediate emergency",
-    "additional": "Tell a trusted adult (parent, teacher, counselor)",
+    "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
+    "additional": "Talk to a trusted adult (parent, teacher, counselor)",
 }
 
 # Keep Slovenia as backup for development/testing
 SLOVENIA_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "TOM telefon za otroke in mladostnike: 116 111 (brezplačno, 24/7)",
-    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)",
-    "emergency": "Klic v sili: 113 (policija) ali 112 (vse nujne službe)",
-    "additional": "Klic v duševni stiski: 01 520 99 00",
+    "crisis_line": "Poišči zaupanja vredno odraslo osebo, da ti pomaga poiskati lokalno podporo.",
+    "suicide_line": "Prosim, obrni se na zaupanja vredno odraslo osebo takoj.",
+    "emergency": "Če si v neposredni nevarnosti, poišči pomoč pri zaupanja vredni odrasli osebi v bližini.",
+    "additional": "Pogovori se s staršem, učiteljem ali šolskim svetovalcem.",
 }
 
 CRISIS_RESOURCES: Dict[str, Dict[str, str]] = {
     "US": US_CRISIS_RESOURCES,
     "SI": SLOVENIA_CRISIS_RESOURCES,
     "EU": {
-        "crisis_line": "European Emergency Line: 116 123",
-        "suicide_line": "Local crisis helpline or 116 123",
-        "emergency": "Emergency services: 112",
-        "additional": "Contact local mental health services",
+        "crisis_line": "Ask a trusted adult to help you find local support.",
+        "suicide_line": "Please reach out to a trusted adult right now.",
+        "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
+        "additional": "Contact local mental health services through a trusted adult.",
     },
     "DEFAULT": US_CRISIS_RESOURCES,  # 🇺🇸 Changed default to US for beta families
 }
