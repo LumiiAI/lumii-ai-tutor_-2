@@ -3691,13 +3691,23 @@ if len(st.session_state.messages) == 0:
 # Display chat history with enhanced memory and safety indicators
 mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
 for i, message in enumerate(st.session_state.messages):
-    with st.chat_message(message["role"]):
-        if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
-            render_message_card(
-                priority=message.get("priority", ""),
-                text=message.get("content", ""),
-                key=f"history_{i}"
-            )
+    if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
+        render_message_card(
+            priority=message.get("priority", ""),
+            text=message.get("content", ""),
+            key=f"history_{i}"
+        )
+    elif message["role"] == "user":
+        # Render user messages with custom card
+        _render_card(
+            body=message.get("content", ""),
+            variant="input",
+            key=f"user_{i}"
+        )
+    else:
+        # For other messages, use default chat display
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
         else:
             st.markdown(message["content"])# Chat input with enhanced safety processing
 prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
