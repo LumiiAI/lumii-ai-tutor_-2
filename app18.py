@@ -2320,63 +2320,57 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
 
 
 def _render_card(title=None, body: str = "", more=None, chips=None, variant: str = "", key=None):
-    # Safe escaping for user/model text so HTML special chars don't break layout
-    from html import escape as _esc
-    from textwrap import dedent
+    """
+    Renders a single chat bubble that wraps the left icon and the text.
+    Avoids Markdown code-block issues by emitting HTML with NO leading spaces.
+    """
     import streamlit as st
+    from html import escape as _esc
 
-    # Layout: a single bubble that contains both the icon and the text
-    row_style = "display:flex; align-items:flex-start; margin:8px 0;"
-    bubble_style = (
-        "display:flex; gap:10px; align-items:flex-start;"
-        "width:100%; border-radius:12px; padding:12px 16px; font-size:15px;"
-    )
+    # Styles
+    row_style = "display:flex;align-items:flex-start;margin:8px 0;"
+    bubble_style = ("display:flex;gap:10px;align-items:flex-start;"
+                    "width:100%;border-radius:12px;padding:12px 16px;font-size:15px;")
 
-    # Pick icon + colors based on variant
-    if variant == "input":                 # user message
-        icon_bg = "#FF6B6B"               # red square
-        icon = "👦"
-        bubble_bg = "#f5f6f8"             # light gray like your input bubble
-    elif variant == "reply":               # Lumii reply
-        icon_bg = "#FFD469"               # yellow square
-        icon = "🤖"
-        bubble_bg = "#eafaf1"             # light green
-    else:                                  # fallback
-        icon_bg = "#ddd"
-        icon = "…"
-        bubble_bg = "#fff"
+    # Variant -> colors/icons
+    if variant == "input":          # user message
+        icon_bg, icon, bubble_bg = "#FF6B6B", "👦", "#f5f6f8"
+    elif variant == "reply":        # assistant reply
+        icon_bg, icon, bubble_bg = "#FFD469", "🤖", "#eafaf1"
+    else:
+        icon_bg, icon, bubble_bg = "#ddd", "…", "#fff"
 
-    # Optional bits (escaped)
-    title_html = f'<div style="font-weight:600; margin-bottom:6px;">{_esc(str(title))}</div>' if title else ""
+    # Optional pieces (escaped)
+    title_html = f'<div style="font-weight:600;margin-bottom:6px;">{_esc(str(title))}</div>' if title else ""
     chips_html = ""
     if chips:
-        chips_html = (
-            '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">'
-            + "".join(
-                f'<span style="border:1px solid #e5e7eb; border-radius:999px; padding:2px 8px; font-size:12px;">{_esc(str(c))}</span>'
-                for c in chips
-            )
-            + "</div>"
-        )
-    more_html = f'<div style="margin-top:8px; font-size:13px; opacity:0.8;">{_esc(str(more))}</div>' if more else ""
+        chips_html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + \
+                     "".join(
+                         f'<span style="border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;font-size:12px;">{_esc(str(c))}</span>'
+                         for c in chips
+                     ) + '</div>'
+    more_html = f'<div style="margin-top:8px;font-size:13px;opacity:0.8;">{_esc(str(more))}</div>' if more else ""
 
-    # Compose safe body (preserve line breaks)
-    body_html = f'<div style="flex:1; white-space: pre-wrap;">{_esc(body)}</div>'
+    # Message body (escaped; preserves line breaks)
+    body_html = f'<div style="flex:1;white-space:pre-wrap;">{_esc(body)}</div>'
 
-    # IMPORTANT: no leading spaces before tags -> avoid Markdown code-block formatting
-    html_block = dedent(f"""\
-    <div style="{row_style}">
-    <div style="background:{bubble_bg}; {bubble_style}">
-    <div style="width:32px;height:32px;border-radius:8px;background:{icon_bg};display:flex;align-items:center;justify-content:center;font-size:18px;">{icon}</div>
-    <div style="flex:1;">
-    {title_html}
-    {body_html}
-    {chips_html}
-    {more_html}
-    </div>
-    </div>
-    </div>
-    """)
+    # Build HTML with NO indentation (critical to avoid Markdown code blocks)
+    parts = []
+    parts.append(f'<div style="{row_style}">')
+    parts.append(f'<div style="background:{bubble_bg};{bubble_style}">')
+    parts.append(f'<div style="width:32px;height:32px;border-radius:8px;background:{icon_bg};display:flex;align-items:center;justify-content:center;font-size:18px;">{icon}</div>')
+    parts.append('<div style="flex:1;">')
+    if title_html:
+        parts.append(title_html)
+    parts.append(body_html)
+    if chips_html:
+        parts.append(chips_html)
+    if more_html:
+        parts.append(more_html)
+    parts.append('</div>')
+    parts.append('</div>')
+    parts.append('</div>')
+    html_block = "\n".join(parts)
 
     st.markdown(html_block, unsafe_allow_html=True)
 
