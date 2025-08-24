@@ -56,6 +56,22 @@ from datetime import datetime
 import requests
 import streamlit as st
 
+# === Safety taxonomy fallbacks (prevent NameError if constants are missing) ===
+# Place this right after imports.
+for _name in [
+    "_FAMILY_PATTERNS",
+    "_HEALTH_PATTERNS",
+    "_SEXUAL_PATTERNS",
+    "_DRUGS_PATTERNS",
+    "_WEAPONS_PATTERNS",
+    "_GAMBLING_PATTERNS",
+    "_POLITICS_PATTERNS",
+    "_RELIGION_PATTERNS",
+]:
+    if _name not in globals():
+        globals()[_name] = []  # empty list fallback → avoids NameError without altering routing logic
+
+
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
 GRADE_RX: Final[Pattern[str]] = re.compile(
