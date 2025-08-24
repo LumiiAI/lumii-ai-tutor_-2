@@ -1450,12 +1450,13 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
         return False, None, None
 
     # NEW: Suicide note detection
-    \1    try:
-        import streamlit as st  # type: ignore
-        st.session_state[\"__harm_lock_suicide_note\"] = True
-    except Exception:
-        pass
-    return True, \"BLOCKED_HARMFUL\", \"suicide_note_request\"
+    if detect_suicide_note_request(message):
+        try:
+            import streamlit as st  # type: ignore
+            st.session_state["__harm_lock_suicide_note"] = True
+        except Exception:
+            pass
+        return True, "BLOCKED_HARMFUL", "suicide_note_request"
 
     # FIX #2: Move the acceptance check AFTER all crisis checks
     if is_accepting_offer(message):
