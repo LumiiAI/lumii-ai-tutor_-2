@@ -1320,23 +1320,21 @@ def render_header_nav(logo_path:str=None):
 # call theme CSS now based on toggle
 _apply_theme_css(high_contrast=st.session_state.get("ui_high_contrast", False))
 # ============================================================================
-  # type: ignore
-        recent_msgs = st.session_state.get("messages", []) or []
-        parts = []
-        for it in recent_msgs[-8:]:
-            try:
-                if isinstance(it, dict):
-                    c = it.get("content") or it.get("text") or it.get("message") or ""
-                elif isinstance(it, (list, tuple)) and it:
-                    c = str(it[-1])
-                else:
-                    c = str(it)
-                parts.append(str(c))
-            except Exception:
-                pass
-        combined_context = (" \n ".join(parts + [message_lower])).lower()
+# type: ignore
+recent_msgs = st.session_state.get("messages", []) or []
+parts = []
+for it in recent_msgs[-8:]:
+    try:
+        if isinstance(it, dict):
+            c = it.get("content") or it.get("text") or it.get("message") or ""
+        elif isinstance(it, (list, tuple)) and it:
+            c = str(it[-1])
+        else:
+            c = str(it)
+        parts.append(str(c))
     except Exception:
-        combined_context = message_lower
+        pass
+combined_context = (" \n ".join(parts + [message_lower])).lower()
 
     # If user downplays with 'it's only/just fiction' but prior context had suicide+note, still trigger
     fiction_softeners = re.search(r"\b(?:only|just)\s+fiction\b", message_lower) or re.search(r"don['\u2019`]?t\s+worry.*?fiction", message_lower)
