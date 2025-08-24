@@ -2319,51 +2319,47 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title=None, body: str = "", more=None, chips=None, variant: str = "", key=None):
-    import streamlit as st
-    from html import escape as _esc
+def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
+    row_style = (
+        "display:flex; align-items:flex-start; gap:10px; "
+        "margin:8px 0; "
+    )
 
-    # Default row container
-    row_style = "display:flex;align-items:flex-start;margin:8px 0;"
+    # Shared bubble style
+    bubble_style = (
+        "flex:1; border-radius:12px; padding:12px 16px; font-size:15px;"
+    )
 
-    # Variant -> bubble background + icon
-    if variant == "input":          # user
-        bubble_bg, icon, icon_bg = "#f5f6f8", "👦", "#FF6B6B"
-    elif variant == "reply":        # assistant
-        bubble_bg, icon, icon_bg = "#eafaf1", "🤖", "#FFD469"
-    else:
-        bubble_bg, icon, icon_bg = "#fff", "…", "#ddd"
+    if variant == "input":   # user message
+        icon_bg = "#FF6B6B"  # red square
+        icon = "👦"          # or your current kid head emoji / svg
+        bubble_bg = "#f5f6f8"
+    elif variant == "reply": # Lumii reply
+        icon_bg = "#FFD469"  # yellow square
+        icon = "🤖"          # robot emoji (or your robot svg)
+        bubble_bg = "#eafaf1"
+    else:                   # default/fallback
+        icon_bg = "#ddd"
+        icon = "…"
+        bubble_bg = "#fff"
 
-    # Optional extras
-    title_html = f'<div style="font-weight:600;margin-bottom:6px;">{_esc(str(title))}</div>' if title else ""
-    chips_html = ""
-    if chips:
-        chips_html = (
-            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">'
-            + "".join(
-                f'<span style="border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;font-size:12px;">{_esc(str(c))}</span>'
-                for c in chips
-            )
-            + "</div>"
-        )
-    more_html = f'<div style="margin-top:8px;font-size:13px;opacity:0.8;">{_esc(str(more))}</div>' if more else ""
-
-    body_html = f'<div style="flex:1;white-space:pre-wrap;">{_esc(body)}</div>'
-
-    # One unified bubble: green/gray wraps both icon + text
-    html_block = f"""
-<div style="{row_style} background:{bubble_bg};border-radius:12px;padding:12px 16px;width:100%;font-size:15px;">
-  <div style="width:32px;height:32px;border-radius:8px;background:{icon_bg};display:flex;align-items:center;justify-content:center;font-size:18px;margin-right:10px;">{icon}</div>
-  <div style="flex:1;">
-    {title_html}
-    {body_html}
-    {chips_html}
-    {more_html}
-  </div>
-</div>
-"""
-
-    st.markdown(html_block, unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style="{row_style}">
+            <div style="width:32px;height:32px;
+                        border-radius:8px;
+                        background:{icon_bg};
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        font-size:18px;">{icon}</div>
+            <div style="background:{bubble_bg}; {bubble_style}">
+                {body}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 def render_reply_card(text: str, key: str = "reply"):
@@ -3696,26 +3692,14 @@ if len(st.session_state.messages) == 0:
 mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
 for i, message in enumerate(st.session_state.messages):
     if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
-        # Suppress Streamlit's default assistant avatar
-        with st.chat_message("assistant"):
-            render_message_card(
-                priority=message.get("priority", ""),
-                text=message.get("content", ""),
-                key=f"history_{i}"
-            )
-    elif message["role"] == "assistant":
-        with st.chat_message("assistant"):
-            st.markdown(message["content"])
+        render_message_card(
+            priority=message.get("priority", ""),
+            text=message.get("content", ""),
+            key=f"history_{i}"
+        )
     else:
-        with st.chat_message("user"):
-            st.markdown(message["content"])
-
-# Chat input with enhanced safety processing
-prompt_placeholder = (
-    "What would you like to learn about in math, physics, chemistry, geography, or history today?"
-    if not st.session_state.student_name
-    else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
-)
+        st.markdown(message["content"])# Chat input with enhanced safety processing
+prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
 
 # --- Input gating: crisis lock first, then behavior timeout ---
 
@@ -3734,17 +3718,15 @@ else:
     if prompt := st.chat_input(prompt_placeholder):
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        st.markdown(prompt)
 
         
         # STEP 1: GLOBAL CRISIS GUARD FIRST (HIGHEST PRIORITY)
         is_crisis, crisis_intervention = global_crisis_guard(prompt)
         if is_crisis:
             # IMMEDIATE TERMINATION - display crisis intervention
-            with st.chat_message("assistant"):
-                st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
-                st.markdown('<div class="safety-badge">🚨 SAFETY INTERVENTION - Conversation Ended</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="safety-badge">🚨 SAFETY INTERVENTION - Conversation Ended</div>', unsafe_allow_html=True)
             
             # Add to messages and stop processing
             st.session_state.messages.append({
@@ -3763,9 +3745,8 @@ else:
             student_age = detect_age_from_message_and_history(prompt)
             response = handle_polite_decline(student_age, st.session_state.student_name)
             
-            with st.chat_message("assistant"):
-                st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
-                st.markdown('<div class="friend-badge">😊 Lumii\'s Understanding</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="friend-badge">😊 Lumii\'s Understanding</div>', unsafe_allow_html=True)
             
             st.session_state.messages.append({
                 "role": "assistant", 
@@ -3784,57 +3765,56 @@ else:
             is_distressed = detect_emotional_distress(prompt)
         
             # Generate response using enhanced memory-safe system
-            with st.chat_message("assistant"):
-                with st.spinner("🧠 Thinking safely with full memory..."):
-                    time.sleep(1)
-                    response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
-                        prompt, priority, tool, student_age, is_distressed, None, safety_trigger
-                    )
+            with st.spinner("🧠 Thinking safely with full memory..."):
+                time.sleep(1)
+                response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
+                    prompt, priority, tool, student_age, is_distressed, None, safety_trigger
+                )
         
-                    # 🚨 Crisis, relapse, or immediate termination → show once, record placeholder, lock input, and stop
-                    if response_priority in ("crisis", "crisis_return", "immediate_termination"):
-                       st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
-                       st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
+                # 🚨 Crisis, relapse, or immediate termination → show once, record placeholder, lock input, and stop
+                if response_priority in ("crisis", "crisis_return", "immediate_termination"):
+                   st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
+                   st.markdown(f'<div class="safety-badge">🚨 Lumii\'s Crisis Response</div>', unsafe_allow_html=True)
 
-                       st.session_state.messages.append({
-                           "role": "system",
-                           "content": "[crisis intervention issued]",
-                           "priority": "crisis" if response_priority != "immediate_termination" else "immediate_termination",
-                           "tool_used": "CRISIS",
-                           "was_distressed": True,
-                           "student_age_detected": student_age,
-                           "safety_triggered": True
-                        })
+                   st.session_state.messages.append({
+                       "role": "system",
+                       "content": "[crisis intervention issued]",
+                       "priority": "crisis" if response_priority != "immediate_termination" else "immediate_termination",
+                       "tool_used": "CRISIS",
+                       "was_distressed": True,
+                       "student_age_detected": student_age,
+                       "safety_triggered": True
+                    })
 
-                       # Enable post-crisis monitoring and lock input
-                       st.session_state["post_crisis_monitoring"] = True
-                       st.session_state["locked_after_crisis"] = True
-                       st.stop()
-
-        
-                    # --- Greeting injection: first safe reply uses grade ONLY if explicit/confirmed ---
-                    if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
-                        prefix = build_grade_prefix(prompt)  # uses explicit grade or previously confirmed grade only
-                        if prefix:
-                            response = f"{prefix}{response}"
+                   # Enable post-crisis monitoring and lock input
+                   st.session_state["post_crisis_monitoring"] = True
+                   st.session_state["locked_after_crisis"] = True
+                   st.stop()
 
         
-                    # --- Non-crisis path continues normally ---
-                    # Check for duplicates and add variation if needed
-                    if is_duplicate_response(response):
-                        response = add_variation_to_response(response)
+                # --- Greeting injection: first safe reply uses grade ONLY if explicit/confirmed ---
+                if st.session_state.get("interaction_count", 0) == 0 and response_priority in ("general", "emotional", "organization", "math", "confusion"):
+                    prefix = build_grade_prefix(prompt)  # uses explicit grade or previously confirmed grade only
+                    if prefix:
+                        response = f"{prefix}{response}"
+
         
-                    # Add natural follow-up if appropriate
-                    follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
-                    if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
-                        response += follow_up
+                # --- Non-crisis path continues normally ---
+                # Check for duplicates and add variation if needed
+                if is_duplicate_response(response):
+                    response = add_variation_to_response(response)
         
-                    # Display with appropriate styling (cards UI)
-                    render_message_card(
-                        priority=response_priority,
-                        text=response,
-                        key=f"fresh_{st.session_state.get('interaction_count', 0)}"
-                    )
+                # Add natural follow-up if appropriate
+                follow_up = generate_natural_follow_up(tool_used, priority, is_distressed)
+                if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
+                    response += follow_up
+        
+                # Display with appropriate styling (cards UI)
+                render_message_card(
+                    priority=response_priority,
+                    text=response,
+                    key=f"fresh_{st.session_state.get('interaction_count', 0)}"
+                )
 
 # Add assistant response to chat with enhanced metadata (non-crisis only)
             st.session_state.messages.append({
