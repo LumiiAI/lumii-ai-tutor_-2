@@ -2319,32 +2319,31 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title: Optional[str], body: str, more: Optional[str], chips: List[str], variant: str, why: Optional[str] = None, key: str = "card"):
-    with st.container():
-        st.markdown('<div class="cards-wrap">', unsafe_allow_html=True)
-        # Title + body
-        st.markdown(f'<div class="card {variant}">', unsafe_allow_html=True)
-        if title:
-            st.markdown(f'<div class="title">{title}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="body">{body}</div>', unsafe_allow_html=True)
+def _render_card(title, body, more=None, chips=None, variant="", key=None):
+    base_style = """
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin: 6px 0;
+        font-size: 15px;
+    """
 
-        # Why? expander (Decline card)
-        if why is not None and variant == "decline":
-            with st.expander("Why?"):
-                st.markdown(why)
+    # Set colors depending on type
+    if variant == "input":     # user input (already grey)
+        bg_color = "#f5f6f8"   # same as your input message color
+    elif variant == "reply":   # Lumii’s reply
+        bg_color = "#eafaf1"   # light green (adjust hex to taste)
+    else:
+        bg_color = "#ffffff"   # default white
 
-        # Show more (progressive disclosure)
-        if more:
-            with st.expander("Show more"):
-                st.markdown(more)
+    st.markdown(
+        f"""
+        <div style="background-color:{bg_color}; {base_style}">
+            {body}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        # Chips + hint (non-submitting)
-        if chips:
-            clicked = _chips(chips, key_prefix=f"{key}_chips")
-            if clicked:
-                st.caption(f"Suggestion: {clicked}")
-        st.markdown("</div>", unsafe_allow_html=True)  # end .card
-        st.markdown("</div>", unsafe_allow_html=True)  # end .cards-wrap
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
