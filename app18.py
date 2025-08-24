@@ -36,6 +36,18 @@ import json
 import os
 import unicodedata
 import re
+
+# === Fallback safety pattern set to avoid NameError in detect_non_educational_topics ===
+try:
+    _HEALTH_PATTERNS
+except NameError:
+    import re as _re_fallback
+    _HEALTH_PATTERNS = [
+        _re_fallback.compile(r"\b(therapy|therapist|counselor|psychiatrist|psychologist)\b", _re_fallback.IGNORECASE),
+        _re_fallback.compile(r"\b(antidepressant|ssri|prozac|sertraline|fluoxetine)\b", _re_fallback.IGNORECASE),
+        _re_fallback.compile(r"\b(diagnos(e|is)|symptom|treatment|medication|side\s*effect)\b", _re_fallback.IGNORECASE),
+        _re_fallback.compile(r"\b(mental\s*health|depression|anxiety|ptsd|bipolar|schizophrenia)\b", _re_fallback.IGNORECASE),
+    ]
 import time
 import uuid
 import unicodedata  # FIX #3: Added for Unicode normalization
