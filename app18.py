@@ -3716,14 +3716,14 @@ mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_sho
 for i, message in enumerate(st.session_state.messages):
     if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
         # Suppress Streamlit's default assistant avatar
-        with st.chat_message("assistant", avatar=""):
+        with st.chat_message("assistant"):
             render_message_card(
                 priority=message.get("priority", ""),
                 text=message.get("content", ""),
                 key=f"history_{i}"
             )
     elif message["role"] == "assistant":
-        with st.chat_message("assistant", avatar=""):
+        with st.chat_message("assistant"):
             st.markdown(message["content"])
     else:
         with st.chat_message("user"):
@@ -3761,7 +3761,7 @@ else:
         is_crisis, crisis_intervention = global_crisis_guard(prompt)
         if is_crisis:
             # IMMEDIATE TERMINATION - display crisis intervention
-            with st.chat_message("assistant", avatar=""):
+            with st.chat_message("assistant"):
                 st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
                 st.markdown('<div class="safety-badge">🚨 SAFETY INTERVENTION - Conversation Ended</div>', unsafe_allow_html=True)
             
@@ -3782,7 +3782,7 @@ else:
             student_age = detect_age_from_message_and_history(prompt)
             response = handle_polite_decline(student_age, st.session_state.student_name)
             
-            with st.chat_message("assistant", avatar=""):
+            with st.chat_message("assistant"):
                 st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown('<div class="friend-badge">😊 Lumii\'s Understanding</div>', unsafe_allow_html=True)
             
@@ -3803,7 +3803,7 @@ else:
             is_distressed = detect_emotional_distress(prompt)
         
             # Generate response using enhanced memory-safe system
-            with st.chat_message("assistant", avatar=""):
+            with st.chat_message("assistant"):
                 with st.spinner("🧠 Thinking safely with full memory..."):
                     time.sleep(1)
                     response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
