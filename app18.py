@@ -44,13 +44,6 @@ from datetime import datetime
 import requests
 import streamlit as st
 
-# Hide Streamlit's default chat avatar so only our custom one shows
-st.markdown("""
-<style>
-[data-testid="stChatMessageAvatar"] { display: none !important; }
-</style>
-""", unsafe_allow_html=True)
-
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
 GRADE_RX: Final[Pattern[str]] = re.compile(
@@ -1442,7 +1435,7 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
     except Exception:
         pass
 
-    # 🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering.
+    """🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering."""
     ml = normalize_message(message).lower().strip()
 
     # 🚨 CRITICAL FIX: Check explicit crisis FIRST, before any academic bypass
@@ -2326,81 +2319,42 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
-    row_style = (
-        "display:flex; align-items:flex-start; gap:10px; "
-        "margin:8px 0; "
-    )
+def _render_card(title: Optional[str], body: str, more: Optional[str], chips: List[str], variant: str, why: Optional[str] = None, key: str = "card"):
+    with st.container():
+        st.markdown('<div class="cards-wrap">', unsafe_allow_html=True)
+        # Title + body
+        st.markdown(f'<div class="card {variant}">', unsafe_allow_html=True)
+        if title:
+            st.markdown(f'<div class="title">{title}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="body">{body}</div>', unsafe_allow_html=True)
 
-    # Shared bubble style
-    bubble_style = (
-        "flex:1; border-radius:12px; padding:12px 16px; font-size:15px;"
-    )
+        # Why? expander (Decline card)
+        if why is not None and variant == "decline":
+            with st.expander("Why?"):
+                st.markdown(why)
 
-    if variant == "input":   # user message (already correct)
-        icon_bg = "#FF6B6B"  # red square
-        icon = "👦"
-        bubble_bg = "#f5f6f8"
-    elif variant == "reply": # assistant reply (make it MATCH input layout)
-        icon_bg = "#FFD469"  # yellow square
-        icon = "🤖"          # your robot avatar
-        bubble_bg = "#eafaf1"
-    else:                    # fallback
-        icon_bg = "#ddd"
-        icon = "…"
-        bubble_bg = "#fff"
+        # Show more (progressive disclosure)
+        if more:
+            with st.expander("Show more"):
+                st.markdown(more)
 
-    # For *input* and *reply* we want the avatar INSIDE the bubble
-    if variant in ("input", "reply"):
-        st.markdown(
-            f"""
-            <div style="{row_style}">
-                <div style="background:{bubble_bg}; {bubble_style}">
-                    <div style="display:flex; align-items:flex-start; gap:10px;">
-                        <div style="width:32px;height:32px;
-                                    border-radius:8px;
-                                    background:{icon_bg};
-                                    display:flex;
-                                    align-items:center;
-                                    justify-content:center;
-                                    font-size:18px;">{icon}</div>
-                        <div style="flex:1;">{body}</div>
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    else:
-        # Avatar outside bubble (kept for any other variants you might use)
-        st.markdown(
-            f"""
-            <div style="{row_style}">
-                <div style="width:32px;height:32px;
-                            border-radius:8px;
-                            background:{icon_bg};
-                            display:flex;
-                            align-items:center;
-                            justify-content:center;
-                            font-size:18px;">{icon}</div>
-                <div style="background:{bubble_bg}; {bubble_style}">
-                    {body}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
+        # Chips + hint (non-submitting)
+        if chips:
+            clicked = _chips(chips, key_prefix=f"{key}_chips")
+            if clicked:
+                st.caption(f"Suggestion: {clicked}")
+        st.markdown("</div>", unsafe_allow_html=True)  # end .card
+        st.markdown("</div>", unsafe_allow_html=True)  # end .cards-wrap
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
-    body = ("\n\n".join([x for x in [head, tail] if x])).strip() or " "
+    body = head if head else "Here’s the short answer. Want the ‘why’ next?"
     _render_card(
         title=None,
         body=body,
-        more=None,
-        chips=None,
-        variant="reply",   # <-- important
+        more=tail,
+        chips=["Break it down", "Example"],
+        variant="",
         key=key,
     )
 
