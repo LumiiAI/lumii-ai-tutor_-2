@@ -3076,8 +3076,6 @@ with main_col:
                 pass
 with rail_col:
     render_quick_actions()
-with rail_col:
-    render_quick_actions()
 
 subject = st.session_state.get('selected_subject')
 example = st.session_state.get('prefill_example', '')
