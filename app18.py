@@ -2319,29 +2319,48 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
+def _render_card(title=None, body: str = "", more=None, chips=None, variant: str = "", key=None):
+    # Escape user/model text safely so HTML special chars don't break the layout
+    from html import escape as _esc
+
+    # Layout: a single bubble that contains both the icon and the text
     row_style = (
-    "display:flex; align-items:flex-start; margin:8px 0;"
+        "display:flex; align-items:flex-start; margin:8px 0;"
     )
 
     bubble_style = (
-    "display:flex; gap:10px; align-items:flex-start;"
-    "width:100%; border-radius:12px; padding:12px 16px; font-size:15px;"
+        "display:flex; gap:10px; align-items:flex-start;"
+        "width:100%; border-radius:12px; padding:12px 16px; font-size:15px;"
     )
 
+    # Pick icon + colors based on variant
     if variant == "input":   # user message
-        icon_bg = "#FF6B6B"  # red square
-        icon = "👦"          # or your current kid head emoji / svg
-        bubble_bg = "#f5f6f8"
-    elif variant == "reply": # Lumii reply
-        icon_bg = "#FFD469"  # yellow square
-        icon = "🤖"          # robot emoji (or your robot svg)
-        bubble_bg = "#eafaf1"
-    else:                   # default/fallback
+        icon_bg = "#FF6B6B"      # red square
+        icon = "👦"              # user/kid icon (adjust to taste)
+        bubble_bg = "#f5f6f8"    # light gray like your input bubble
+    elif variant == "reply":      # Lumii reply
+        icon_bg = "#FFD469"       # yellow square
+        icon = "🤖"               # robot
+        bubble_bg = "#eafaf1"     # light green
+    else:                         # fallback
         icon_bg = "#ddd"
         icon = "…"
         bubble_bg = "#fff"
 
+    # Optional title/chips/more rendering (safe and minimal)
+    title_html = f'<div style="font-weight:600; margin-bottom:6px;">{_esc(str(title))}</div>' if title else ""
+    chips_html = ""
+    if chips:
+        chips_html = '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">' + \
+                     "".join([f'<span style="border:1px solid #e5e7eb; border-radius:999px; padding:2px 8px; font-size:12px;">{_esc(str(c))}</span>' for c in chips]) + \
+                     '</div>'
+    more_html = f'<div style="margin-top:8px; font-size:13px; opacity:0.8;">{_esc(str(more))}</div>' if more else ""
+
+    # Compose safe body (preserve line breaks)
+    body_html = f'<div style="flex:1; white-space: pre-wrap;">{_esc(body)}</div>'
+
+    # Render: bubble wraps icon + title/body/extras
+    import streamlit as st
     st.markdown(
         f"""
         <div style="{row_style}">
@@ -2353,7 +2372,12 @@ def _render_card(title=None, body:str="", more=None, chips=None, variant:str="",
                             align-items:center;
                             justify-content:center;
                             font-size:18px;">{icon}</div>
-                <div style="flex:1;">{body}</div>
+                <div style="flex:1;">
+                    {title_html}
+                    {body_html}
+                    {chips_html}
+                    {more_html}
+                </div>
             </div>
         </div>
         """,
