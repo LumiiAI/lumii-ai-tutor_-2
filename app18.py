@@ -3707,8 +3707,9 @@ for i, message in enumerate(st.session_state.messages):
         # For other messages, use default chat display
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-        else:
-            st.markdown(message["content"])# Chat input with enhanced safety processing
+
+# Chat input with enhanced safety processing
+            
 prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
 
 # --- Input gating: crisis lock first, then behavior timeout ---
