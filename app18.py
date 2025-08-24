@@ -2348,12 +2348,12 @@ def _render_card(title: Optional[str], body: str, more: Optional[str], chips: Li
 
 def render_reply_card(text: str, key: str = "reply"):
     head, tail = _excerpt_2_lines(text)
-    body = head if head else "Here’s the short answer. Want the ‘why’ next?"
+    body = head if head else "Here’s the short answer."
     _render_card(
         title=None,
         body=body,
-        more=tail,
-        chips=["Break it down", "Example"],
+        more=None,
+        chips=None,
         variant="",
         key=key,
     )
