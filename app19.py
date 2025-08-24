@@ -780,7 +780,6 @@ def detect_suicide_note_request(message: str) -> bool:
 
     return False
 
-IMMEDIATE_TERMINATION_PATTERNS (List[Pattern[str]])
 # - FORBIDDEN_INPUT_PATTERNS (List[Pattern[str]])
 # - FORBIDDEN_RESPONSE_PATTERNS (List[Pattern[str]])
 # - is_accepting_offer(message: str) -> bool
