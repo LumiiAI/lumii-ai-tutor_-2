@@ -2321,13 +2321,12 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
 
 def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
     row_style = (
-        "display:flex; align-items:flex-start; gap:10px; "
-        "margin:8px 0; "
+    "display:flex; align-items:flex-start; margin:8px 0;"
     )
 
-    # Shared bubble style
     bubble_style = (
-        "flex:1; border-radius:12px; padding:12px 16px; font-size:15px;"
+    "display:flex; gap:10px; align-items:flex-start;"
+    "width:100%; border-radius:12px; padding:12px 16px; font-size:15px;"
     )
 
     if variant == "input":   # user message
@@ -2346,15 +2345,15 @@ def _render_card(title=None, body:str="", more=None, chips=None, variant:str="",
     st.markdown(
         f"""
         <div style="{row_style}">
-            <div style="width:32px;height:32px;
-                        border-radius:8px;
-                        background:{icon_bg};
-                        display:flex;
-                        align-items:center;
-                        justify-content:center;
-                        font-size:18px;">{icon}</div>
             <div style="background:{bubble_bg}; {bubble_style}">
-                {body}
+                <div style="width:32px;height:32px;
+                            border-radius:8px;
+                            background:{icon_bg};
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:18px;">{icon}</div>
+                <div style="flex:1;">{body}</div>
             </div>
         </div>
         """,
@@ -3691,16 +3690,27 @@ if len(st.session_state.messages) == 0:
 # Display chat history with enhanced memory and safety indicators
 mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
 for i, message in enumerate(st.session_state.messages):
-    with st.chat_message(message["role"]):
-        if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
+    if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
+        # Suppress Streamlit's default assistant avatar
+        with st.chat_message("assistant", avatar=""):
             render_message_card(
                 priority=message.get("priority", ""),
                 text=message.get("content", ""),
                 key=f"history_{i}"
             )
-        else:
-            st.markdown(message["content"])# Chat input with enhanced safety processing
-prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
+    elif message["role"] == "assistant":
+        with st.chat_message("assistant", avatar=""):
+            st.markdown(message["content"])
+    else:
+        with st.chat_message("user"):
+            st.markdown(message["content"])
+
+# Chat input with enhanced safety processing
+prompt_placeholder = (
+    "What would you like to learn about in math, physics, chemistry, geography, or history today?"
+    if not st.session_state.student_name
+    else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
+)
 
 # --- Input gating: crisis lock first, then behavior timeout ---
 
@@ -3727,7 +3737,7 @@ else:
         is_crisis, crisis_intervention = global_crisis_guard(prompt)
         if is_crisis:
             # IMMEDIATE TERMINATION - display crisis intervention
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar=""):
                 st.markdown(f'<div class="safety-response">{crisis_intervention}</div>', unsafe_allow_html=True)
                 st.markdown('<div class="safety-badge">🚨 SAFETY INTERVENTION - Conversation Ended</div>', unsafe_allow_html=True)
             
@@ -3748,7 +3758,7 @@ else:
             student_age = detect_age_from_message_and_history(prompt)
             response = handle_polite_decline(student_age, st.session_state.student_name)
             
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar=""):
                 st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
                 st.markdown('<div class="friend-badge">😊 Lumii\'s Understanding</div>', unsafe_allow_html=True)
             
@@ -3769,7 +3779,7 @@ else:
             is_distressed = detect_emotional_distress(prompt)
         
             # Generate response using enhanced memory-safe system
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar=""):
                 with st.spinner("🧠 Thinking safely with full memory..."):
                     time.sleep(1)
                     response, tool_used, response_priority, memory_status = generate_response_with_memory_safety(
