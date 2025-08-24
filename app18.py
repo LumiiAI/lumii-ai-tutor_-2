@@ -2320,28 +2320,33 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
 
 
 def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
-    # Same bubble layout for input + reply, color only differs
     base_style = (
         "border-radius: 12px;"
         "padding: 12px 16px;"
         "margin: 6px 0;"
         "font-size: 15px;"
+        "display: flex;"
+        "align-items: flex-start;"
+        "gap: 8px;"
     )
 
-    if variant == "input":          # user message
-        bg_color = "#f5f6f8"        # your grey bubble
-    elif variant == "reply":        # Lumii message
-        bg_color = "#eafaf1"        # light green bubble
+    if variant == "input":
+        bg_color = "#f5f6f8"
+        icon = "🧑"   # or whatever you used for user
+    elif variant == "reply":
+        bg_color = "#eafaf1"
+        icon = "🤖"   # robot for Lumii
     else:
-        bg_color = "#ffffff"        # default
+        bg_color = "#ffffff"
+        icon = ""
 
-    # Title (optional)
-    if title:
-        st.markdown(f"<div style='margin:6px 0; font-weight:600;'>{title}</div>", unsafe_allow_html=True)
-
-    # Bubble
     st.markdown(
-        f"<div style='background-color:{bg_color}; {base_style}'>{body}</div>",
+        f"""
+        <div style="background-color:{bg_color}; {base_style}">
+            <div style="flex-shrink:0; font-size:20px;">{icon}</div>
+            <div style="flex:1;">{body}</div>
+        </div>
+        """,
         unsafe_allow_html=True
     )
 
