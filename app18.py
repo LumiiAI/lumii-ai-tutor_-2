@@ -2319,7 +2319,7 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
         return st.session_state.get(state_key)
 
 
-def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
+def _render_card(title=None, body: str = "", more=None, chips=None, variant: str = "", key=None, why: str | None = None):
     # Shared bubble style
     bubble_style = (
         "display:flex; align-items:flex-start; gap:12px; "
