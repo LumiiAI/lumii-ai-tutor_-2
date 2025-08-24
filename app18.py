@@ -2337,21 +2337,21 @@ def _render_card(title=None, body:str="", more=None, chips=None, variant:str="",
         "flex:1; border-radius:12px; padding:12px 16px; font-size:15px;"
     )
 
-    if variant == "input":   # user message
+    if variant == "input":   # user message (already correct)
         icon_bg = "#FF6B6B"  # red square
-        icon = "👦"          # boy avatar
+        icon = "👦"
         bubble_bg = "#f5f6f8"
-    elif variant == "reply": # Lumii reply
+    elif variant == "reply": # assistant reply (make it MATCH input layout)
         icon_bg = "#FFD469"  # yellow square
-        icon = "🤖"          # robot avatar (or your robot image)
+        icon = "🤖"          # your robot avatar
         bubble_bg = "#eafaf1"
-    else:                   # default/fallback
+    else:                    # fallback
         icon_bg = "#ddd"
         icon = "…"
         bubble_bg = "#fff"
 
-    # For reply and input → avatar inside the bubble
-    if variant in ("reply", "input"):
+    # For *input* and *reply* we want the avatar INSIDE the bubble
+    if variant in ("input", "reply"):
         st.markdown(
             f"""
             <div style="{row_style}">
@@ -2372,7 +2372,7 @@ def _render_card(title=None, body:str="", more=None, chips=None, variant:str="",
             unsafe_allow_html=True
         )
     else:
-        # Fallback layout → avatar outside the bubble
+        # Avatar outside bubble (kept for any other variants you might use)
         st.markdown(
             f"""
             <div style="{row_style}">
