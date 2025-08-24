@@ -2047,74 +2047,319 @@ if not st.session_state.agreed_to_terms:
 # MAIN APP CONTINUES HERE (AFTER DISCLAIMER AGREEMENT)
 # =============================================================================
 
-# === Global UI polish (visual-only; no logic changes) ========================
-_APP_CSS = """
+# Custom CSS for beautiful styling (copy unchanged; extracted into a constant)
+_APP_CSS: Final[str] = """
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #4A90E2;
+        text-align: center;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+    .subtitle {
+        font-size: 1.3rem;
+        color: #666;
+        text-align: center;
+        margin-bottom: 2rem;
+        font-style: italic;
+    }
+    .emotional-response {
+        background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #e55a5a;
+    }
+    .concerning-response {
+        background: linear-gradient(135deg, #ff8c42, #ffa726);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #ff7043;
+    }
+    .safety-response {
+        background: linear-gradient(135deg, #ff4444, #ff6666);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #cc0000;
+        font-weight: bold;
+    }
+    .behavior-response {
+        background: linear-gradient(135deg, #9c27b0, #ba68c8);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #7b1fa2;
+        font-weight: bold;
+    }
+    .educational-boundary-response {
+        background: linear-gradient(135deg, #795548, #a1887f);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #5d4037;
+    }
+    .manipulation-response {
+        background: linear-gradient(135deg, #d32f2f, #f44336);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #b71c1c;
+        font-weight: bold;
+    }
+    .subject-restriction-response {
+        background: linear-gradient(135deg, #1976d2, #42a5f5);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #0d47a1;
+    }
+    .math-response {
+        background: linear-gradient(135deg, #4ecdc4, #6dd5d0);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #3bb3ab;
+    }
+    .organization-response {
+        background: linear-gradient(135deg, #9b59b6, #c39bd3);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #8e44ad;
+    }
+    .general-response {
+        background: linear-gradient(135deg, #45b7d1, #6bc5d8);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #2e8bb8;
+    }
+    .friend-badge {
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .concerning-badge {
+        background: linear-gradient(45deg, #ff8c42, #ffa726);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .safety-badge {
+        background: linear-gradient(45deg, #ff4444, #ff0000);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .behavior-badge {
+        background: linear-gradient(45deg, #9c27b0, #7b1fa2);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .educational-boundary-badge {
+        background: linear-gradient(45deg, #795548, #5d4037);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .manipulation-badge {
+        background: linear-gradient(45deg, #d32f2f, #b71c1c);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .subject-restriction-badge {
+        background: linear-gradient(45deg, #1976d2, #0d47a1);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+    .success-banner {
+        background: linear-gradient(135deg, #4CAF50, #45a049);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        text-align: center;
+        font-weight: bold;
+    }
+    .memory-indicator {
+        background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        display: inline-block;
+        margin-left: 0.5rem;
+    }
+
+    .identity-response {
+        background: linear-gradient(135deg, #e74c3c, #f39c12);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        border-left: 5px solid #c0392b;
+    }
+    .identity-badge {
+        background: linear-gradient(45deg, #e74c3c, #c0392b);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+</style>
+"""
+st.markdown(_APP_CSS, unsafe_allow_html=True)
+
+
+# === Cards UI injection (presentation-only; logic unchanged) ==================
+_CARDS_CSS = """
+<style>
+/* Container */
+.cards-wrap { max-width: 640px; margin: 0.5rem 0; line-height: 1.6; }
+.card { border-radius: 16px; padding: 12px 14px; margin: 10px 0; border: 1px solid rgba(0,0,0,0.06);
+        background: linear-gradient(180deg, #f7fbfd 0%, #eef7f8 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.card.decline { border-left: 5px solid #e57373; background: linear-gradient(180deg, #fff7f7 0%, #ffe9e9 100%); }
+.card.crisis { border-left: 5px solid #2e8bb8; background: linear-gradient(180deg, #f1fbff 0%, #e8f6ff 100%); }
+.card.banner { border-left: 5px solid #f4b400; background: linear-gradient(180deg, #fffaf2 0%, #fff3d9 100%); }
+.card .title { font-weight: 700; margin: 0 0 6px 0; font-size: 0.98rem; color: #124; }
+.card.banner .title { display:none; }  /* banner variant no title by default */
+.card .body { font-size: 0.95rem; color: #123; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .showmore { margin-top: 8px; }
+.card .why { margin-top: 8px; }
+.card .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.card .chip-row .stButton>button { border-radius: 9999px; padding: 2px 10px; font-size: 0.85rem; border: 1px solid rgba(0,0,0,0.08);
+                                   max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.decline .stButton>button { background: #fff1f1; }
+.card.crisis .stButton>button { background: #edf7ff; }
+.card.banner .stButton>button { background: #fff4de; }
+.card .hint { font-size: 0.8rem; color: #456; margin-bottom: 6px; }
+</style>
+"""
+st.markdown(_CARDS_CSS, unsafe_allow_html=True)
+
+
+# === Additional UI polish overrides (UI-only; safe to remove) ================
+_UI_POLISH_CSS = """
 <style>
 :root{
-  --lumii-bg: #f7fafc;
-  --lumii-bg-soft: #f0f4f8;
-  --lumii-card: #ffffff;
-  --lumii-ink: #1f2937;
-  --lumii-muted: #64748b;
-  --lumii-primary: #2563eb;      /* calm blue */
-  --lumii-primary-soft: #e8f0ff;
-  --lumii-accent: #06b6d4;       /* teal accent */
-  --lumii-success: #10b981;
-  --lumii-warning: #f59e0b;
-  --lumii-danger:  #ef4444;
-  --radius-lg: 16px;
-  --radius-md: 12px;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-md: 0 6px 22px rgba(2, 8, 23, 0.06);
+  --ui-radius-lg: 16px;
+  --ui-radius-md: 12px;
+  --ui-shadow-sm: 0 1px 2px rgba(2,8,23,.06);
+  --ui-shadow-md: 0 8px 28px rgba(2,8,23,.08);
+  --ui-ink: #0f172a;
+  --ui-muted: #64748b;
+  --ui-primary: #2563eb;
+  --ui-bg: #f8fafc;
+  --ui-card: #ffffff;
 }
 
-html, body, .stApp { background: var(--lumii-bg); color: var(--lumii-ink); }
+/* App chrome */
+.stApp, html, body { background: var(--ui-bg); color: var(--ui-ink); }
+[data-testid="stHeader"]{ background: linear-gradient(180deg, #fff 0%, #f8fafc 100%) !important; border-bottom: 1px solid #eef2f7; }
+.block-container { max-width: 980px; padding-top: 1.0rem; }
 
-[data-testid="stHeader"] { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important; border-bottom: 1px solid #eef2f7; }
-
-.block-container { padding-top: 1.25rem; max-width: 960px; }
-
+/* Typography */
 h1, h2, h3 { letter-spacing: .2px; }
-h1 { font-size: 1.75rem; }
-h2 { font-size: 1.25rem; color: var(--lumii-ink); }
-h3 { font-size: 1.05rem; color: var(--lumii-ink); }
+h1 { font-size: 1.8rem; }
+h2 { font-size: 1.3rem; color: var(--ui-ink); }
+h3 { font-size: 1.05rem; color: var(--ui-ink); }
+.small, .stCaption, .caption { color: var(--ui-muted) !important; }
 
-small, .caption, .stCaption { color: var(--lumii-muted) !important; }
+/* Sidebar */
+[data-testid="stSidebar"] { background: #fff; border-right: 1px solid #eef2f7; }
+[data-testid="stSidebar"] .stMetric { background: #f1f5f9; border-radius: var(--ui-radius-md); padding: .5rem; box-shadow: var(--ui-shadow-sm); }
 
-[data-testid="stSidebar"] {
-  background: #ffffff;
-  border-right: 1px solid #eef2f7;
-}
-[data-testid="stSidebar"] .stMetric { background: var(--lumii-bg-soft); border-radius: var(--radius-md); padding: .5rem; box-shadow: var(--shadow-sm); }
-
+/* Chat messages */
 [data-testid="stChatMessage"] {
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(2,8,23,0.06);
-  background: var(--lumii-card);
+  border-radius: var(--ui-radius-lg);
+  border: 1px solid rgba(2,8,23,.06);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow-sm);
 }
 
-/* Chat input polishing */
+/* Chat input */
 [data-testid="stChatInput"] textarea {
-  border-radius: var(--radius-lg) !important;
+  border-radius: var(--ui-radius-lg) !important;
   border: 1px solid #e5e7eb !important;
-  box-shadow: var(--shadow-sm) !important;
-  background: #ffffff !important;
+  background: #fff !important;
+  box-shadow: var(--ui-shadow-sm) !important;
 }
 
-/* App banners & helpers */
-.success-banner {
-  background: var(--lumii-primary-soft);
-  color: #123c7a;
-  padding: .85rem 1rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid #dbe6ff;
-  text-align: center;
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
+/* Cards (override any previous) */
+.cards-wrap { max-width: 720px; line-height: 1.6; }
+.card {
+  border-radius: var(--ui-radius-lg);
+  padding: 14px 16px;
+  margin: 12px 0;
+  border: 1px solid rgba(2,8,23,.06);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow-sm);
 }
+.card.decline { border-left: 6px solid #e11d48; background: #fff1f2; }
+.card.crisis  { border-left: 6px solid #0ea5e9; background: #f0f9ff; }
+.card.banner  { border-left: 6px solid #f59e0b; background: #fffbeb; }
 
-/* Safety / friend badges — gentler solids, accessible contrast */
+.card .title { font-weight: 700; margin: 0 0 6px 0; font-size: 1rem; color: #0f172a; }
+/* Remove any previous line-clamp to avoid hiding content */
+.card .body { font-size: .96rem; color: #0f172a; display: block; overflow: visible; }
+
+/* Alert / info boxes (used across the app) */
+.stAlert {
+  border-radius: var(--ui-radius-lg);
+  border: 1px solid #e5e7eb;
+  box-shadow: var(--ui-shadow-sm);
+}
+.stAlert [data-baseweb="notification"] { background: #ffffff !important; color: var(--ui-ink) !important; }
+
+/* Badges */
 .safety-badge, .friend-badge, .behavior-badge, .educational-boundary-badge,
 .manipulation-badge, .subject-restriction-badge, .identity-badge, .memory-indicator {
   display: inline-block;
@@ -2123,80 +2368,14 @@ small, .caption, .stCaption { color: var(--lumii-muted) !important; }
   font-size: .9rem;
   font-weight: 700;
   letter-spacing: .2px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--ui-shadow-sm);
   margin: .2rem .18rem 0 0;
 }
-.safety-badge{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
-.friend-badge{ background:#ecfeff; color:#0c4a6e; border:1px solid #bae6fd; }
-.behavior-badge{ background:#f5f3ff; color:#4c1d95; border:1px solid #ddd6fe; }
-.educational-boundary-badge{ background:#efeae6; color:#4a2f22; border:1px solid #e6dcd5; }
-.manipulation-badge{ background:#ffe4e6; color:#9f1239; border:1px solid #fecdd3; }
-.subject-restriction-badge{ background:#e0f2fe; color:#0c4a6e; border:1px solid #bae6fd; }
-.identity-badge{ background:#ffe8e1; color:#9a3412; border:1px solid #fed7aa; }
-.memory-indicator{ background:#ede9fe; color:#3730a3; border:1px solid #ddd6fe; }
-
-/* Safety / identity callouts */
-.safety-response, .identity-response, .general-response {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-left: 6px solid var(--lumii-primary);
-  padding: 1rem;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-.identity-response { border-left-color: var(--lumii-warning); }
-
-/* Footer */
-.lumii-footer {
-  text-align: center;
-  color: #667085;
-  margin-top: 2rem;
-}
 </style>
 """
-st.markdown(_APP_CSS, unsafe_allow_html=True)
+st.markdown(_UI_POLISH_CSS, unsafe_allow_html=True)
 
 
-# === Cards UI injection (presentation-only; logic unchanged) ==================
-# === Cards UI (clean, soft, readable; presentation-only) =====================
-_CARDS_CSS = """
-<style>
-.cards-wrap { max-width: 680px; margin: .5rem 0; line-height: 1.6; }
-.card {
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin: 10px 0;
-  border: 1px solid rgba(2,8,23,0.06);
-  background: #ffffff;
-  box-shadow: var(--shadow-sm);
-}
-.card.decline { border-left: 6px solid #e11d48; background: #fff1f2; }
-.card.crisis  { border-left: 6px solid #0ea5e9; background: #f0f9ff; }
-.card.banner  { border-left: 6px solid #f59e0b; background: #fffbeb; }
-
-.card .title { font-weight: 700; margin: 0 0 6px 0; font-size: 1rem; color: #0f172a; }
-.card.banner .title { display: none; }
-
-.card .body {
-  font-size: .96rem; color: #0f172a;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-}
-.card .why   { margin-top: 8px; color: var(--lumii-muted); font-size: .9rem; }
-.card .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-
-.chip {
-  display: inline-block;
-  padding: .35rem .6rem;
-  border-radius: 999px;
-  font-size: .85rem;
-  font-weight: 600;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  color: #334155;
-}
-</style>
-"""
-st.markdown(_CARDS_CSS, unsafe_allow_html=True)
 
 from typing import List, Optional
 
