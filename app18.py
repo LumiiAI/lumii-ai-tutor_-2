@@ -2320,31 +2320,42 @@ def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
 
 
 def _render_card(title=None, body:str="", more=None, chips=None, variant:str="", key=None):
-    base_style = (
-        "border-radius: 12px;"
-        "padding: 12px 16px;"
-        "margin: 6px 0;"
-        "font-size: 15px;"
-        "display: flex;"
-        "align-items: flex-start;"
-        "gap: 8px;"
+    row_style = (
+        "display:flex; align-items:flex-start; gap:10px; "
+        "margin:8px 0; "
     )
 
-    if variant == "input":
-        bg_color = "#f5f6f8"
-        icon = "🧑"   # or whatever you used for user
-    elif variant == "reply":
-        bg_color = "#eafaf1"
-        icon = "🤖"   # robot for Lumii
-    else:
-        bg_color = "#ffffff"
-        icon = ""
+    # Shared bubble style
+    bubble_style = (
+        "flex:1; border-radius:12px; padding:12px 16px; font-size:15px;"
+    )
+
+    if variant == "input":   # user message
+        icon_bg = "#FF6B6B"  # red square
+        icon = "👦"          # or your current kid head emoji / svg
+        bubble_bg = "#f5f6f8"
+    elif variant == "reply": # Lumii reply
+        icon_bg = "#FFD469"  # yellow square
+        icon = "🤖"          # robot emoji (or your robot svg)
+        bubble_bg = "#eafaf1"
+    else:                   # default/fallback
+        icon_bg = "#ddd"
+        icon = "…"
+        bubble_bg = "#fff"
 
     st.markdown(
         f"""
-        <div style="background-color:{bg_color}; {base_style}">
-            <div style="flex-shrink:0; font-size:20px;">{icon}</div>
-            <div style="flex:1;">{body}</div>
+        <div style="{row_style}">
+            <div style="width:32px;height:32px;
+                        border-radius:8px;
+                        background:{icon_bg};
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        font-size:18px;">{icon}</div>
+            <div style="background:{bubble_bg}; {bubble_style}">
+                {body}
+            </div>
         </div>
         """,
         unsafe_allow_html=True
