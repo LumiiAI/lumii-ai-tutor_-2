@@ -2053,30 +2053,20 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # Button: extra space + precise centering + wider look (keeps Streamlit primary red)
-    st.markdown(
-        """
-        <style>
-        .lumii-agree { text-align: center; margin-top: 26px; }
-        .lumii-agree .stButton > button {
-            min-width: 340px;         /* make it feel centered & substantial */
-            padding: 0.7rem 1.4rem;   /* a bit taller/wider */
-            font-weight: 700;
-            border-radius: 10px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown("<div class='lumii-agree'>", unsafe_allow_html=True)
-    agree_clicked = st.button("🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button")
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Add space before button + center using columns
+    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([3, 2, 3])
+    with col2:
+        agree_clicked = st.button(
+            "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
+        )
 
     if agree_clicked:
         st.session_state.agreed_to_terms = True
         st.rerun()
 
-    st.stop()  # Do not continue rendering until accepted# Show disclaimer popup before allowing app access (logic unchanged)
+    st.stop()  # Do not continue rendering until accepted
     
 if not st.session_state.agreed_to_terms:
     _show_privacy_disclaimer()
