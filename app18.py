@@ -2601,24 +2601,24 @@ def get_groq_response_with_memory_safety(
                     )
 
             # Enhanced response validation (same behavior)
-is_safe, _ = validate_ai_response(ai_content)
-if not is_safe:
-    return (
-        "💙 I understand you might be going through something difficult.\n\n"
-        "I care about your safety and wellbeing, and I want to help in healthy ways.\n\n"
-        "Please talk to a trusted adult (parent/guardian, teacher, or school counselor) about how you’re feeling. "
-        "They can help you right now.\n\n"
-        "Let’s focus on something positive we can work on together. "
-        "How can I help you with my beta subjects (Math, Physics, Chemistry, Geography, History) today?",
-        None,
-        False,
-    )
+            is_safe, _ = validate_ai_response(ai_content)
+            if not is_safe:
+                return (
+                    "💙 I understand you might be going through something difficult.\n\n"
+                    "I care about your safety and wellbeing, and I want to help in healthy ways.\n\n"
+                    "Please talk to a trusted adult (parent/guardian, teacher, or school counselor) about how you’re feeling. "
+                    "They can help you right now.\n\n"
+                    "Let’s focus on something positive we can work on together. "
+                    "How can I help you with my beta subjects (Math, Physics, Chemistry, Geography, History) today?",
+                    None,
+                    False,
+                 )
+     
+            # Final beta safety guard: if model output includes hotlines/brands, swap to trusted-adult reply
+            if _contains_crisis_resource(ai_content):
+                ai_content = generate_age_adaptive_crisis_intervention(student_age, student_name)
 
-# Final beta safety guard: if model output includes hotlines/brands, swap to trusted-adult reply
-if _contains_crisis_resource(ai_content):
-    ai_content = generate_age_adaptive_crisis_intervention(student_age, student_name)
-
-return ai_content, None, False
+            return ai_content, None, False
 
         # Non-200 → return error + indicate safe fallback
         error_msg = f"API Error: {response.status_code}"
