@@ -1983,8 +1983,10 @@ import streamlit as st
 
 import streamlit as st
 
+import streamlit as st
+
 def _show_privacy_disclaimer() -> None:
-    """Render the beta privacy/safety disclaimer (fully centered)."""
+    """Render the beta privacy/safety disclaimer (fully centered and polished)."""
 
     # Centered title + subtitle
     st.markdown(
@@ -2053,11 +2055,29 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # Add space before button + center using columns
-    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+    # --- Button section ---
+    st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)  # extra space
 
-    col1, col2, col3 = st.columns([3, 2, 3])
+    # Use columns to perfectly center the button
+    col1, col2, col3 = st.columns([1, 2, 1])  # middle col is 2x wider
     with col2:
+        # Add width styling via markdown
+        st.markdown(
+            """
+            <style>
+            div.stButton > button {
+                width: 100% !important;
+                max-width: 400px;
+                margin: 0 auto;
+                display: block;
+                font-weight: 700;
+                padding: 0.8rem 1.2rem;
+                border-radius: 10px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         agree_clicked = st.button(
             "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
         )
@@ -2067,6 +2087,7 @@ def _show_privacy_disclaimer() -> None:
         st.rerun()
 
     st.stop()  # Do not continue rendering until accepted
+
     
 if not st.session_state.agreed_to_terms:
     _show_privacy_disclaimer()
