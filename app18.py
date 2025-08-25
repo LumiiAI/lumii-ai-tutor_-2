@@ -3526,37 +3526,23 @@ with st.sidebar:
 st.markdown('<h1 class="main-header">🎓 My Friend Lumii</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Your safe AI Math, Physics, Chemistry, Geography & History tutor! 🛡️💙</p>', unsafe_allow_html=True)
 
-st.info("""
-🎯 **Beta Subject Focus:** Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
+with st.expander("ℹ️ About Lumii (Beta) — click to learn more", expanded=False):
+    st.markdown("""
+💙 **Hi, I'm Lumii!**  
+I'm here to help you with:
+- 📘 Math  
+- 🔬 Physics  
+- ⚗️ Chemistry  
+- 🌍 Geography  
+- 📜 History  
 
-🛡️ **Safety First:** I will never help with anything that could hurt you or others
+🛡️ **My promise:**  
+I’ll always be kind, safe, and helpful.  
+If something feels too big or scary, I’ll remind you to talk to a trusted adult.
 
-🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
-
-📚 **What I Can Help With:**
-• **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
-• **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
-• **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
-• **Geography:** Physical geography, world geography, maps, countries, continents
-• **History:** World history, historical events, timelines, historical analysis
-• **Study Skills:** Organization, test prep, note-taking, homework strategies
-
-📖 **What I Can't Help With (Ask Parents/Teachers):**
-• English/Literature • Biology/Life Science • Social Studies/Civics 
-• Health/PE • Art/Music • Foreign Languages
-
-🤔 **Confusion Help:** If you're confused about my subjects, just tell me! I'll help you understand
-
-💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
-
-🧠 **I remember:** Your name, age, subjects we've discussed, and our learning journey
-🎯 **When you're stressed about school** → I provide caring emotional support first  
-📚 **When you ask questions about my subjects** → I give you helpful answers building on our previous conversations
-🚨 **When you're in danger** → I'll encourage you to talk to a trusted adult immediately
-🌟 **Always** → I'm supportive, encouraging, genuinely helpful, protective, and focused on my beta subjects
-
-**I'm not just smart - I'm your safe learning companion who remembers, grows with you, and excels in Math, Physics, Chemistry, Geography, and History!** 
+✨ Ready? Let’s learn together!
 """)
+
 
 # Display chat history with enhanced memory and safety indicators
 mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_show_user_memory_badge() else ''
