@@ -1983,15 +1983,15 @@ import streamlit as st
 
 def _show_privacy_disclaimer() -> None:
     """Render the updated beta privacy/safety disclaimer with subject scope information."""
-   st.markdown(
-    """
-    <div style="text-align: center;">
-        <h1>🌟 Welcome to My Friend Lumii!</h1>
-        <h2>🚀 Beta Testing Phase - Math & Science Tutor</h2>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        """
+        <div style="text-align: center;">
+            <h1>🌟 Welcome to My Friend Lumii!</h1>
+            <h2>🚀 Beta Testing Phase - Math & Science Tutor</h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
     # Main disclaimer content (centered custom box)
