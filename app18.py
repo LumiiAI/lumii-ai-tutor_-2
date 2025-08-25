@@ -2019,7 +2019,13 @@ def _show_privacy_disclaimer() -> None:
     )
 
     st.markdown(
-        "**Ready to start learning math, science, geography, and history together safely? Click below if you understand and your parents are okay with it! 😊**"
+        """
+        <div style="text-align: center; font-weight: bold; margin-top: 15px;">
+            Ready to start learning math, science, geography, and history together safely? 
+            Click below if you understand and your parents are okay with it! 😊
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     # Working button logic (unchanged)
