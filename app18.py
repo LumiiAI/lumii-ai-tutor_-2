@@ -2056,7 +2056,30 @@ def _show_privacy_disclaimer() -> None:
     )
 
     # --- Button section ---
-    st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)  # extra space
+    # 5 equal columns, place button in the true middle one
+c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1])
+with c3:
+    # force the button itself to center within its own wrapper and give it a nice width
+    st.markdown(
+        """
+        <style>
+        div.stButton > button {
+            display: block;
+            margin-left: auto;     /* center the element */
+            margin-right: auto;    /* center the element */
+            width: 100%;
+            max-width: 420px;      /* feel free to tweak 360–480px */
+            font-weight: 700;
+            padding: 0.85rem 1.2rem;
+            border-radius: 10px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    agree_clicked = st.button(
+        "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
+    )
 
     # Use columns to perfectly center the button
     col1, col2, col3 = st.columns([1, 2, 1])  # middle col is 2x wider
