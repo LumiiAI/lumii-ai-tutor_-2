@@ -1981,10 +1981,6 @@ initialize_session_state()
 # =============================================================================
 import streamlit as st
 
-import streamlit as st
-
-import streamlit as st
-
 def _show_privacy_disclaimer() -> None:
     """Render the beta privacy/safety disclaimer (fully centered and polished)."""
 
@@ -2055,37 +2051,40 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # --- Button section ---
-    # 5 equal columns, place button in the true middle one
-c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1])
-with c3:
-    # force the button itself to center within its own wrapper and give it a nice width
-    st.markdown(
-        """
-        <style>
-        div.stButton > button {
-            display: block;
-            margin-left: auto;     /* center the element */
-            margin-right: auto;    /* center the element */
-            width: 100%;
-            max-width: 420px;      /* feel free to tweak 360–480px */
-            font-weight: 700;
-            padding: 0.85rem 1.2rem;
-            border-radius: 10px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    agree_clicked = st.button(
-        "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
-    )
+    # --- Button section (INSIDE the function) ---
+    st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)  # spacing
 
-if agree_clicked:
-    st.session_state.agreed_to_terms = True
-    st.rerun()
+    # 5 equal columns, put button in the true middle
+    c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1])
+    with c3:
+        st.markdown(
+            """
+            <style>
+            div.stButton > button {
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+                width: 100%;
+                max-width: 420px;
+                font-weight: 700;
+                padding: 0.85rem 1.2rem;
+                border-radius: 10px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        agree_clicked = st.button(
+            "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
+        )
 
-    st.stop()  # Do not continue rendering until accepted
+    if agree_clicked:
+        st.session_state.agreed_to_terms = True
+        st.rerun()
+
+    # IMPORTANT: stop rendering the rest of the app until user agrees
+    st.stop()
+
 
     
 if not st.session_state.agreed_to_terms:
