@@ -3762,17 +3762,22 @@ else:
             # Rerun to update sidebar stats and memory display
             st.rerun()
 
-# Footer with enhanced safety and beta scope info
+# Footer with clean, minimal design
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: #667; margin-top: 2rem;'>
-    <p><strong>My Friend Lumii</strong> - Your safe AI Math, Physics, Chemistry, Geography & History tutor 🛡️💙</p>
-    <p>🎯 Beta subjects: Math • Physics • Chemistry • Geography • History • Study Skills</p>
-    <p>🛡️ Safety first • 🧠 Remembers conversations • 🎯 Smart emotional support • 📚 Natural conversation flow • 🌟 Always protective</p>
-    <p>🤝 Respectful learning • 👨‍👩‍👧‍👦 Family guidance for other subjects • 🔒 Multi-layer safety • 📞 Crisis resources • ⚡ Error recovery • 💪 Always helpful, never harmful</p>
-    <p>🤔 <strong>NEW:</strong> Confusion help - If you're confused about my subjects, just tell me! I'll help you understand without judgment.</p>
-    <p>🚨 <strong>ALL CRITICAL ISSUES RESOLVED:</strong> Syntax errors eliminated, regex patterns complete, safety ordering fixed, Unicode bypasses closed, acceptance flow secured - PRODUCTION-READY for safe deployment.</p>
-    <p><em>The AI tutor that knows you, grows with you, respects you, includes you, and always keeps you safe while excelling in core STEM and History subjects</em></p>
+<div style='text-align: center; color: #6b7280; margin-top: 2rem; font-size: 14px;'>
+    <p style='margin-bottom: 0.5rem; font-weight: 600; color: #374151;'>
+        <strong>My Friend Lumii</strong> - Your Safe AI Learning Companion
+    </p>
+    <p style='margin-bottom: 0.5rem;'>
+        🎯 Math • Physics • Chemistry • Geography • History • Study Skills
+    </p>
+    <p style='margin-bottom: 0.5rem; font-size: 12px;'>
+        🛡️ Always Safe • 🧠 Remembers You • 💙 Always Helpful
+    </p>
+    <p style='margin: 0; font-size: 11px; color: #9ca3af;'>
+        <em>Beta Version - Enhanced Safety & Memory</em>
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
