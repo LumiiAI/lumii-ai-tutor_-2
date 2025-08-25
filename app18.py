@@ -3481,28 +3481,33 @@ with st.sidebar:
             st.info("✅ Conversation summarized")
     
     # Tool explanations with beta subject focus
+    # Tool explanations with beta subject focus
     st.subheader("🛠️ How I Help You (Beta)")
-    st.markdown("""
-    **🛡️ Safety First** - I'll always protect you from harmful content
-    
-    **🎯 Beta Subject Focus** - I specialize in:
-    • **Math:** Algebra, geometry, calculus, word problems
-    • **Physics:** Mechanics, electricity, thermodynamics 
-    • **Chemistry:** Reactions, periodic table, molecules
-    • **Geography:** Maps, countries, physical geography
-    • **History:** World history, historical events, timelines
-    • **Study Skills:** Organization, test prep, homework help
-    
-    **📖 Other Subjects** - For English, Biology, Social Studies, Health, Art, Music, etc., please ask your parents, teachers, or school counselors
-    
-    **🤝 Respectful Learning** - I expect kind, respectful communication
-    
-    **💙 Emotional Support** - When you're feeling stressed, frustrated, or overwhelmed about school
-    
-    **🤔 Confusion Help** - When you're genuinely confused about any of my beta topics
-    
-    *I remember our conversation, keep you safe, and focus on my specialty subjects!*
+
+    with st.expander("📘 Subjects I Cover", expanded=False):
+        st.markdown("""
+    - **Math:** Algebra, geometry, calculus, word problems  
+    - **Physics:** Mechanics, electricity, thermodynamics  
+    - **Chemistry:** Reactions, periodic table, molecules  
+    - **Geography:** Maps, countries, physical geography  
+    - **History:** World history, timelines, events  
+    - **Study Skills:** Organization, test prep, homework
     """)
+
+    with st.expander("🛡️ Safety & Behavior", expanded=False):
+        st.markdown("""
+    - I will always keep you safe  
+    - I expect kind, respectful communication  
+    - If you're upset, I’ll first support your feelings  
+    - If something feels scary, please talk to a trusted adult
+    """)
+
+    with st.expander("📖 Other Subjects (Not in Beta)", expanded=False):
+        st.markdown("""
+    English, Biology, Social Studies, Health, Art, Music → Please ask your **parents, teachers, or school counselors** instead
+    """)
+
+    st.caption("💡 I remember our conversations, keep you safe, and focus only on my beta subjects.")
     
     # Beta: neutral help banner (no numbers, no links)
     st.subheader("💙 If You Need Help")
