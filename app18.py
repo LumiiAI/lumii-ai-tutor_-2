@@ -1991,7 +1991,7 @@ def _show_privacy_disclaimer() -> None:
     </div>
     """,
     unsafe_allow_html=True,
-    )
+)
 
 
     # Main disclaimer content (centered custom box)
