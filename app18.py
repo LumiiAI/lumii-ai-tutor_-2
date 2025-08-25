@@ -1108,12 +1108,13 @@ def global_crisis_guard(message: str) -> Tuple[bool, Optional[str]]:
 
     return False, None
 
-def get_crisis_resources() -> Dict[str, str]:
-    """Neutral, no-numbers resources (kept for compatibility; we don't render these in beta)."""
+def get_crisis_resources() -> dict:
+    # Beta: no phone numbers or hotlines; trusted-adult guidance only.
     return {
-        "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
-        "crisis_line": "Ask a trusted adult to help you find local support.",
-        "suicide_line": "Please reach out to a trusted adult right now.",
+        "crisis_line": "Please talk to a trusted adult who can help you right now.",
+        "suicide_line": "Reach out to a parent/guardian, teacher, or school counselor.",
+        "emergency": "If you feel unsafe, find a trusted adult nearby immediately.",
+        "text_line": "A trusted adult can help you get support.",
     }
 
 
@@ -1560,26 +1561,14 @@ def should_terminate_conversation(message: str, harmful_request_count: int) -> T
     return False, None
 
 def generate_age_adaptive_crisis_intervention(student_age: int, student_name: str = "") -> str:
-    """Age-adaptive crisis intervention for beta families."""
+    """Age-adaptive crisis intervention for beta families (no hotlines, trusted-adult only)."""
     name_part = f"{student_name}, " if student_name else ""
-
-    if student_age <= 11:  # Elementary
-        return f"""🚨 {name_part}I care about you and I'm here to listen. It takes a lot of courage to share those feelings with me.
-
-I want you to know something important: those thoughts are not true. You are important, and your life has value.
-
-Here's what I want you to do: I want you to reach out to a trusted adult, like your mom, dad, a teacher, or the school counselor, and talk to them about how you're feeling. They can provide you with support and help.
-
-Remember, you are important, and your life matters. Don't hesitate to reach out for help."""
-    
-    else:  # Middle School & High School (12-18)
-        return f"""🚨 {name_part}I care about you and I'm here to listen. It takes a lot of courage to share those feelings with me.
-
-First, I want you to know that those thoughts are not true. You are important, and your life has value. It's understandable to feel overwhelmed or struggling with difficult emotions, but it's crucial to remember that you are not alone.
-
-Here's what I want you to do: I want you to reach out to a trusted adult, like a parent, teacher, or school counselor, and talk to them about how you're feeling. They can provide you with support, guidance, and resources to help you work through these difficult emotions.
-
-Remember, you are important, and your life matters. Don't hesitate to reach out for help."""
+    return (
+        f"💙 {name_part}I’m really glad you told me. You matter. "
+        "Could you tell a trusted adult (parent/guardian, teacher, or school counselor) how you feel? "
+        "They can help you right now. "
+        "I’m here to listen — what’s been the hardest part today?"
+    )
 
 # =============================================================================
 # NON-EDUCATIONAL TOPICS DETECTION (ENHANCED) – FIXED: removed advice-seeking requirement
