@@ -96,17 +96,16 @@ def _apply_ui_polish_inline():
         .lumii-divider{ height:1px; background: rgba(0,0,0,.07); margin: var(--lumii-gap-6) 0; }
         section[data-testid="stSidebar"] .block-container{ padding-top: var(--lumii-gap-4); }
         </style>
-        """",
+        """,
         unsafe_allow_html=True,
     )
 
-# Try to import an external 'ui_overrides' if present; otherwise use inline
+# Try external overrides if present; else use inline
 try:
-    from ui_overrides import apply_ui_polish as apply_ui_polish  # optional
+    from ui_overrides import apply_ui_polish as apply_ui_polish  # optional, if you add the file later
 except Exception:
     apply_ui_polish = _apply_ui_polish_inline
 
-# Apply immediately
 apply_ui_polish()
 # === end UI polish ===
 
