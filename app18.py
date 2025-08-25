@@ -540,32 +540,28 @@ IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
     ),
 ]
 
-# US Crisis Resources for Beta Launch (English-speaking families)
+# Beta: no phone numbers or hotlines; trusted-adult guidance only.
 US_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "988 (Suicide & Crisis Lifeline)",
-    "text_line": "",
-    "emergency": "911 for immediate emergency",
-    "additional": "Tell a trusted adult (parent, teacher, counselor)",
+    "crisis_line": "Please talk to a trusted adult who can help you right now.",
+    "suicide_line": "Reach out to a parent/guardian, teacher, or school counselor.",
+    "emergency": "If you feel unsafe, find a trusted adult nearby immediately.",
+    "text_line": "A trusted adult can help you get support.",
+    "additional": "",
 }
 
-# Keep Slovenia as backup for development/testing
 SLOVENIA_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "TOM telefon za otroke in mladostnike: 116 111 (brezplačno, 24/7)",
-    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)",
-    "emergency": "Klic v sili: 113 (policija) ali 112 (vse nujne službe)",
-    "additional": "Klic v duševni stiski: 01 520 99 00",
+    "crisis_line": "Prosimo, pogovorite se s skrbnikom ali drugo zaupanja vredno odraslo osebo.",
+    "suicide_line": "Obrnite se na starše/skrbnike, učitelja ali šolskega svetovalca.",
+    "emergency": "Če se počutite ogrožene, poiščite bližnjega zaupanja vrednega odraslega.",
+    "text_line": "Zaupanja vreden odrasli vam lahko pomaga poiskati podporo.",
+    "additional": "",
 }
 
 CRISIS_RESOURCES: Dict[str, Dict[str, str]] = {
     "US": US_CRISIS_RESOURCES,
     "SI": SLOVENIA_CRISIS_RESOURCES,
-    "EU": {
-        "crisis_line": "European Emergency Line: 116 123",
-        "suicide_line": "Local crisis helpline or 116 123",
-        "emergency": "Emergency services: 112",
-        "additional": "Contact local mental health services",
-    },
-    "DEFAULT": US_CRISIS_RESOURCES,  # 🇺🇸 Changed default to US for beta families
+    "EU": US_CRISIS_RESOURCES,      # keep neutral during beta
+    "DEFAULT": US_CRISIS_RESOURCES, # neutral default
 }
 
 # Enhanced response validator patterns
