@@ -44,6 +44,73 @@ from datetime import datetime
 import requests
 import streamlit as st
 
+# === UI polish: inline (presentation-only, logic untouched) ===
+def _apply_ui_polish_inline():
+    import streamlit as st
+    st.markdown(
+        """
+        <style>
+        :root{
+          --lumii-radius: 14px;
+          --lumii-radius-sm: 10px;
+          --lumii-gap-1: .25rem;
+          --lumii-gap-2: .5rem;
+          --lumii-gap-3: .75rem;
+          --lumii-gap-4: 1rem;
+          --lumii-gap-6: 1.5rem;
+          --lumii-gap-8: 2rem;
+          --lumii-shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+          --lumii-ring: 0 0 0 3px rgba(59,130,246,.35);
+          --lumii-font-size: 16px;
+          --lumii-muted: rgba(0,0,0,.55);
+          --lumii-maxw: 1200px;
+        }
+        .main > div { max-width: var(--lumii-maxw); margin: 0 auto; }
+        .main h1, .main h2, .main h3{ margin-top: var(--lumii-gap-6); margin-bottom: var(--lumii-gap-3); }
+        .main p { margin-bottom: var(--lumii-gap-3); font-size: var(--lumii-font-size); line-height: 1.6; }
+        .lumii-card{ border-radius: var(--lumii-radius); padding: var(--lumii-gap-4);
+          background:#fff; box-shadow: var(--lumii-shadow-sm); border:1px solid rgba(0,0,0,.06); margin-bottom: var(--lumii-gap-4); }
+        button[kind="secondary"], button[kind="primary"], .stButton>button{
+          border-radius: var(--lumii-radius-sm); padding: .625rem 1rem; box-shadow: var(--lumii-shadow-sm);
+          border: 1px solid rgba(0,0,0,.08);
+        }
+        .stButton>button:focus-visible{ outline: none; box-shadow: var(--lumii-ring); }
+        .stButton>button:hover{ transform: translateY(-1px); transition: transform .08s ease-out; }
+        .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"]{
+          border-radius: var(--lumii-radius-sm)!important; box-shadow:none!important; border:1px solid rgba(0,0,0,.12)!important;
+        }
+        .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus{
+          outline:none!important; box-shadow: var(--lumii-ring)!important; border-color: rgba(59,130,246,.5)!important;
+        }
+        .stDataFrame, .stTable{ border-radius: var(--lumii-radius); overflow:hidden; box-shadow: var(--lumii-shadow-sm); }
+        .lumii-badge{ display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .6rem; border-radius:999px; font-size:.8rem;
+          background: rgba(59,130,246,.1); color:#1f4bb8; border:1px solid rgba(59,130,246,.25); }
+        .lumii-section{ margin: var(--lumii-gap-6) 0 var(--lumii-gap-3); display:flex; align-items:center; gap:.6rem; }
+        .lumii-section .title{ font-weight:700; font-size:1.15rem; }
+        .lumii-section .hint{ color: var(--lumii-muted); font-size:.95rem; }
+        .lumii-chat{ display:flex; gap:.75rem; margin-bottom: var(--lumii-gap-3); }
+        .lumii-chat .bubble{ padding:.6rem .8rem; border-radius: var(--lumii-radius);
+          background:#f8fafc; border:1px solid rgba(0,0,0,.06); max-width: 80%; }
+        .lumii-chat.user .bubble{ background:#eef2ff; }
+        .lumii-chat.assistant .bubble{ background:#f1f5f9; }
+        .lumii-divider{ height:1px; background: rgba(0,0,0,.07); margin: var(--lumii-gap-6) 0; }
+        section[data-testid="stSidebar"] .block-container{ padding-top: var(--lumii-gap-4); }
+        </style>
+        """",
+        unsafe_allow_html=True,
+    )
+
+# Try to import an external 'ui_overrides' if present; otherwise use inline
+try:
+    from ui_overrides import apply_ui_polish as apply_ui_polish  # optional
+except Exception:
+    apply_ui_polish = _apply_ui_polish_inline
+
+# Apply immediately
+apply_ui_polish()
+# === end UI polish ===
+
+
 # === Grade/Age detection (ADD THESE LINES) ===============================
 # e.g., "grade 8", "8th grade", "in 8th grade", "I'm in 8th grade"
 GRADE_RX: Final[Pattern[str]] = re.compile(
@@ -275,11 +342,6 @@ if not st.session_state.get("_page_configured", False):
         initial_sidebar_state="expanded",
     )
     st.session_state["_page_configured"] = True
-
-    # === UI polish hook (presentation only) ===
-    from ui_overrides import apply_ui_polish
-    apply_ui_polish()
-
 
 # =============================================================================
 # ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (CRITICAL SAFETY FIXES)
