@@ -2048,11 +2048,13 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # Centered button
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    agree_clicked = st.button(
-        "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
-    )
+    # Center the button container itself
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+       agree_clicked = st.button(
+           "I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
+       )
+        
     st.markdown("</div>", unsafe_allow_html=True)
 
     if agree_clicked:
