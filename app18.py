@@ -1981,8 +1981,12 @@ initialize_session_state()
 # =============================================================================
 import streamlit as st
 
+import streamlit as st
+
 def _show_privacy_disclaimer() -> None:
     """Render the updated beta privacy/safety disclaimer with subject scope information."""
+
+    # Centered title + subtitle
     st.markdown(
         """
         <div style="text-align: center;">
@@ -1993,8 +1997,7 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-
-    # Main disclaimer content (centered custom box)
+    # Centered disclaimer box
     st.markdown(
         """
         <div style="
@@ -2005,6 +2008,8 @@ def _show_privacy_disclaimer() -> None:
             text-align: center;
             font-size: 16px;
             line-height: 1.6;
+            max-width: 800px;
+            margin: auto;
         ">
             🎯 <b>Beta Subject Focus:</b> Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
             <br><br>
@@ -2037,7 +2042,7 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # Centered disclaimer text
+    # Centered footer text
     st.markdown(
         """
         <div style="text-align: center; font-weight: bold; margin-top: 20px;">
@@ -2048,21 +2053,18 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # Center the button container itself
-    col1, col2, col3 = st.columns([1,2,1])
+    # Centered button using columns
+    col1, col2, col3 = st.columns([4, 2, 4])
     with col2:
-       agree_clicked = st.button(
-           "I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
-       )
-        
-    st.markdown("</div>", unsafe_allow_html=True)
+        agree_clicked = st.button(
+            "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
+        )
 
     if agree_clicked:
         st.session_state.agreed_to_terms = True
         st.rerun()
 
     st.stop()  # Do not continue rendering until accepted
-
 # Show disclaimer popup before allowing app access (logic unchanged)
 if not st.session_state.agreed_to_terms:
     _show_privacy_disclaimer()
