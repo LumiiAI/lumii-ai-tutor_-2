@@ -1986,68 +1986,72 @@ def _show_privacy_disclaimer() -> None:
     st.markdown("# 🌟 Welcome to My Friend Lumii!")
     st.markdown("## 🚀 Beta Testing Phase - Math & Science Tutor")
 
-st.markdown(
-    """
-    <div style="
-        background-color: #f0f8ff;
-        border: 1px solid #d6e9f9;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        font-size: 16px;
-        line-height: 1.6;
-        ">
-        🎯 <b>Beta Subject Focus:</b> Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
-        <br><br>
-        🛡️ <b>Enhanced Safety Features:</b> Multiple layers of protection to keep you safe
-        <br><br>
-        👨‍👩‍👧‍👦 <b>Ask Your Parents First:</b> If you're under 16, make sure your parents say it's okay to chat with Lumii
-        <br><br>
-        📚 <b>What I Can Help With:</b><br>
-        • Math (algebra, geometry, calculus, word problems)<br>
-        • Physics (mechanics, electricity, motion, energy)<br>
-        • Chemistry (reactions, periodic table, molecules)<br>
-        • Geography (maps, countries, physical geography)<br>
-        • History (world history, historical events, timelines)<br>
-        • Study skills and organization
-        <br><br>
-        📖 <b>What I Can't Help With During Beta:</b><br>
-        • English/Literature (ask your teacher or parents)<br>
-        • Biology/Life Science (ask your parents or school nurse)<br>
-        • Social Studies/Civics (ask your parents or teacher)<br>
-        • Health/PE topics (ask your parents or school nurse)<br>
-        • Art/Music interpretation (ask your teacher or parents)
-        <br><br>
-        🔒 <b>Safety First:</b> I will never help with anything that could hurt you or others
-        <br><br>
-        📞 <b>If You Need Real Help:</b> If you're having difficult thoughts, I'll always encourage you to talk to a trusted adult
-        <br><br>
-        🧪 <b>We're Testing Together:</b> You're helping me get better at being your safe learning friend in these specific subjects!
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
+    # Main disclaimer content (centered custom box)
     st.markdown(
         """
-        <div style="text-align: center; font-weight: bold; margin-top: 15px;">
-            Ready to start learning math, science, geography, and history together safely? 
+        <div style="
+            background-color: #f0f8ff;
+            border: 1px solid #d6e9f9;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 16px;
+            line-height: 1.6;
+        ">
+            🎯 <b>Beta Subject Focus:</b> Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
+            <br><br>
+            🛡️ <b>Enhanced Safety Features:</b> Multiple layers of protection to keep you safe
+            <br><br>
+            👨‍👩‍👧‍👦 <b>Ask Your Parents First:</b> If you're under 16, make sure your parents say it's okay to chat with Lumii
+            <br><br>
+            📚 <b>What I Can Help With:</b><br>
+            • Math (algebra, geometry, calculus, word problems)<br>
+            • Physics (mechanics, electricity, motion, energy)<br>
+            • Chemistry (reactions, periodic table, molecules)<br>
+            • Geography (maps, countries, physical geography)<br>
+            • History (world history, historical events, timelines)<br>
+            • Study skills and organization
+            <br><br>
+            📖 <b>What I Can't Help With During Beta:</b><br>
+            • English/Literature (ask your teacher or parents)<br>
+            • Biology/Life Science (ask your parents or school nurse)<br>
+            • Social Studies/Civics (ask your parents or teacher)<br>
+            • Health/PE topics (ask your parents or school nurse)<br>
+            • Art/Music interpretation (ask your teacher or parents)
+            <br><br>
+            🔒 <b>Safety First:</b> I will never help with anything that could hurt you or others
+            <br><br>
+            📞 <b>If You Need Real Help:</b> If you're having difficult thoughts, I'll always encourage you to talk to a trusted adult
+            <br><br>
+            🧪 <b>We're Testing Together:</b> You're helping me get better at being your safe learning friend in these specific subjects!
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Centered disclaimer text
+    st.markdown(
+        """
+        <div style="text-align: center; font-weight: bold; margin-top: 20px;">
+            Ready to start learning math, science, geography, and history together safely?<br>
             Click below if you understand and your parents are okay with it! 😊
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # Working button logic (unchanged)
+    # Centered button
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
     agree_clicked = st.button(
         "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
     )
+    st.markdown("</div>", unsafe_allow_html=True)
+
     if agree_clicked:
         st.session_state.agreed_to_terms = True
         st.rerun()
 
     st.stop()  # Do not continue rendering until accepted
-
 
 # Show disclaimer popup before allowing app access (logic unchanged)
 if not st.session_state.agreed_to_terms:
