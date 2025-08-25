@@ -1984,7 +1984,7 @@ import streamlit as st
 import streamlit as st
 
 def _show_privacy_disclaimer() -> None:
-    """Render the updated beta privacy/safety disclaimer with subject scope information."""
+    """Render the beta privacy/safety disclaimer (fully centered)."""
 
     # Centered title + subtitle
     st.markdown(
@@ -2009,7 +2009,7 @@ def _show_privacy_disclaimer() -> None:
             font-size: 16px;
             line-height: 1.6;
             max-width: 800px;
-            margin: auto;
+            margin: 0 auto;
         ">
             🎯 <b>Beta Subject Focus:</b> Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
             <br><br>
@@ -2045,7 +2045,7 @@ def _show_privacy_disclaimer() -> None:
     # Centered footer text
     st.markdown(
         """
-        <div style="text-align: center; font-weight: bold; margin-top: 20px;">
+        <div style="text-align: center; font-weight: bold; margin-top: 22px;">
             Ready to start learning math, science, geography, and history together safely?<br>
             Click below if you understand and your parents are okay with it! 😊
         </div>
@@ -2053,19 +2053,31 @@ def _show_privacy_disclaimer() -> None:
         unsafe_allow_html=True,
     )
 
-    # Centered button using columns
-    col1, col2, col3 = st.columns([4, 2, 4])
-    with col2:
-        agree_clicked = st.button(
-            "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
-        )
+    # Button: extra space + precise centering + wider look (keeps Streamlit primary red)
+    st.markdown(
+        """
+        <style>
+        .lumii-agree { text-align: center; margin-top: 26px; }
+        .lumii-agree .stButton > button {
+            min-width: 340px;         /* make it feel centered & substantial */
+            padding: 0.7rem 1.4rem;   /* a bit taller/wider */
+            font-weight: 700;
+            border-radius: 10px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div class='lumii-agree'>", unsafe_allow_html=True)
+    agree_clicked = st.button("🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if agree_clicked:
         st.session_state.agreed_to_terms = True
         st.rerun()
 
-    st.stop()  # Do not continue rendering until accepted
-# Show disclaimer popup before allowing app access (logic unchanged)
+    st.stop()  # Do not continue rendering until accepted# Show disclaimer popup before allowing app access (logic unchanged)
+    
 if not st.session_state.agreed_to_terms:
     _show_privacy_disclaimer()
 
