@@ -2081,33 +2081,9 @@ with c3:
         "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
     )
 
-    # Use columns to perfectly center the button
-    col1, col2, col3 = st.columns([1, 2, 1])  # middle col is 2x wider
-    with col2:
-        # Add width styling via markdown
-        st.markdown(
-            """
-            <style>
-            div.stButton > button {
-                width: 100% !important;
-                max-width: 400px;
-                margin: 0 auto;
-                display: block;
-                font-weight: 700;
-                padding: 0.8rem 1.2rem;
-                border-radius: 10px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-        agree_clicked = st.button(
-            "🎓 I Agree & Start Learning with Lumii!", type="primary", key="agree_button"
-        )
-
-    if agree_clicked:
-        st.session_state.agreed_to_terms = True
-        st.rerun()
+if agree_clicked:
+    st.session_state.agreed_to_terms = True
+    st.rerun()
 
     st.stop()  # Do not continue rendering until accepted
 
