@@ -276,6 +276,11 @@ if not st.session_state.get("_page_configured", False):
     )
     st.session_state["_page_configured"] = True
 
+    # === UI polish hook (presentation only) ===
+    from ui_overrides import apply_ui_polish
+    apply_ui_polish()
+
+
 # =============================================================================
 # ENHANCED CRISIS DETECTION - GLOBAL GUARD SYSTEM (CRITICAL SAFETY FIXES)
 # =============================================================================
@@ -476,28 +481,28 @@ IMMEDIATE_TERMINATION_PATTERNS: Final[List[Pattern[str]]] = [
 
 # US Crisis Resources for Beta Launch (English-speaking families)
 US_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "Ask a trusted adult to help you find local support.",
+    "crisis_line": "988 (Suicide & Crisis Lifeline)",
     "text_line": "",
-    "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
-    "additional": "Talk to a trusted adult (parent, teacher, counselor)",
+    "emergency": "911 for immediate emergency",
+    "additional": "Tell a trusted adult (parent, teacher, counselor)",
 }
 
 # Keep Slovenia as backup for development/testing
 SLOVENIA_CRISIS_RESOURCES: Final[Dict[str, str]] = {
-    "crisis_line": "Poišči zaupanja vredno odraslo osebo, da ti pomaga poiskati lokalno podporo.",
-    "suicide_line": "Prosim, obrni se na zaupanja vredno odraslo osebo takoj.",
-    "emergency": "Če si v neposredni nevarnosti, poišči pomoč pri zaupanja vredni odrasli osebi v bližini.",
-    "additional": "Pogovori se s staršem, učiteljem ali šolskim svetovalcem.",
+    "crisis_line": "TOM telefon za otroke in mladostnike: 116 111 (brezplačno, 24/7)",
+    "suicide_line": "Samarijan: 116 123 (brezplačno, 24/7)",
+    "emergency": "Klic v sili: 113 (policija) ali 112 (vse nujne službe)",
+    "additional": "Klic v duševni stiski: 01 520 99 00",
 }
 
 CRISIS_RESOURCES: Dict[str, Dict[str, str]] = {
     "US": US_CRISIS_RESOURCES,
     "SI": SLOVENIA_CRISIS_RESOURCES,
     "EU": {
-        "crisis_line": "Ask a trusted adult to help you find local support.",
-        "suicide_line": "Please reach out to a trusted adult right now.",
-        "emergency": "If you're in immediate danger, seek help from a trusted adult nearby.",
-        "additional": "Contact local mental health services through a trusted adult.",
+        "crisis_line": "European Emergency Line: 116 123",
+        "suicide_line": "Local crisis helpline or 116 123",
+        "emergency": "Emergency services: 112",
+        "additional": "Contact local mental health services",
     },
     "DEFAULT": US_CRISIS_RESOURCES,  # 🇺🇸 Changed default to US for beta families
 }
@@ -561,39 +566,6 @@ def detect_suicide_note_request(message: str) -> bool:
     """
     message_lower = normalize_message(message or "").lower()
     
-    # Build recent combined context from session (robust to different message shapes)
-    combined_context = message_lower
-    try:
-        import streamlit as st  # type: ignore
-        recent_msgs = st.session_state.get("messages", []) or []
-        parts = []
-        for it in recent_msgs[-8:]:
-            try:
-                if isinstance(it, dict):
-                    c = it.get("content") or it.get("text") or it.get("message") or ""
-                elif isinstance(it, (list, tuple)) and it:
-                    c = str(it[-1])
-                else:
-                    c = str(it)
-                parts.append(str(c))
-            except Exception:
-                pass
-        combined_context = (" \n ".join(parts + [message_lower])).lower()
-    except Exception:
-        combined_context = message_lower
-
-    # If user downplays with 'it's only/just fiction' but prior context had suicide+note, still trigger
-    fiction_softeners = re.search(r"\b(?:only|just)\s+fiction\b", message_lower) or re.search(r"don['\u2019`]?t\s+worry.*?fiction", message_lower)
-    had_suicide = re.search(r"\b(?:suicide|unalive|self[-\s]*harm)\b", combined_context)
-    had_note = re.search(r"\b(?:note|letter|good[-\s]*bye|farewell|final\s+(?:message|words)|last\s+(?:message|words)|goodbye)\b", combined_context)
-    if fiction_softeners and had_suicide and had_note:
-        return True
-
-    # Cross-turn combination: any fiction/character/script markers anywhere + suicide+note anywhere → refuse
-    fiction_anywhere = re.search(r"\b(?:for\s+(?:my|a)\s+character|fictional(?:ly)?|in\s+(?:a\s+)?(?:story|novel|book|script|screenplay|play)|in[-\s]*character|role\s*play|rp|fan\s*fic(?:tion)?)\b", combined_context)
-    if fiction_anywhere and had_suicide and had_note:
-        return True
-
     # Direct suicide note request in current message
     if any(pattern.search(message_lower) for pattern in SUICIDE_NOTE_PATTERNS):
         return True
@@ -1416,25 +1388,6 @@ def has_immediate_termination_language(message: str) -> bool:
 # =============================================================================
 
 def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Optional[str]]:
-    # Allow explicit, safe topic switch to clear the lock
-    ml = normalize_message(message or "").lower()
-    try:
-        import streamlit as st  # type: ignore
-        if st.session_state.get("__harm_lock_suicide_note", False):
-            if (re.search(r"\b(?:new\s+topic|change\s+the\s+subject|switch\s+topic)\b", ml)
-                and not re.search(r"\b(?:suicide|unalive|self[-\s]*harm|good[-\s]*bye|farewell|note|letter|final\s+(?:message|words)|last\s+(?:message|words)|goodbye)\b", ml)):
-                st.session_state["__harm_lock_suicide_note"] = False
-    except Exception:
-        pass
-
-    # Sticky harm lock: if previously flagged as suicide-note, keep blocking follow-ups
-    try:
-        import streamlit as st  # type: ignore
-        if st.session_state.get("__harm_lock_suicide_note", False):
-            return True, "BLOCKED_HARMFUL", "suicide_note_request"
-    except Exception:
-        pass
-
     """🚨 CRITICAL FIX: Enhanced crisis check with suicide note detection and proper ordering."""
     ml = normalize_message(message).lower().strip()
 
@@ -1451,11 +1404,6 @@ def global_crisis_override_check(message: str) -> Tuple[bool, Optional[str], Opt
 
     # NEW: Suicide note detection
     if detect_suicide_note_request(message):
-        try:
-            import streamlit as st  # type: ignore
-            st.session_state["__harm_lock_suicide_note"] = True
-        except Exception:
-            pass
         return True, "BLOCKED_HARMFUL", "suicide_note_request"
 
     # FIX #2: Move the acceptance check AFTER all crisis checks
@@ -2258,156 +2206,6 @@ _APP_CSS: Final[str] = """
 """
 st.markdown(_APP_CSS, unsafe_allow_html=True)
 
-
-# === Cards UI injection (presentation-only; logic unchanged) ==================
-_CARDS_CSS = """
-<style>
-/* Container */
-.cards-wrap { max-width: 640px; margin: 0.5rem 0; line-height: 1.6; }
-.card { border-radius: 16px; padding: 12px 14px; margin: 10px 0; border: 1px solid rgba(0,0,0,0.06);
-        background: linear-gradient(180deg, #f7fbfd 0%, #eef7f8 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.card.decline { border-left: 5px solid #e57373; background: linear-gradient(180deg, #fff7f7 0%, #ffe9e9 100%); }
-.card.crisis { border-left: 5px solid #2e8bb8; background: linear-gradient(180deg, #f1fbff 0%, #e8f6ff 100%); }
-.card.banner { border-left: 5px solid #f4b400; background: linear-gradient(180deg, #fffaf2 0%, #fff3d9 100%); }
-.card .title { font-weight: 700; margin: 0 0 6px 0; font-size: 0.98rem; color: #124; }
-.card.banner .title { display:none; }  /* banner variant no title by default */
-.card .body { font-size: 0.95rem; color: #123; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card .showmore { margin-top: 8px; }
-.card .why { margin-top: 8px; }
-.card .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-.card .chip-row .stButton>button { border-radius: 9999px; padding: 2px 10px; font-size: 0.85rem; border: 1px solid rgba(0,0,0,0.08);
-                                   max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card.decline .stButton>button { background: #fff1f1; }
-.card.crisis .stButton>button { background: #edf7ff; }
-.card.banner .stButton>button { background: #fff4de; }
-.card .hint { font-size: 0.8rem; color: #456; margin-bottom: 6px; }
-</style>
-"""
-st.markdown(_CARDS_CSS, unsafe_allow_html=True)
-
-from typing import List, Optional
-
-def _excerpt_2_lines(text: str) -> (str, str):
-    """Return (first_two_lines, remainder). Pure presentation helper."""
-    txt = (text or "").strip()
-    if not txt:
-        return "", ""
-    # split by hard newlines and also soft sentence-ish boundaries to approximate 2 lines
-    parts = re.split(r'(?:\n+)|(?<=[.!?])\s+', txt)
-    out = []
-    remainder_start = 0
-    for i, p in enumerate(parts):
-        if p.strip():
-            out.append(p.strip())
-        if len(out) >= 2:
-            remainder_start = i + 1
-            break
-    head = " ".join(out).strip()
-    tail = " ".join(parts[remainder_start:]).strip() if remainder_start < len(parts) else ""
-    return head, tail
-
-def _chips(labels: List[str], key_prefix: str) -> Optional[str]:
-    """Render non-submitting suggestion chips. Returns clicked label (persisted) or None."""
-    state_key = f"{key_prefix}_clicked"
-    if state_key not in st.session_state:
-        st.session_state[state_key] = None
-    with st.container():
-        cols = st.columns(len(labels))
-        for i, label in enumerate(labels):
-            if cols[i].button(label, key=f"{key_prefix}_chip_{i}"):
-                st.session_state[state_key] = label
-        return st.session_state.get(state_key)
-
-
-def _render_card(title: Optional[str], body: str, more: Optional[str], chips: List[str], variant: str, why: Optional[str] = None, key: str = "card"):
-    with st.container():
-        st.markdown('<div class="cards-wrap">', unsafe_allow_html=True)
-        # Title + body
-        st.markdown(f'<div class="card {variant}">', unsafe_allow_html=True)
-        if title:
-            st.markdown(f'<div class="title">{title}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="body">{body}</div>', unsafe_allow_html=True)
-
-        # Why? expander (Decline card)
-        if why is not None and variant == "decline":
-            with st.expander("Why?"):
-                st.markdown(why)
-
-        # Show more (progressive disclosure)
-        if more:
-            with st.expander("Show more"):
-                st.markdown(more)
-
-        # Chips + hint (non-submitting)
-        if chips:
-            clicked = _chips(chips, key_prefix=f"{key}_chips")
-            if clicked:
-                st.caption(f"Suggestion: {clicked}")
-        st.markdown("</div>", unsafe_allow_html=True)  # end .card
-        st.markdown("</div>", unsafe_allow_html=True)  # end .cards-wrap
-
-def render_reply_card(text: str, key: str = "reply"):
-    head, tail = _excerpt_2_lines(text)
-    body = head if head else "Here’s the short answer. Want the ‘why’ next?"
-    _render_card(
-        title=None,
-        body=body,
-        more=tail,
-        chips=["Break it down", "Example"],
-        variant="",
-        key=key,
-    )
-
-def render_decline_card(text: str, key: str = "decline"):
-    head, tail = _excerpt_2_lines(text)
-    _render_card(
-        title="I can’t help with that topic",
-        body="I can help with study skills or another subject.",
-        more=tail,
-        chips=["Study skills", "Switch subject", "Why?"],
-        variant="decline",
-        why=head or text.split("\n")[0][:200],
-        key=key,
-    )
-
-def render_crisis_card(text: str, key: str = "crisis"):
-    head, tail = _excerpt_2_lines(text)
-    _render_card(
-        title="I’m really sorry you’re going through this",
-        body=head or text.split("\n")[0][:200],
-        more=tail,
-        chips=["Grounding exercise", "Talk about it"],
-        variant="crisis",
-        key=key,
-    )
-
-def render_banner_card(text: str, key: str = "banner"):
-    # short banner; keep details under show more
-    head, tail = _excerpt_2_lines(text)
-    _render_card(
-        title=None,
-        body="I can’t help with unsafe content—even for homework.",
-        more=tail or (head if head else None),
-        chips=["Writing craft tips", "Research ethics", "New topic"],
-        variant="banner",
-        key=key,
-    )
-
-def render_message_card(priority: str, text: str, decline_why: Optional[str] = None, show_more: Optional[str] = None, key: str = "msg"):
-    p = (priority or "").lower()
-    # Map priorities to variants
-    if p in ("crisis", "crisis_return", "immediate_termination", "post_crisis_support"):
-        render_crisis_card(text, key=f"{key}_crisis")
-    elif p == "safety":
-        render_decline_card(text, key=f"{key}_decline")
-    elif p == "manipulation":
-        render_banner_card(text, key=f"{key}_banner")
-    elif p in ("subject_restricted", "educational_boundary"):
-        render_decline_card(text, key=f"{key}_decline")
-    else:
-        render_reply_card(text, key=f"{key}_reply")
-
-
 # =============================================================================
 # MEMORY MANAGEMENT & CONVERSATION MONITORING (polished, no behavior change)
 # =============================================================================
@@ -2918,7 +2716,7 @@ def detect_priority_smart_with_safety(message: str) -> Tuple[str, str, Optional[
 
     # STEP 0.5: SUICIDE NOTE DETECTION (critical - catches gradual escalation)
     if detect_suicide_note_request(msg_norm):
-        return 'safety', 'BLOCKED_HARMFUL', 'suicide_note_request'
+        return 'crisis', 'BLOCKED_HARMFUL', 'suicide_note_request'
 
     # 0) 🔥 EXPLICIT crisis check – absolutely first
     if has_explicit_crisis_language(message_lower):
@@ -3191,28 +2989,34 @@ Please consider talking to:
 I'm here to listen and support you too. Can you tell me more about what's been happening? 💙"""
 
 def emergency_intervention(message, safety_type, student_age, student_name=""):
-    """Enhanced emergency intervention with age-appropriate crisis response (no hotlines in beta)."""
+    """Enhanced emergency intervention with age-appropriate crisis response"""
     name_part = f"{student_name}, " if student_name else ""
-
+    resources = get_crisis_resources()
+    
     if student_age <= 11:  # Elementary
-        return f"""🚨 {name_part}I'm very worried about what you're saying.
+        return f"""🚨 {name_part}I'm very worried about what you're saying. 
 
 Please find a grown-up RIGHT NOW:
-• Your mom, dad, or a caregiver
-• Your teacher or the school counselor
+• Your mom, dad, or family
+• Your teacher
+• Call {resources['emergency']} if you're in danger
 
 You are loved and important. Please get help right away.
 
-Tell a grown-up exactly what you told me so they can help you."""
+Tell a grown-up what you said to me. They will help you."""
+    
     else:  # Middle & High School
         return f"""🚨 {name_part}I'm extremely concerned about what you're saying. Your safety is the most important thing.
 
 Please get help IMMEDIATELY:
-• Tell a trusted adult right now — don’t wait
-• If you’re at school: counselor, teacher, or another staff member
-• If you’re at home: a parent, caregiver, or another trusted adult
+• Call {resources['crisis_line']} right now
+• {resources['text_line']}
+• Call {resources['emergency']} if you're in immediate danger
+• Tell a trusted adult immediately
 
-You don’t have to go through this alone. Please reach out for help right now."""
+You don't have to go through this alone. There are people who want to help you.
+
+Please reach out for help right now."""
 
 def generate_response_with_memory_safety(message, priority, tool, student_age=10, is_distressed=False, safety_type=None, trigger=None):
     """Generate AI responses with ALL fixes applied including beta subject restrictions"""
@@ -3380,14 +3184,6 @@ Please come back when you're ready to be respectful and learn together positivel
     elif priority == 'safety':
         st.session_state.harmful_request_count += 1
         st.session_state.safety_interventions += 1
-        if (trigger or '').lower() == 'suicide_note_request':
-            # Decline copy for suicide-note requests (no hotlines; offer safe alternatives)
-            decline = (
-                "I can’t help create or edit suicide notes—even for fiction. "
-                "If you’re writing about a character in crisis, I can help with writing craft instead: "
-                "building backstory and stressors, showing warning signs responsibly, framing a scene that leads to support/interruptions, and depicting recovery without glamorizing harm."
-            )
-            return decline, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
         response = emergency_intervention(message, safety_type, student_age, st.session_state.student_name)
         return response, "🛡️ Lumii's Safety Response", "safety", "⚠️ Safety First"
     
@@ -3592,84 +3388,80 @@ with st.sidebar:
     
     # Tool explanations with beta subject focus
     st.subheader("🛠️ How I Help You (Beta)")
-    st.caption('Math • Physics • Chemistry • Geography • History • Study Skills')
-    with st.expander('Details', expanded=False):
-        st.markdown("""
-        **🛡️ Safety First** - I'll always protect you from harmful content
+    st.markdown("""
+    **🛡️ Safety First** - I'll always protect you from harmful content
     
-        **🎯 Beta Subject Focus** - I specialize in:
-        • **Math:** Algebra, geometry, calculus, word problems
-        • **Physics:** Mechanics, electricity, thermodynamics 
-        • **Chemistry:** Reactions, periodic table, molecules
-        • **Geography:** Maps, countries, physical geography
-        • **History:** World history, historical events, timelines
-        • **Study Skills:** Organization, test prep, homework help
+    **🎯 Beta Subject Focus** - I specialize in:
+    • **Math:** Algebra, geometry, calculus, word problems
+    • **Physics:** Mechanics, electricity, thermodynamics 
+    • **Chemistry:** Reactions, periodic table, molecules
+    • **Geography:** Maps, countries, physical geography
+    • **History:** World history, historical events, timelines
+    • **Study Skills:** Organization, test prep, homework help
     
-        **📖 Other Subjects** - For English, Biology, Social Studies, Health, Art, Music, etc., please ask your parents, teachers, or school counselors
+    **📖 Other Subjects** - For English, Biology, Social Studies, Health, Art, Music, etc., please ask your parents, teachers, or school counselors
     
-        **🤝 Respectful Learning** - I expect kind, respectful communication
+    **🤝 Respectful Learning** - I expect kind, respectful communication
     
-        **💙 Emotional Support** - When you're feeling stressed, frustrated, or overwhelmed about school
+    **💙 Emotional Support** - When you're feeling stressed, frustrated, or overwhelmed about school
     
-        **🤔 Confusion Help** - When you're genuinely confused about any of my beta topics
+    **🤔 Confusion Help** - When you're genuinely confused about any of my beta topics
     
-        *I remember our conversation, keep you safe, and focus on my specialty subjects!*
-        """)
+    *I remember our conversation, keep you safe, and focus on my specialty subjects!*
+    """)
     
-        # Beta: neutral help banner (no numbers, no links)
-        st.subheader("💙 If You Need Help")
-        st.markdown(
-            "**Talk to a trusted adult right now** — a parent/caregiver, teacher, or school counselor."
-        )
+    # Beta: neutral help banner (no numbers, no links)
+    st.subheader("💙 If You Need Help")
+    st.markdown(
+        "**Talk to a trusted adult right now** — a parent/caregiver, teacher, or school counselor."
+    )
     
-        # API Status with enhanced monitoring
-        st.subheader("🤖 AI Status")
-        try:
-            api_key = st.secrets["GROQ_API_KEY"]
-            if st.session_state.memory_safe_mode:
-                st.warning("⚠️ Memory Safe Mode Active")
-            else:
-                st.success("✅ Smart AI with Safety Active")
-            st.caption("Full safety protocols enabled")
-        except:
-            st.error("❌ API Configuration Missing")
+    # API Status with enhanced monitoring
+    st.subheader("🤖 AI Status")
+    try:
+        api_key = st.secrets["GROQ_API_KEY"]
+        if st.session_state.memory_safe_mode:
+            st.warning("⚠️ Memory Safe Mode Active")
+        else:
+            st.success("✅ Smart AI with Safety Active")
+        st.caption("Full safety protocols enabled")
+    except:
+        st.error("❌ API Configuration Missing")
 
 # Main header
 st.markdown('<h1 class="main-header">🎓 My Friend Lumii</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Your safe AI Math, Physics, Chemistry, Geography & History tutor! 🛡️💙</p>', unsafe_allow_html=True)
 
-if len(st.session_state.messages) == 0:
-    with st.expander('About & Safety', expanded=False):
-        st.info("""
-        🎯 **Beta Subject Focus:** Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
-        
-        🛡️ **Safety First:** I will never help with anything that could hurt you or others
-        
-        🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
-        
-        📚 **What I Can Help With:**
-        • **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
-        • **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
-        • **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
-        • **Geography:** Physical geography, world geography, maps, countries, continents
-        • **History:** World history, historical events, timelines, historical analysis
-        • **Study Skills:** Organization, test prep, note-taking, homework strategies
-        
-        📖 **What I Can't Help With (Ask Parents/Teachers):**
-        • English/Literature • Biology/Life Science • Social Studies/Civics 
-        • Health/PE • Art/Music • Foreign Languages
-        
-        🤔 **Confusion Help:** If you're confused about my subjects, just tell me! I'll help you understand
-        
-        💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
-        
-        🧠 **I remember:** Your name, age, subjects we've discussed, and our learning journey
-        🎯 **When you're stressed about school** → I provide caring emotional support first  
-        📚 **When you ask questions about my subjects** → I give you helpful answers building on our previous conversations
-        🚨 **When you're in danger** → I'll encourage you to talk to a trusted adult immediately
-        🌟 **Always** → I'm supportive, encouraging, genuinely helpful, protective, and focused on my beta subjects
-        
-        **I'm not just smart - I'm your safe learning companion who remembers, grows with you, and excels in Math, Physics, Chemistry, Geography, and History!** 
+st.info("""
+🎯 **Beta Subject Focus:** Math, Physics, Chemistry, Geography, and History tutoring with enhanced safety
+
+🛡️ **Safety First:** I will never help with anything that could hurt you or others
+
+🤝 **Respectful Learning:** I expect kind communication and will guide you toward better behavior
+
+📚 **What I Can Help With:**
+• **Math:** Algebra, geometry, trigonometry, calculus, word problems, equations
+• **Physics:** Mechanics, electricity, waves, thermodynamics, motion, energy  
+• **Chemistry:** Chemical reactions, periodic table, molecular structure, equations
+• **Geography:** Physical geography, world geography, maps, countries, continents
+• **History:** World history, historical events, timelines, historical analysis
+• **Study Skills:** Organization, test prep, note-taking, homework strategies
+
+📖 **What I Can't Help With (Ask Parents/Teachers):**
+• English/Literature • Biology/Life Science • Social Studies/Civics 
+• Health/PE • Art/Music • Foreign Languages
+
+🤔 **Confusion Help:** If you're confused about my subjects, just tell me! I'll help you understand
+
+💙 **What makes me special?** I'm emotionally intelligent, remember our conversations, and keep you safe! 
+
+🧠 **I remember:** Your name, age, subjects we've discussed, and our learning journey
+🎯 **When you're stressed about school** → I provide caring emotional support first  
+📚 **When you ask questions about my subjects** → I give you helpful answers building on our previous conversations
+🚨 **When you're in danger** → I'll encourage you to talk to a trusted adult immediately
+🌟 **Always** → I'm supportive, encouraging, genuinely helpful, protective, and focused on my beta subjects
+
+**I'm not just smart - I'm your safe learning companion who remembers, grows with you, and excels in Math, Physics, Chemistry, Geography, and History!** 
 """)
 
 # Display chat history with enhanced memory and safety indicators
@@ -3677,13 +3469,54 @@ mem_tag = '<span class="memory-indicator">🧠 With Memory</span>' if should_sho
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         if message["role"] == "assistant" and "priority" in message and "tool_used" in message:
-            render_message_card(
-                priority=message.get("priority", ""),
-                text=message.get("content", ""),
-                key=f"history_{i}"
-            )
+            priority = message["priority"]
+            tool_used = message["tool_used"]
+            
+            if priority == "safety" or priority == "crisis" or priority == "crisis_return" or priority == "immediate_termination":
+                st.markdown(f'<div class="safety-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "manipulation":
+                st.markdown(f'<div class="manipulation-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="manipulation-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "subject_restricted":
+                st.markdown(f'<div class="subject-restriction-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="subject-restriction-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "educational_boundary":
+                st.markdown(f'<div class="educational-boundary-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority in ["behavior", "behavior_final", "behavior_timeout"]:
+                st.markdown(f'<div class="behavior-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
+            elif priority == "post_crisis_support":
+                st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
+            elif priority == "concerning":
+                st.markdown(f'<div class="concerning-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="concerning-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
+            elif priority == "emotional":
+                st.markdown(f'<div class="emotional-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
+            elif priority == "math":
+                st.markdown(f'<div class="math-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
+            elif priority == "organization":
+                st.markdown(f'<div class="organization-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
+            elif priority == "summary":
+                st.info(f"📋 {message['content']}")
+            elif priority == "polite_decline":
+                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">😊 Understanding</span>', unsafe_allow_html=True)
+            elif priority == "confusion":
+                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="general-response">{message["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="friend-badge">{tool_used}</div>{mem_tag}', unsafe_allow_html=True)
         else:
-            st.markdown(message["content"])# Chat input with enhanced safety processing
+            st.markdown(message["content"])
+
+# Chat input with enhanced safety processing
 prompt_placeholder = "What would you like to learn about in math, physics, chemistry, geography, or history today?" if not st.session_state.student_name else f"Hi {st.session_state.student_name}! What beta subject can I help you with today?"
 
 # --- Input gating: crisis lock first, then behavior timeout ---
@@ -3798,14 +3631,36 @@ else:
                     if follow_up and is_appropriate_followup_time(tool_used.lower(), st.session_state.messages):
                         response += follow_up
         
-                    # Display with appropriate styling (cards UI)
-                    render_message_card(
-                        priority=response_priority,
-                        text=response,
-                        key=f"fresh_{st.session_state.get('interaction_count', 0)}"
-                    )
-
-# Add assistant response to chat with enhanced metadata (non-crisis only)
+                    # Display with appropriate styling
+                    if response_priority == "safety":
+                        st.markdown(f'<div class="safety-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="safety-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "manipulation":
+                        st.markdown(f'<div class="manipulation-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="manipulation-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "subject_restricted":
+                        st.markdown(f'<div class="subject-restriction-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="subject-restriction-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "educational_boundary":
+                        st.markdown(f'<div class="educational-boundary-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="educational-boundary-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority in ["behavior", "behavior_final", "behavior_timeout"]:
+                        st.markdown(f'<div class="behavior-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="behavior-badge">{tool_used}</div>', unsafe_allow_html=True)
+                    elif response_priority == "post_crisis_support":
+                        st.markdown(f'<div class="emotional-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤗 Post-Crisis Care</span>', unsafe_allow_html=True)
+                    elif response_priority == "concerning":
+                        st.markdown(f'<div class="concerning-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="concerning-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+                    elif response_priority == "confusion":
+                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div><span class="memory-indicator">🤔 Helping with Confusion</span>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="general-response">{response}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="friend-badge">{tool_used}</div>{memory_status}', unsafe_allow_html=True)
+        
+            # Add assistant response to chat with enhanced metadata (non-crisis only)
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": response,
